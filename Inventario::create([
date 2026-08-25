@@ -1,0 +1,16 @@
+[90m= [39m[34;4mApp\Models\Inventario[39;24m {#8779
+    [34mmodelo[39m: [32m"[39m[32mLaptop Dell XPS 13[39m[32m"[39m,
+    [34mdescripcion[39m: [32m"[39m[32mLaptop de alta gama con procesador Intel i7[39m[32m"[39m,
+    [34mmarca[39m: [32m"[39m[32mDell[39m[32m"[39m,
+    [34mcategoria[39m: [32m"[39m[32mHardware[39m[32m"[39m,
+    [34mexistencia[39m: [35m5[39m,
+    [34malmacen[39m: [32m"[39m[32mBodega Central[39m[32m"[39m,
+    [34mapea[39m: [32m"[39m[32mAPE-001[39m[32m"[39m,
+    [34mfecha_modificacion[39m: [34;4mIlluminate\Support\Carbon @1787027378[39;24m {#8591
+      [34mdate[39m: [36m2026-08-18 04:29:38.807751 UTC (+00:00)[39m,
+    },
+    [34mmodificado_por[39m: [32m"[39m[32madmin[39m[32m"[39m,
+    [34mupdated_at[39m: [32m"[39m[32m2026-08-18 04:29:38[39m[32m"[39m,
+    [34mcreated_at[39m: [32m"[39m[32m2026-08-18 04:29:38[39m[32m"[39m,
+    [34mid[39m: [35m1[39m,
+  }
