@@ -19,12 +19,11 @@ class UsuarioController extends Controller
         return null;
     }
 
-    public function index()
-    {
-        if ($redir = $this->verificarAdmin()) return $redir;
-        $usuarios = Usuario::with('rol')->get();
-        return view('usuarios.index', compact('usuarios'));
-    }
+   public function index()
+{
+    $usuarios = Usuario::all(); // o con orden, filtros, etc.
+    return view('usuarios.index', compact('usuarios'));
+}
 
     public function create()
     {

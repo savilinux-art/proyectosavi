@@ -50,17 +50,16 @@
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-striped" id="usuariosTable">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Usuario</th>
-                        <th>Nombre</th>
-                        <th>Telegram chat id</th>
-                        <th>Correo</th>
-                        <th>Rol</th>
-                        <th>Fecha Creación</th>
-                        <th>Acciones</th>
-                    </tr>
+               <thead>
+                <tr>
+                     <th>ID</th>
+                    <th>Usuario</th>
+                    <th>Nombre</th>
+                    <th>Correo</th>
+                    <th>Rol</th>
+                    <th>Telegram Chat ID</th>   <!-- Nueva columna -->
+                     <th>Acciones</th>
+                </tr>
                 </thead>
                 <tbody>
                     @foreach($usuarios as $usuario)
@@ -132,3 +131,17 @@
     });
 </script>
 @endpush
+
+ @foreach($usuarios as $usuario)
+    <tr>
+        <td>{{ $usuario->id }}</td>
+        <td>{{ $usuario->usuario }}</td>
+        <td>{{ $usuario->nombre }}</td>
+        <td>{{ $usuario->correo }}</td>
+        <td>{{ $usuario->rol }}</td>
+        <td>{{ $usuario->telegram_chat_id ?? 'No registrado' }}</td>
+        <td>
+            <!-- Botones de acción -->
+        </td>
+    </tr>
+    @endforeach
