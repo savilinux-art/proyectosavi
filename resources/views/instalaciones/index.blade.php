@@ -18,6 +18,9 @@
                 <td>{{ $instalacion->fecha_hora_fin ? \Carbon\Carbon::parse($instalacion->fecha_hora_fin)->format('d/m/Y H:i') : 'Pendiente' }}</td>
                 <td><span class="badge bg-{{ $instalacion->estatus_instalacion == 'entrega' ? 'success' : ($instalacion->estatus_instalacion == 'pruebas' ? 'warning' : ($instalacion->estatus_instalacion == 'programacion' ? 'info' : 'primary')) }}">{{ ucfirst($instalacion->estatus_instalacion ?? 'N/A') }}</span></td>
                 <td>
+                <th>Ubicación Inicio</th>
+                <th>Ubicación Fin</th>
+
                     <div class="btn-group">
                         <a href="{{ route('instalaciones.show', $instalacion->id) }}" class="btn btn-sm btn-info"><i class="bi bi-eye"></i></a>
                         <a href="{{ route('instalaciones.edit', $instalacion->id) }}" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i></a>
@@ -25,6 +28,34 @@
                     </div>
                 </td>
             </tr>
+            <td>
+    @php
+        $ubicacionInicio = $instalacion->ubicaciones->where('tipo', 'inicio')->first();
+    @endphp
+    @if($ubicacionInicio)
+        <a href="https://www.google.com/maps?q={{ $ubicacionInicio->latitud }},{{ $ubicacionInicio->longitud }}" target="_blank">
+            Ver mapa
+        </a>
+        <br>
+        <small>{{ \Carbon\Carbon::parse($ubicacionInicio->fecha_hora)->format('d/m/Y H:i') }}</small>
+    @else
+        <span class="text-muted">Sin registrar</span>
+    @endif
+</td>
+<td>
+    @php
+        $ubicacionFin = $instalacion->ubicaciones->where('tipo', 'fin')->first();
+    @endphp
+    @if($ubicacionFin)
+        <a href="https://www.google.com/maps?q={{ $ubicacionFin->latitud }},{{ $ubicacionFin->longitud }}" target="_blank">
+            Ver mapa
+        </a>
+        <br>
+        <small>{{ \Carbon\Carbon::parse($ubicacionFin->fecha_hora)->format('d/m/Y H:i') }}</small>
+    @else
+        <span class="text-muted">Sin registrar</span>
+    @endif
+</td>
             @endforeach
         </tbody>
     </table>

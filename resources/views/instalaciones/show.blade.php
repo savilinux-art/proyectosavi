@@ -17,6 +17,7 @@
                 <tr><th>Fecha Fin</th><td>{{ $instalacion->fecha_hora_fin ? \Carbon\Carbon::parse($instalacion->fecha_hora_fin)->format('d/m/Y H:i:s') : 'Pendiente' }}</td></tr>
                 <tr><th>Estatus</th><td><span class="badge bg-{{ $instalacion->estatus_instalacion == 'entrega' ? 'success' : ($instalacion->estatus_instalacion == 'pruebas' ? 'warning' : 'primary') }}">{{ ucfirst($instalacion->estatus_instalacion ?? 'N/A') }}</span></td></tr>
                 <tr><th>Checklist</th><td>@if($instalacion->check_list && count($instalacion->check_list)>0)@foreach($instalacion->check_list as $item)<span class="badge bg-success me-1">✓ {{ str_replace('_', ' ', ucfirst($item)) }}</span>@endforeach@else<span class="text-muted">No hay items</span>@endif</td></tr>
+              
             </table>
         </div></div>
     </div>
@@ -31,4 +32,35 @@
         </div></div>
     </div>
 </div>
+<h3 class="mt-4">📍 Ubicaciones registradas</h3>
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Instalador</th>
+            <th>Tipo</th>
+            <th>Fecha/Hora</th>
+            <th>Ubicación</th>
+        </tr>
+    </thead>
+    <tbody>
+        @forelse($instalacion->ubicaciones->sortBy('fecha_hora') as $ubicacion)
+        <tr>
+            <td>{{ $ubicacion->usuario->nombre ?? 'N/A' }}</td>
+            <td>
+                <span class="badge {{ $ubicacion->tipo == 'inicio' ? 'bg-success' : 'bg-danger' }}">
+                    {{ ucfirst($ubicacion->tipo) }}
+                </span>
+            </td>
+            <td>{{ \Carbon\Carbon::parse($ubicacion->fecha_hora)->format('d/m/Y H:i:s') }}</td>
+            <td>
+                <a href="https://www.google.com/maps?q={{ $ubicacion->latitud }},{{ $ubicacion->longitud }}" target="_blank">
+                    <i class="bi bi-geo-alt"></i> Ver en mapa
+                </a>
+            </td>
+        </tr>
+        @empty
+        <tr><td colspan="4" class="text-center text-muted">No hay ubicaciones registradas para esta instalación.</td></tr>
+        @endforelse
+    </tbody>
+</table>
 @endsection

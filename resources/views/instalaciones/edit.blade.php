@@ -10,6 +10,19 @@
                 <div class="col-md-6 mb-3"><label for="nombre_proyecto" class="form-label">Proyecto *</label><select class="form-select @error('nombre_proyecto') is-invalid @enderror" id="nombre_proyecto" name="nombre_proyecto" required>@foreach($proyectos as $p)<option value="{{ $p->nombre_proyecto }}" {{ old('nombre_proyecto', $instalacion->nombre_proyecto)==$p->nombre_proyecto?'selected':'' }}>{{ $p->nombre_proyecto }}</option>@endforeach</select>@error('nombre_proyecto')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                 <div class="col-md-6 mb-3"><label for="estatus_instalacion" class="form-label">Estatus *</label><select class="form-select @error('estatus_instalacion') is-invalid @enderror" id="estatus_instalacion" name="estatus_instalacion" required>@foreach($estatus as $e)<option value="{{ $e }}" {{ old('estatus_instalacion', $instalacion->estatus_instalacion)==$e?'selected':'' }}>{{ ucfirst($e) }}</option>@endforeach</select>@error('estatus_instalacion')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
             </div>
+<div class="mb-3">
+    <label for="instaladores" class="form-label">Instaladores asignados</label>
+    <select name="instaladores[]" id="instaladores" class="form-control" multiple>
+        @foreach($instaladores as $instalador)
+            <option value="{{ $instalador->id }}" 
+                {{ isset($instalacion) && $instalacion->instaladores->contains($instalador->id) ? 'selected' : '' }}>
+                {{ $instalador->nombre }} ({{ $instalador->usuario }})
+            </option>
+        @endforeach
+    </select>
+    <small class="text-muted">Selecciona uno o varios instaladores. Presiona Ctrl (Cmd en Mac) para selección múltiple.</small>
+</div>
+
             <div class="row">
                 <div class="col-md-6 mb-3"><label for="fecha_hora_inicio" class="form-label">Fecha Inicio *</label><input type="datetime-local" class="form-control @error('fecha_hora_inicio') is-invalid @enderror" id="fecha_hora_inicio" name="fecha_hora_inicio" value="{{ old('fecha_hora_inicio', date('Y-m-d\TH:i', strtotime($instalacion->fecha_hora_inicio))) }}" required>@error('fecha_hora_inicio')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                 <div class="col-md-6 mb-3"><label for="fecha_hora_fin" class="form-label">Fecha Fin</label><input type="datetime-local" class="form-control @error('fecha_hora_fin') is-invalid @enderror" id="fecha_hora_fin" name="fecha_hora_fin" value="{{ old('fecha_hora_fin', $instalacion->fecha_hora_fin ? date('Y-m-d\TH:i', strtotime($instalacion->fecha_hora_fin)) : '') }}">@error('fecha_hora_fin')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>

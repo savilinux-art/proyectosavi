@@ -22,7 +22,7 @@ class UsuarioController extends Controller
     public function index()
     {
         if ($redir = $this->verificarAdmin()) return $redir;
-        $usuarios = Usuario::with('role')->get();
+        $usuarios = Usuario::with('rol')->get();
         return view('usuarios.index', compact('usuarios'));
     }
 

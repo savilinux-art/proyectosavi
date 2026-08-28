@@ -2,41 +2,22 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Model;
+use App\Models\Instalacion;
 
-class Usuario extends Authenticatable
+class Usuario extends Model
 {
-    use HasApiTokens, HasFactory, Notifiable;
-
     protected $table = 'usuarios';
-    protected $primaryKey = 'usuario';
-    public $incrementing = false;
-    protected $keyType = 'string';
+    protected $primaryKey = 'id';
+    public $timestamps = true;
 
     protected $fillable = [
-        'usuario', 
-        'nombre', 
-        'correo', 
-        'contraseña', 
-        'rol'
+        'usuario', 'nombre', 'correo', 'telegram_chat_id',
+        'contraseña', 'rol'
     ];
 
-    protected $hidden = [
-        'contraseña',
-        'remember_token',
-    ];
-
-    // Relación con el rol
-    public function role()
-    {
-        return $this->belongsTo(Rol::class, 'rol', 'rol');
-    }
-
-    // Relación muchos a muchos con instalaciones (como instalador)
-    public function instalacionesAsignadas()
+    // Relación inversa con instalaciones (a través de pivote)
+    public function instalaciones()
     {
         return $this->belongsToMany(
             Instalacion::class,
@@ -45,39 +26,13 @@ class Usuario extends Authenticatable
             'instalacion_id',
             'usuario',
             'id'
-        )->withTimestamps();
+        );
     }
 
-    // Relación con ventas (como vendedor)
-    public function ventas()
+    // Ubicaciones del usuario
+    public function ubicaciones()
     {
-        return $this->hasMany(Venta::class, 'vendedor', 'usuario');
+        return $this->hasMany(UbicacionUsuario::class);
     }
-
-    // Relación con proyectos (como modificador)
-    public function proyectosModificados()
-    {
-        return $this->hasMany(Proyecto::class, 'modificado_por', 'usuario');
-    }
-
-    // Relación con inventario (como modificador)
-    public function inventarioModificado()
-    {
-        return $this->hasMany(Inventario::class, 'modificado_por', 'usuario');
-    }
-
-    // Relación con notificaciones
-    public function notificaciones()
-    {
-        return $this->hasMany(Notificacion::class, 'usuario_id', 'usuario');
-    }
-
-    // Método para verificar permisos
-    public function hasPermiso($slug)
-{
-    if ($this->rol === 'Administrador') {
-        return true;
-    }
-    return $this->role && $this->role->permisos()->where('slug', $slug)->exists();
-}
+  
 }

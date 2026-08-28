@@ -26,16 +26,15 @@ class AsignacionInstalacionController extends Controller
         ->get();
 
     $instaladores = Usuario::where('rol', 'Instalador')
-        ->withCount(['instalacionesAsignadas' => function($query) {
+        ->withCount(['instalaciones' => function($query) {
             $query->whereIn('estatus_instalacion', ['preparacion', 'en_proceso', 'programacion', 'pruebas']);
         }])
         ->get();
 
-    // 🔥 Agregar esta variable
     $estadisticas = [
         'total_pendientes' => $instalacionesPendientes->count(),
-        'instaladores_activos' => $instaladores->where('instalaciones_asignadas_count', '>', 0)->count(),
-        'instaladores_disponibles' => $instaladores->where('instalaciones_asignadas_count', 0)->count(),
+        'instaladores_activos' => $instaladores->where('instalaciones_count', '>', 0)->count(),
+        'instaladores_disponibles' => $instaladores->where('instalaciones_count', 0)->count(),
     ];
 
     return view('asignaciones.index', compact('instalacionesPendientes', 'instaladores', 'estadisticas'));
@@ -45,25 +44,25 @@ class AsignacionInstalacionController extends Controller
      * Show the form for creating a new resource.
      */
     public function create()
-    {
-        if (Session::get('user_rol') !== 'Administrador') {
-            return redirect()->route('dashboard')->with('error', 'No tienes permisos para acceder a este módulo');
-        }
-
-        $instalacionesDisponibles = Instalacion::whereDoesntHave('instaladores')
-            ->whereIn('estatus_instalacion', ['preparacion', 'en_proceso', 'programacion'])
-            ->with(['proyecto'])
-            ->get();
-
-        $instaladores = Usuario::where('rol', 'Instalador')
-            ->withCount(['instalacionesAsignadas' => function($query) {
-                $query->whereIn('estatus_instalacion', ['preparacion', 'en_proceso', 'programacion', 'pruebas']);
-            }])
-            ->orderBy('instalaciones_asignadas_count')
-            ->get();
-
-        return view('asignaciones.create', compact('instalacionesDisponibles', 'instaladores'));
+{
+    if (Session::get('user_rol') !== 'Administrador') {
+        return redirect()->route('dashboard')->with('error', 'No tienes permisos para acceder a este módulo');
     }
+
+    $instalacionesDisponibles = Instalacion::whereDoesntHave('instaladores')
+        ->whereIn('estatus_instalacion', ['preparacion', 'en_proceso', 'programacion'])
+        ->with(['proyecto'])
+        ->get();
+
+    $instaladores = Usuario::where('rol', 'Instalador')
+        ->withCount(['instalaciones' => function($query) {
+            $query->whereIn('estatus_instalacion', ['preparacion', 'en_proceso', 'programacion', 'pruebas']);
+        }])
+        ->orderBy('instalaciones_count')
+        ->get();
+
+    return view('asignaciones.create', compact('instalacionesDisponibles', 'instaladores'));
+}
 
     /**
      * Store a newly created resource in storage.

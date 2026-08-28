@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ClienteController;
 use App\Http\Controllers\Api\ProyectoController;
 use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\TelegramWebhookController;
 
 /*
 |--------------------------------------------------------------------------
@@ -57,6 +58,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/instalaciones/{id}/evidencia', [InstalacionController::class, 'uploadEvidence']);
     Route::post('/instalaciones/{id}/checklist', [InstalacionController::class, 'updateChecklist']);
     
+   
+    // Telegram Webhook
+    Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle'])
+    ->name('telegram.webhook');
+
     // Clientes
     Route::get('/clientes', [ClienteController::class, 'index']);
     Route::get('/clientes/{id}', [ClienteController::class, 'show']);

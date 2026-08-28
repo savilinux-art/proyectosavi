@@ -108,7 +108,11 @@ Route::middleware(['auth.session'])->group(function () {
 });
 
 // Telegram Location
- Route::get('/enviar-ubicacion/{user}', [TelegramLocationController::class, 'sendLocationRequest'])->name('enviar.ubicacion');
+Route::post('/telegram/send-location/start/{id}', [TelegramLocationController::class, 'sendStartLocation'])
+    ->name('telegram.send-start');
+
+Route::post('/telegram/send-location/end/{id}', [TelegramLocationController::class, 'sendEndLocation'])
+    ->name('telegram.send-end');
 
 
 // Salidas y Devoluciones
