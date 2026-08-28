@@ -43,11 +43,21 @@ class InstalacionController extends Controller
 
 public function store(Request $request, TelegramService $telegramService)
 {
+   
+
+    // Convertir a array si llega como string
+    if ($request->has('instaladores') && is_string($request->instaladores)) {
+        $request->merge([
+            'instaladores' => explode(',', $request->instaladores)
+        ]);
+    }
+
     $validated = $request->validate([
         'nombre_proyecto' => 'required|exists:ventas,nombre_proyecto',
         'fecha_hora_inicio' => 'required|date',
         'estatus_instalacion' => 'required|exists:estatus,estatus',
-        'instaladores' => 'array|exists:usuarios,id',
+        'instaladores' => 'required|array|min:1',
+        'instaladores.*' => 'exists:usuarios,id',
     ]);
 
     $instalacion = Instalacion::create($validated);

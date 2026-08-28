@@ -30,6 +30,18 @@ return [
     |                       Acme\Project\Commands\BotFather\ByeCommand::class,
     |             ]
     */
+
+
+/*
+    |--------------------------------------------------------------------------
+    | Token del bot (para acceso rápido)
+    |--------------------------------------------------------------------------
+    */
+    'bot_token' => env('TELEGRAM_BOT_TOKEN'), // <-- Agrega esta línea
+
+
+
+
     'bots' => [
         'mybot' => [
             'token' => env('TELEGRAM_BOT_TOKEN', 'YOUR-BOT-TOKEN'),

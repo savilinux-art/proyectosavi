@@ -3,10 +3,9 @@
 namespace App\Services;
 
 use Telegram\Bot\Api;
-use Telegram\Bot\Objects\Keyboard;
-use Telegram\Bot\Objects\KeyboardButton;
-use Telegram\Bot\Objects\InlineKeyboardButton;
-use Telegram\Bot\Objects\InlineKeyboardMarkup;
+use Telegram\Bot\Keyboard\Keyboard;
+use Telegram\Bot\Keyboard\InlineKeyboardButton;
+use Telegram\Bot\Keyboard\InlineKeyboardMarkup;
 use App\Models\Usuario;
 use App\Models\Instalacion;
 use App\Models\UbicacionUsuario;
@@ -19,7 +18,11 @@ class TelegramService
 
     public function __construct()
     {
-        $this->telegram = new Api(config('telegram.bot_token'));
+        $token = config('telegram.bot_token');
+        if (empty($token)) {
+            throw new \Exception('Token de Telegram no configurado. Agrega TELEGRAM_BOT_TOKEN en .env');
+        }
+        $this->telegram = new Api($token);
     }
 
     /**
@@ -37,18 +40,18 @@ class TelegramService
                  "📍 Dirección: {$instalacion->ubicacion_actual}\n\n" .
                  "Selecciona una opción para reportar tu ubicación:";
 
-        $inlineKeyboard = new InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton::make([
+        $inlineKeyboard = Keyboard::make()
+            ->inline()
+            ->row([
+                Keyboard::inlineButton([
                     'text' => '▶️ Iniciar Jornada',
-                    'callback_data' => "inicio|{$instalacion->id}"
+                    'callback_data' => "inicio|{$instalacion->id}",
                 ]),
-                InlineKeyboardButton::make([
+                Keyboard::inlineButton([
                     'text' => '⏹️ Finalizar Jornada',
-                    'callback_data' => "fin|{$instalacion->id}"
+                    'callback_data' => "fin|{$instalacion->id}",
                 ]),
-            ]
-        ]);
+            ]);
 
         $this->telegram->sendMessage([
             'chat_id' => $instalador->telegram_chat_id,
@@ -61,7 +64,7 @@ class TelegramService
     /**
      * Maneja el callback de los botones (Iniciar/Finalizar)
      */
-    public function handleCallbackQuery($callbackQuery): void
+    public function handleCallbackQuery(array $callbackQuery): void
     {
         $data = $callbackQuery['data'] ?? '';
         $chatId = $callbackQuery['message']['chat']['id'];
@@ -82,7 +85,7 @@ class TelegramService
             return;
         }
 
-        // Verificar que sea instalador de esa instalación (usando relación de la pivote)
+        // Verificar que sea instalador de esa instalación
         $instalacion = Instalacion::find($instalacionId);
         if (!$instalacion || !$instalacion->instaladores->contains($usuario)) {
             $this->sendMessage($chatId, '❌ No tienes permiso para esta instalación.');
@@ -98,7 +101,7 @@ class TelegramService
         ]);
 
         // Pedir ubicación
-        $locationButton = KeyboardButton::make([
+        $locationButton = Keyboard::button([
             'text' => '📍 Compartir mi ubicación',
             'request_location' => true,
         ]);
