@@ -64,65 +64,40 @@ class TelegramService
     /**
      * Maneja el callback de los botones (Iniciar/Finalizar)
      */
-    public function handleCallbackQuery(array $callbackQuery): void
-    {
-        $data = $callbackQuery['data'] ?? '';
-        $chatId = $callbackQuery['message']['chat']['id'];
-        $messageId = $callbackQuery['message']['message_id'];
+   public function handleCallbackQuery($callbackQuery): void
+{
+    // ... código existente ...
 
-        // Eliminar mensaje anterior con botones
-        $this->telegram->deleteMessage([
-            'chat_id' => $chatId,
-            'message_id' => $messageId,
-        ]);
-
-        list($tipo, $instalacionId) = explode('|', $data);
-
-        // Buscar usuario por chat_id
-        $usuario = Usuario::where('telegram_chat_id', $chatId)->first();
-        if (!$usuario) {
-            $this->sendMessage($chatId, '❌ No estás registrado.');
-            return;
-        }
-
-        // Verificar que sea instalador de esa instalación
-        $instalacion = Instalacion::find($instalacionId);
-        if (!$instalacion || !$instalacion->instaladores->contains($usuario)) {
-            $this->sendMessage($chatId, '❌ No tienes permiso para esta instalación.');
-            return;
-        }
-
-        // Guardar solicitud pendiente
-        SolicitudUbicacion::create([
-            'usuario_id' => $usuario->id,
-            'chat_id' => $chatId,
-            'tipo' => $tipo,
-            'instalacion_id' => $instalacionId,
-        ]);
-
-        // Pedir ubicación
-        $locationButton = Keyboard::button([
-            'text' => '📍 Compartir mi ubicación',
-            'request_location' => true,
-        ]);
-
-        $keyboard = Keyboard::make([
-            'keyboard' => [[$locationButton]],
-            'resize_keyboard' => true,
-            'one_time_keyboard' => true,
-        ]);
-
-        $texto = $tipo === 'inicio'
-            ? "🟢 Para *iniciar* la jornada, comparte tu ubicación actual."
-            : "🔴 Para *finalizar* la jornada, comparte tu ubicación actual.";
-
-        $this->telegram->sendMessage([
-            'chat_id' => $chatId,
-            'text' => $texto,
-            'reply_markup' => $keyboard,
-            'parse_mode' => 'Markdown',
-        ]);
+    // Verificar que sea instalador de esa instalación
+    $instalacion = Instalacion::find($instalacionId);
+    if (!$instalacion || !$instalacion->instaladores->contains($usuario)) {
+        $this->sendMessage($chatId, '❌ No tienes permiso para esta instalación.');
+        return;
     }
+
+    // 🔥 Control de jornada: solo permitir "Finalizar" si existe un "Inicio" previo
+    if ($tipo === 'fin') {
+        $inicioExistente = UbicacionUsuario::where('usuario_id', $usuario->id)
+            ->where('instalacion_id', $instalacionId)
+            ->where('tipo', 'inicio')
+            ->exists();
+
+        if (!$inicioExistente) {
+            $this->sendMessage($chatId, '❌ No puedes finalizar sin haber iniciado la jornada primero.');
+            return;
+        }
+    }
+
+    // Guardar solicitud pendiente
+    SolicitudUbicacion::create([
+        'usuario_id' => $usuario->id,
+        'chat_id' => $chatId,
+        'tipo' => $tipo,
+        'instalacion_id' => $instalacionId,
+    ]);
+
+    // ... resto del código ...
+}
 
     /**
      * Maneja la ubicación recibida

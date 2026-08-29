@@ -90,12 +90,7 @@ Route::middleware(['auth.session', 'administrador'])->group(function () {
 
 // Asignaciones (solo admin)
 Route::middleware(['auth.session', 'administrador'])->group(function () {
-    Route::prefix('asignaciones')->name('asignaciones.')->group(function () {
-        Route::get('/', [AsignacionInstalacionController::class, 'index'])->name('index');
-        Route::get('/create', [AsignacionInstalacionController::class, 'create'])->name('create');
-        Route::post('/', [AsignacionInstalacionController::class, 'store'])->name('store');
-        Route::delete('/{id}', [AsignacionInstalacionController::class, 'destroy'])->name('destroy');
-    });
+    Route::resource('asignaciones', AsignacionInstalacionController::class);
 });
 
 // Notificaciones

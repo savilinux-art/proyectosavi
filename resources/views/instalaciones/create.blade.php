@@ -21,8 +21,8 @@
                 
                 <div class="col-md-6 mb-3"><label for="instaladores" class="form-label">Instaladores *</label>
                      <select class="form-select @error('instaladores') is-invalid @enderror" name="instaladores[]" 
-                        id="instaladores" multiple required>@foreach($instaladores as $inst)
-                    <option value="{{ $inst->id }}" {{ in_array($inst->usuario, old('instaladores', [])) ? 'selected' : '' }}>{{ $inst->nombre }}                    
+                        id="instaladores" multiple>@foreach($instaladores as $inst)
+                    <option value="{{ $inst->id }}" {{ in_array($inst->id, old('instaladores', [])) ? 'selected' : '' }}>{{ $inst->nombre }}                    
                     </option>@endforeach</select>@error('instaladores')<div class="invalid-feedback">{{ $message }}                    
                 </div>@enderror<small class="text-muted">Presiona Ctrl/Cmd en mac para seleccionar varios</small></div>
             </div>

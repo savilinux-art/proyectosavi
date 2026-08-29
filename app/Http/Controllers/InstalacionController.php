@@ -56,7 +56,7 @@ public function store(Request $request, TelegramService $telegramService)
         'nombre_proyecto' => 'required|exists:ventas,nombre_proyecto',
         'fecha_hora_inicio' => 'required|date',
         'estatus_instalacion' => 'required|exists:estatus,estatus',
-        'instaladores' => 'required|array|min:1',
+        'instaladores' => 'nullable|array',
         'instaladores.*' => 'exists:usuarios,id',
     ]);
 

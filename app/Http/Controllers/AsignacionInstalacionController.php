@@ -13,7 +13,7 @@ class AsignacionInstalacionController extends Controller
     /**
      * Display a listing of the resource.
      */
-   public function index()
+public function index()
 {
     if (Session::get('user_rol') !== 'Administrador') {
         return redirect()->route('dashboard')->with('error', 'No tienes permisos para acceder a este módulo');
@@ -21,7 +21,7 @@ class AsignacionInstalacionController extends Controller
 
     $instalacionesPendientes = Instalacion::whereDoesntHave('instaladores')
         ->whereIn('estatus_instalacion', ['preparacion', 'en_proceso', 'programacion'])
-        ->with(['proyecto'])
+        ->with(['proyecto', 'instaladores']) // Cargar proyecto e instaladores
         ->orderBy('created_at', 'desc')
         ->get();
 
@@ -43,7 +43,7 @@ class AsignacionInstalacionController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+ public function create()
 {
     if (Session::get('user_rol') !== 'Administrador') {
         return redirect()->route('dashboard')->with('error', 'No tienes permisos para acceder a este módulo');
@@ -54,6 +54,8 @@ class AsignacionInstalacionController extends Controller
         ->with(['proyecto'])
         ->get();
 
+    
+
     $instaladores = Usuario::where('rol', 'Instalador')
         ->withCount(['instalaciones' => function($query) {
             $query->whereIn('estatus_instalacion', ['preparacion', 'en_proceso', 'programacion', 'pruebas']);
@@ -63,7 +65,6 @@ class AsignacionInstalacionController extends Controller
 
     return view('asignaciones.create', compact('instalacionesDisponibles', 'instaladores'));
 }
-
     /**
      * Store a newly created resource in storage.
      */
