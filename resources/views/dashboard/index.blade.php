@@ -27,7 +27,7 @@
 </div>
 @endif
 
-<!-- ==================== ACCESO RÁPIDO (por rol + permisos) ==================== -->
+<!-- ==================== ACCESO RÁPIDO ==================== -->
 @php
     $userRol = session('user_rol');
     $user = \App\Models\Usuario::find(session('user_usuario'));
@@ -42,8 +42,6 @@
             <div class="card-header bg-primary text-white"><h5><i class="bi bi-rocket-takeoff"></i> Acceso Rápido</h5></div>
             <div class="card-body">
                 <div class="row g-3">
-
-                    <!-- ADMINISTRADOR: ve todas las opciones -->
                     @if($userRol == 'Administrador')
                         <div class="col-md-2"><a href="{{ route('inventario.create') }}" class="text-decoration-none"><div class="card h-100 border-primary hover-shadow"><div class="card-body text-center"><i class="bi bi-box" style="font-size:36px;color:#0d6efd;"></i><h6 class="mt-2">Nuevo Producto</h6></div></div></a></div>
                         <div class="col-md-2"><a href="{{ route('ventas.create') }}" class="text-decoration-none"><div class="card h-100 border-success hover-shadow"><div class="card-body text-center"><i class="bi bi-cart-plus" style="font-size:36px;color:#198754;"></i><h6 class="mt-2">Nueva Venta</h6></div></div></a></div>
@@ -51,8 +49,6 @@
                         <div class="col-md-2"><a href="{{ route('proyectos.create') }}" class="text-decoration-none"><div class="card h-100 border-warning hover-shadow"><div class="card-body text-center"><i class="bi bi-folder-plus" style="font-size:36px;color:#ffc107;"></i><h6 class="mt-2">Nuevo Proyecto</h6></div></div></a></div>
                         <div class="col-md-2"><a href="{{ route('instalaciones.create') }}" class="text-decoration-none"><div class="card h-100 border-danger hover-shadow"><div class="card-body text-center"><i class="bi bi-tools" style="font-size:36px;color:#dc3545;"></i><h6 class="mt-2">Nueva Instalación</h6></div></div></a></div>
                         <div class="col-md-2"><a href="{{ route('asignaciones.index') }}" class="text-decoration-none"><div class="card h-100 border-dark hover-shadow"><div class="card-body text-center"><i class="bi bi-person-plus" style="font-size:36px;color:#212529;"></i><h6 class="mt-2">Asignaciones</h6></div></div></a></div>
-
-                    <!-- INVENTARIOS -->
                     @elseif($userRol == 'Inventarios')
                         @if($hasPermiso('crear-producto'))
                         <div class="col-md-3"><a href="{{ route('inventario.create') }}" class="text-decoration-none"><div class="card h-100 border-primary hover-shadow"><div class="card-body text-center"><i class="bi bi-box" style="font-size:36px;color:#0d6efd;"></i><h6 class="mt-2">Nuevo Producto</h6></div></div></a></div>
@@ -66,16 +62,12 @@
                         @if($hasPermiso('ver-proyectos'))
                         <div class="col-md-3"><a href="{{ route('proyectos.index') }}" class="text-decoration-none"><div class="card h-100 border-warning hover-shadow"><div class="card-body text-center"><i class="bi bi-folder" style="font-size:36px;color:#ffc107;"></i><h6 class="mt-2">Ver Proyectos</h6></div></div></a></div>
                         @endif
-
-                    <!-- INSTALADORES -->
                     @elseif($userRol == 'Instalador')
                         <div class="col-md-3"><a href="{{ route('instalaciones.index') }}" class="text-decoration-none"><div class="card h-100 border-primary hover-shadow"><div class="card-body text-center"><i class="bi bi-tools" style="font-size:36px;color:#0d6efd;"></i><h6 class="mt-2">Mis Instalaciones</h6></div></div></a></div>
                         <div class="col-md-3"><a href="{{ route('proyectos.index') }}" class="text-decoration-none"><div class="card h-100 border-success hover-shadow"><div class="card-body text-center"><i class="bi bi-folder" style="font-size:36px;color:#198754;"></i><h6 class="mt-2">Proyectos</h6></div></div></a></div>
                         @if($hasPermiso('crear-instalacion'))
                         <div class="col-md-3"><a href="{{ route('instalaciones.create') }}" class="text-decoration-none"><div class="card h-100 border-warning hover-shadow"><div class="card-body text-center"><i class="bi bi-plus-circle" style="font-size:36px;color:#ffc107;"></i><h6 class="mt-2">Nueva Instalación</h6></div></div></a></div>
                         @endif
-
-                    <!-- CONTABILIDAD -->
                     @elseif($userRol == 'Contabilidad')
                         @if($hasPermiso('crear-cliente'))
                         <div class="col-md-3"><a href="{{ route('clientes.create') }}" class="text-decoration-none"><div class="card h-100 border-primary hover-shadow"><div class="card-body text-center"><i class="bi bi-person-plus" style="font-size:36px;color:#0d6efd;"></i><h6 class="mt-2">Nuevo Cliente</h6></div></div></a></div>
@@ -89,8 +81,6 @@
                         @if($hasPermiso('ver-instalaciones'))
                         <div class="col-md-3"><a href="{{ route('instalaciones.index') }}" class="text-decoration-none"><div class="card h-100 border-warning hover-shadow"><div class="card-body text-center"><i class="bi bi-tools" style="font-size:36px;color:#ffc107;"></i><h6 class="mt-2">Ver Instalaciones</h6></div></div></a></div>
                         @endif
-
-                    <!-- SISTEMAS -->
                     @elseif($userRol == 'Sistemas')
                         <div class="col-md-3"><a href="{{ route('proyectos.index') }}" class="text-decoration-none"><div class="card h-100 border-primary hover-shadow"><div class="card-body text-center"><i class="bi bi-folder" style="font-size:36px;color:#0d6efd;"></i><h6 class="mt-2">Ver Proyectos</h6></div></div></a></div>
                         <div class="col-md-3"><a href="{{ route('instalaciones.index') }}" class="text-decoration-none"><div class="card h-100 border-success hover-shadow"><div class="card-body text-center"><i class="bi bi-tools" style="font-size:36px;color:#198754;"></i><h6 class="mt-2">Ver Instalaciones</h6></div></div></a></div>
@@ -100,8 +90,6 @@
                         @if($hasPermiso('crear-instalacion'))
                         <div class="col-md-3"><a href="{{ route('instalaciones.create') }}" class="text-decoration-none"><div class="card h-100 border-danger hover-shadow"><div class="card-body text-center"><i class="bi bi-plus-circle" style="font-size:36px;color:#dc3545;"></i><h6 class="mt-2">Nueva Instalación</h6></div></div></a></div>
                         @endif
-
-                    <!-- VENTAS -->
                     @elseif($userRol == 'Ventas')
                         @if($hasPermiso('crear-venta'))
                         <div class="col-md-3"><a href="{{ route('ventas.create') }}" class="text-decoration-none"><div class="card h-100 border-primary hover-shadow"><div class="card-body text-center"><i class="bi bi-cart-plus" style="font-size:36px;color:#0d6efd;"></i><h6 class="mt-2">Nueva Venta</h6></div></div></a></div>
@@ -116,7 +104,6 @@
                         <div class="col-md-3"><a href="{{ route('clientes.index') }}" class="text-decoration-none"><div class="card h-100 border-warning hover-shadow"><div class="card-body text-center"><i class="bi bi-people" style="font-size:36px;color:#ffc107;"></i><h6 class="mt-2">Clientes</h6></div></div></a></div>
                         @endif
                     @endif
-
                 </div>
             </div>
         </div>
@@ -124,10 +111,6 @@
 </div>
 
 <!-- ==================== ESTADÍSTICAS Y CONTENIDO POR ROL ==================== -->
-
-@php
-    $userRol = session('user_rol');
-@endphp
 
 <!-- ====== INVENTARIOS ====== -->
 @if($userRol == 'Inventarios')
@@ -161,7 +144,6 @@
     </div>
 </div>
 
-<!-- Productos con stock bajo -->
 @if(isset($inventario_bajo) && $inventario_bajo->count() > 0)
 <div class="row mt-4">
     <div class="col-12">
@@ -212,6 +194,7 @@
             </div>
         </div>
     </div>
+
     <div class="col-md-6">
         <div class="card">
             <div class="card-header bg-success text-white"><h5><i class="bi bi-folder"></i> Mis Proyectos</h5></div>
@@ -368,7 +351,6 @@
     </div>
 </div>
 
-<!-- Gráfico de ventas por estatus -->
 @if(isset($ventas_por_estatus) && $ventas_por_estatus->count() > 0)
 <div class="row mb-4">
     <div class="col-md-8">
@@ -395,6 +377,90 @@
 </div>
 @endif
 @endif
+
+<!-- ====== INSTALACIONES ACTIVAS (COMÚN PARA TODOS) ====== -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5><i class="bi bi-tools"></i> Instalaciones Activas</h5>
+    </div>
+    <div class="card-body">
+        @if($instalacionesActivas->count() > 0)
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Proyecto</th>
+                            <th>Estatus</th>
+                            <th>Instaladores</th>
+                            <th>Fecha Inicio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($instalacionesActivas as $instalacion)
+                        <tr>
+                            <td>{{ $instalacion->proyecto->nombre_proyecto ?? 'N/A' }}</td>
+                            <td><span class="badge bg-primary">{{ ucfirst($instalacion->estatus_instalacion) }}</span></td>
+                            <td>
+                                @foreach($instalacion->instaladores as $inst)
+                                    <span class="badge bg-secondary me-1">{{ $inst->nombre }}</span>
+                                @endforeach
+                            </td>
+                            <td>{{ \Carbon\Carbon::parse($instalacion->fecha_hora_inicio)->format('d/m/Y H:i') }}</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @else
+            <p class="text-muted">No hay instalaciones activas.</p>
+        @endif
+    </div>
+</div>
+
+<!-- ====== UBICACIONES RECIENTES (COMÚN PARA TODOS) ====== -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5><i class="bi bi-geo-alt"></i> Ubicaciones Recientes (últimas 24h)</h5>
+    </div>
+    <div class="card-body">
+        @if($ubicacionesRecientes->count() > 0)
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Instalador</th>
+                            <th>Instalación</th>
+                            <th>Tipo</th>
+                            <th>Fecha/Hora</th>
+                            <th>Ubicación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($ubicacionesRecientes as $ubicacion)
+                        <tr>
+                            <td>{{ $ubicacion->usuario->nombre ?? 'N/A' }}</td>
+                            <td>{{ $ubicacion->instalacion->proyecto->nombre_proyecto ?? 'N/A' }}</td>
+                            <td>
+                                <span class="badge {{ $ubicacion->tipo == 'inicio' ? 'bg-success' : 'bg-danger' }}">
+                                    {{ ucfirst($ubicacion->tipo) }}
+                                </span>
+                            </td>
+                            <td>{{ \Carbon\Carbon::parse($ubicacion->fecha_hora)->format('d/m/Y H:i') }}</td>
+                            <td>
+                                <a href="https://www.google.com/maps?q={{ $ubicacion->latitud }},{{ $ubicacion->longitud }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-geo-alt"></i> Ver mapa
+                                </a>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @else
+            <p class="text-muted">No hay ubicaciones recientes.</p>
+        @endif
+    </div>
+</div>
 
 @endsection
 
