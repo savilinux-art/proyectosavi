@@ -48,7 +48,10 @@ Route::middleware(['auth.session'])->group(function () {
 
 // Devoluciones de Inventario
 Route::middleware(['auth.session'])->group(function () {
-    Route::resource('devoluciones', DevolucionInventarioController::class);
+    Route::resource('devoluciuse Telegram\Bot\Api;
+use Telegram\Bot\Keyboard\Keyboard;
+use Telegram\Bot\Objects\InlineKeyboardButton;
+use Telegram\Bot\Objects\InlineKeyboardMarkup;ones', DevolucionInventarioController::class);
     Route::get('devoluciones/buscar-productos', [DevolucionInventarioController::class, 'buscarProductos'])->name('devoluciones.buscarProductos');
 });
 
@@ -72,7 +75,10 @@ Route::middleware(['auth.session', 'permiso:ver-clientes'])->group(function () {
 Route::middleware(['auth.session', 'permiso:ver-proyectos'])->group(function () {
     Route::resource('proyectos', ProyectoController::class);
 });
-
+use Telegram\Bot\Api;
+use Telegram\Bot\Keyboard\Keyboard;
+use Telegram\Bot\Objects\InlineKeyboardButton;
+use Telegram\Bot\Objects\InlineKeyboardMarkup;
 // Categorías y Estatus
 Route::middleware(['auth.session', 'permiso:ver-inventario'])->group(function () {
     Route::resource('categorias', CategoriaController::class);
