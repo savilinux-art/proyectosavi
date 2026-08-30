@@ -18,7 +18,9 @@ use App\Http\Controllers\SalidaInventarioController;
 use App\Http\Controllers\DevolucionInventarioController;
 use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\EstatusController;
+use App\Http\Controllers\TelegramWebhookController;
 use App\Http\Controllers\TelegramLocationController;
+use App\Services\TelegramService;
 
 // Auth
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
@@ -109,7 +111,6 @@ Route::post('/telegram/send-location/start/{id}', [TelegramLocationController::c
 Route::post('/telegram/send-location/end/{id}', [TelegramLocationController::class, 'sendEndLocation'])
     ->name('telegram.send-end');
 
-
 // Salidas y Devoluciones
 Route::middleware(['auth.session', 'permiso:ver-salidas'])->group(function () {
     Route::resource('salidas', SalidaInventarioController::class);
@@ -123,4 +124,18 @@ Route::middleware(['auth.session', 'permiso:ver-devoluciones'])->group(function 
 // Reportes
 Route::middleware(['auth.session'])->group(function () {
     Route::resource('reportes', ReporteController::class)->except(['update']);
+});
+
+// Ruta de prueba para enviar un mensaje de prueba a un chat_id específico
+Route::get('/test-telegram-system', function (TelegramService $telegram) {
+    $chatId = '8884130238'; // Reemplaza con tu chat_id real
+    try {
+        $telegram->sendMessage($chatId, '✅ Mensaje de prueba desde Laravel');
+        return '✅ Mensaje enviado correctamente desde Laravel';
+    } catch (\Exception $e) {
+        return '❌ Error: ' . $e->getMessage();
+    }
+
+    
+
 });

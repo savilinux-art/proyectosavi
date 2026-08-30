@@ -21,4 +21,26 @@ class UbicacionUsuario extends Model
     {
         return $this->belongsTo(Instalacion::class);
     }
+
+    /**
+ * Verifica si existe un inicio de jornada sin finalizar para un instalador en una instalación
+ */
+public static function tieneInicioSinFin($usuarioId, $instalacionId)
+{
+    return self::where('usuario_id', $usuarioId)
+        ->where('instalacion_id', $instalacionId)
+        ->where('tipo', 'inicio')
+        ->exists();
+}
+
+/**
+ * Verifica si existe un fin de jornada para un instalador en una instalación
+ */
+public static function tieneFin($usuarioId, $instalacionId)
+{
+    return self::where('usuario_id', $usuarioId)
+        ->where('instalacion_id', $instalacionId)
+        ->where('tipo', 'fin')
+        ->exists();
+}
 }

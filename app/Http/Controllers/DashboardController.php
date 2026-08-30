@@ -7,9 +7,10 @@ use App\Models\Venta;
 use App\Models\Instalacion;
 use App\Models\Inventario;
 use App\Models\Usuario;
-use App\Models\Cliente;        // ← Agregar
-use App\Models\Proyecto;       // ← Agregar
-use App\Models\Notificacion;   // ← Agregar (opcional, si usas tabla de notificaciones)
+use App\Models\Cliente;
+use App\Models\Proyecto;
+use App\Models\Notificacion;
+use App\Models\UbicacionUsuario;  // ← Importante
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
 
@@ -34,7 +35,6 @@ class DashboardController extends Controller
         // 2. DATOS SEGÚN ROL
         // =====================================================
         switch ($rol) {
-            // ---------- ADMINISTRADOR Y VENTAS ----------
             case 'Administrador':
             case 'Ventas':
                 $data['total_ventas'] = Venta::count();
@@ -47,7 +47,6 @@ class DashboardController extends Controller
                     ->get();
                 break;
 
-            // ---------- INVENTARIOS ----------
             case 'Inventarios':
                 $data['total_inventario'] = Inventario::sum('existencia');
                 $data['total_ventas'] = Venta::count();
@@ -55,7 +54,6 @@ class DashboardController extends Controller
                 $data['inventario_bajo'] = Inventario::where('existencia', '<', 10)->get();
                 break;
 
-            // ---------- INSTALADOR ----------
             case 'Instalador':
                 $data['instalaciones'] = Instalacion::whereHas('instaladores', function($q) use ($userUsuario) {
                     $q->where('instalador_usuario', $userUsuario);
@@ -70,20 +68,17 @@ class DashboardController extends Controller
                 })->get();
                 break;
 
-            // ---------- CONTABILIDAD ----------
             case 'Contabilidad':
                 $data['total_clientes'] = Cliente::count();
                 $data['total_proyectos'] = Proyecto::count();
                 $data['total_instalaciones'] = Instalacion::count();
                 break;
 
-            // ---------- SISTEMAS ----------
             case 'Sistemas':
                 $data['proyectos'] = Proyecto::with(['venta'])->get();
                 $data['instalaciones'] = Instalacion::with(['proyecto', 'instaladores'])->get();
                 break;
 
-            // ---------- POR DEFECTO (otros roles) ----------
             default:
                 $data['total_ventas'] = Venta::count();
                 $data['total_inventario'] = Inventario::sum('existencia');
@@ -95,11 +90,30 @@ class DashboardController extends Controller
                 break;
         }
 
+        // =====================================================
+        // 3. DATOS COMUNES PARA TODOS LOS ROLES
+        // =====================================================
+        // Instalaciones activas (con instaladores asignados)
+        $data['instalacionesActivas'] = Instalacion::whereHas('instaladores')
+            ->whereIn('estatus_instalacion', ['en_proceso', 'programacion', 'pruebas'])
+            ->with(['proyecto', 'instaladores'])
+            ->get();
+
+        // Ubicaciones recientes (últimas 24 horas)
+        $data['ubicacionesRecientes'] = UbicacionUsuario::with(['usuario', 'instalacion'])
+            ->where('fecha_hora', '>=', now()->subDay())
+            ->orderBy('fecha_hora', 'desc')
+            ->limit(10)
+            ->get();
+
+        // =====================================================
+        // 4. RETORNAR VISTA CON TODOS LOS DATOS
+        // =====================================================
         return view('dashboard.index', $data);
     }
 
     // =====================================================
-    // NOTIFICACIONES GENERALES (para Admin, Ventas, Inventarios, etc.)
+    // NOTIFICACIONES GENERALES
     // =====================================================
     private function getNotificacionesGenerales()
     {
@@ -153,7 +167,6 @@ class DashboardController extends Controller
             $notificaciones[] = "📌 Instalación pendiente: {$instalacion->proyecto->nombre_proyecto} - Estatus: {$instalacion->estatus_instalacion}";
         }
 
-        // Instalaciones completadas recientemente (opcional)
         $completadas = Instalacion::whereHas('instaladores', function($q) use ($userId) {
             $q->where('instalador_usuario', $userId);
         })

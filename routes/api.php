@@ -21,6 +21,9 @@ use App\Http\Controllers\TelegramWebhookController;
 // Rutas públicas (sin autenticación)
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
+Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle'])
+->name('telegram.webhook')
+->middleware('throttle:telegram-webhook'); // Usa el limiter sin límite
 
 // Rutas protegidas (requieren autenticación)
 Route::middleware('auth:sanctum')->group(function () {
@@ -59,9 +62,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/instalaciones/{id}/checklist', [InstalacionController::class, 'updateChecklist']);
     
    
-    // Telegram Webhook
-    Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle'])
-    ->name('telegram.webhook');
+  
+   
+
 
     // Clientes
     Route::get('/clientes', [ClienteController::class, 'index']);
@@ -98,6 +101,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/proyectos/estatus/{estatus}', [ProyectoController::class, 'byStatus']);
     Route::get('/proyectos/existe/{nombre}', [ProyectoController::class, 'exists']);
     Route::get('/proyectos/{id}/archivo/{tipo}', [ProyectoController::class, 'downloadFile']);
+
+
+
 
 });
 

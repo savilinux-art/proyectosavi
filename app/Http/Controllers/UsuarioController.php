@@ -70,11 +70,38 @@ class UsuarioController extends Controller
         $roles = Rol::all();
         return view('usuarios.edit', compact('usuario', 'roles'));
     }
+public function update(Request $request, $id)
+{
+    $usuario = Usuario::findOrFail($id);
 
-    public function update(Request $request, $id)
-    {
-        // Similar a store pero con validación de unique excluyendo el mismo usuario
+    $request->validate([
+        'usuario' => 'required|string|max:255|unique:usuarios,usuario,' . $id,
+        'nombre' => 'required|string|max:255',
+        'correo' => 'required|email|max:255|unique:usuarios,correo,' . $id,
+        'telegram_chat_id' => 'nullable|string|max:255', // ← Opcional
+        'contraseña' => 'nullable|string|min:6',
+        'rol' => 'required|string|exists:roles,rol',
+    ]);
+
+    $data = $request->all();
+
+    // Si no se envió contraseña, la eliminamos del array para no actualizarla
+    if (empty($data['contraseña'])) {
+        unset($data['contraseña']);
+    } else {
+        $data['contraseña'] = bcrypt($data['contraseña']);
     }
+
+    // Si telegram_chat_id está vacío, lo guardamos como null
+    if (empty($data['telegram_chat_id'])) {
+        $data['telegram_chat_id'] = null;
+    }
+
+    $usuario->update($data);
+
+    return redirect()->route('usuarios.index')->with('success', 'Usuario actualizado exitosamente.');
+}
+   
 
     public function destroy($id)
     {

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Services\TelegramService;
@@ -18,11 +19,33 @@ class TelegramWebhookController extends Controller
     {
         $payload = $request->all();
 
-        // Log para depuración (opcional)
-        Log::info('Webhook Telegram recibido', $payload);
+        // 🔍 Log 1: Ver qué llega exactamente
+        Log::info('📨 Webhook recibido - PAYLOAD COMPLETO', $payload);
 
-        $this->telegramService->handleWebhook($payload);
+        try {
+            // 🔥 Verificar si existe callback_query
+            if (isset($payload['callback_query'])) {
+                Log::info('📞 Procesando CALLBACK_QUERY', $payload['callback_query']);
+                $this->telegramService->handleCallbackQuery($payload['callback_query']);
+                return response()->json(['status' => 'callback_processed']);
+            }
 
-        return response()->json(['status' => 'ok']);
+            // 🔥 Verificar si existe mensaje con ubicación
+            if (isset($payload['message']['location'])) {
+                Log::info('📍 Procesando LOCATION', $payload['message']['location']);
+                $this->telegramService->handleLocation($payload['message']);
+                return response()->json(['status' => 'location_processed']);
+            }
+
+            // Si es otro tipo de mensaje
+            Log::info('📩 Mensaje ignorado', ['tipo' => 'otro']);
+            return response()->json(['status' => 'ignored']);
+
+        } catch (\Exception $e) {
+            Log::error('❌ Error en webhook: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
     }
 }

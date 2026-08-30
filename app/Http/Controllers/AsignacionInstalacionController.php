@@ -7,7 +7,9 @@ use App\Models\Usuario;
 use App\Models\Venta;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
-
+use App\Services\TelegramService;
+use Illuminate\Support\Facades\Log;   
+use Illuminate\Support\Facades\Notification;
 class AsignacionInstalacionController extends Controller
 {
     /**
@@ -68,45 +70,62 @@ public function index()
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
-    {
-        if (Session::get('user_rol') !== 'Administrador') {
-            return redirect()->route('dashboard')->with('error', 'No autorizado');
+    public function store(Request $request, TelegramService $telegramService) // ← Agrega la inyección
+{
+    if (Session::get('user_rol') !== 'Administrador') {
+        return redirect()->route('dashboard')->with('error', 'No autorizado');
+    }
+
+    $request->validate([
+        'instalacion_id' => 'required|exists:instalaciones,id',
+        'instaladores' => 'required|array|min:1',
+        'instaladores.*' => 'exists:usuarios,usuario',
+        'fecha_hora_inicio' => 'required|date|after:now',
+        'observaciones' => 'nullable|string'
+    ]);
+
+    DB::beginTransaction();
+    try {
+        $instalacion = Instalacion::findOrFail($request->instalacion_id);
+        
+        if ($instalacion->instaladores()->count() > 0) {
+            return back()->with('error', 'Esta instalación ya tiene instaladores asignados');
         }
 
-        $request->validate([
-            'instalacion_id' => 'required|exists:instalaciones,id',
-            'instaladores' => 'required|array|min:1',
-            'instaladores.*' => 'exists:usuarios,usuario',
-            'fecha_hora_inicio' => 'required|date|after:now',
-            'observaciones' => 'nullable|string'
+        // Asignar instaladores
+        $instalacion->instaladores()->sync($request->instaladores);
+        $instalacion->update([
+            'fecha_hora_inicio' => $request->fecha_hora_inicio,
+            'estatus_instalacion' => 'en_proceso',
+            'observaciones' => $request->observaciones
         ]);
 
-        DB::beginTransaction();
-        try {
-            $instalacion = Instalacion::findOrFail($request->instalacion_id);
-            
-            if ($instalacion->instaladores()->count() > 0) {
-                return back()->with('error', 'Esta instalación ya tiene instaladores asignados');
+        // 🔥 NUEVO: Enviar notificaciones por Telegram
+        foreach ($instalacion->instaladores as $instalador) {
+            try {
+                $telegramService->notifyInstalacionAsignada($instalador, $instalacion);
+                Log::info('✅ Notificación enviada a instalador', [
+                    'instalador_id' => $instalador->id,
+                    'chat_id' => $instalador->telegram_chat_id
+                ]);
+            } catch (\Exception $e) {
+                Log::error('❌ Error enviando notificación a instalador', [
+                    'instalador_id' => $instalador->id,
+                    'error' => $e->getMessage()
+                ]);
             }
-
-            $instalacion->instaladores()->sync($request->instaladores);
-            $instalacion->update([
-                'fecha_hora_inicio' => $request->fecha_hora_inicio,
-                'estatus_instalacion' => 'en_proceso',
-                'observaciones' => $request->observaciones
-            ]);
-
-            DB::commit();
-
-            return redirect()->route('asignaciones.index')
-                ->with('success', 'Instalación asignada exitosamente a ' . count($request->instaladores) . ' instalador(es)');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->with('error', 'Error al asignar la instalación: ' . $e->getMessage());
         }
+
+        DB::commit();
+
+        return redirect()->route('asignaciones.index')
+            ->with('success', 'Instalación asignada exitosamente a ' . count($request->instaladores) . ' instalador(es)');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->with('error', 'Error al asignar la instalación: ' . $e->getMessage());
     }
+}
 
     /**
      * Display the specified resource.

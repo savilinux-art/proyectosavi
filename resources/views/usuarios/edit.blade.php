@@ -37,8 +37,8 @@
                     <label for="telegram_chat_id" class="form-label">Telegram chat id *</label>
                     <input type="text" class="form-control @error('telegram_chat_id') is-invalid @enderror" 
                            id="telegram_chat_id" name="telegram_chat_id" value="{{ old('telegram_chat_id') }}" 
-                           placeholder="Ej: 123456789" required>
-                    @error('telegram_chat_id')
+                           placeholder="Ej: 123456789" >
+                            @error('telegram_chat_id')
                         <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
                 </div>
