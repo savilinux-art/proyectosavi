@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-
 use App\Models\Instalacion;
 use App\Models\SolicitudUbicacion;
 use App\Models\UbicacionUsuario;
@@ -11,63 +10,74 @@ use Illuminate\Support\Facades\Log;
 use Telegram\Bot\Api;
 use Telegram\Bot\Keyboard\Keyboard;
 
-
-
 class TelegramService
 {
     protected Api $telegram;
 
     public function __construct()
     {
-        // ✅ Corrección: usar la clave correcta de config
         $token = config('telegram.bot_token');
         if (empty($token)) {
             throw new \Exception('Token de Telegram no configurado. Agrega TELEGRAM_BOT_TOKEN en .env');
         }
-
         $this->telegram = new Api($token);
     }
 
     /**
      * Notifica a un instalador sobre una instalación asignada
      */
-   public function notifyInstalacionAsignada(Usuario $instalador, Instalacion $instalacion): void
-{
-    if (empty($instalador->telegram_chat_id)) {
-        return;
-    }
-
-    $texto = "🔔 *Nueva instalación asignada*\n\n" .
-        "📋 Instalación #{$instalacion->id}\n" .
-        "📌 Proyecto: {$instalacion->nombre_proyecto}\n" .
-        "📍 Dirección: {$instalacion->ubicacion_actual}\n\n" .
-        'Selecciona una opción para reportar tu ubicación:';
-
-    // ✅ Usar Keyboard::make()->inline() en lugar de InlineKeyboardMarkup
-    $inlineKeyboard = Keyboard::make()
-        ->inline()
-        ->row([
-            Keyboard::inlineButton([
-                'text' => '▶️ Iniciar Jornada',
-                'callback_data' => "inicio|{$instalacion->id}",
-            ]),
-            Keyboard::inlineButton([
-                'text' => '⏹️ Finalizar Jornada',
-                'callback_data' => "fin|{$instalacion->id}",
-            ]),
+    public function notifyInstalacionAsignada(Usuario $instalador, Instalacion $instalacion): void
+    {
+        Log::info('📨 NOTIFY - INICIO', [
+            'instalador_id' => $instalador->id,
+            'chat_id' => $instalador->telegram_chat_id,
+            'instalacion_id' => $instalacion->id,
         ]);
 
-    $this->telegram->sendMessage([
-        'chat_id' => $instalador->telegram_chat_id,
-        'text' => $texto,
-        'reply_markup' => $inlineKeyboard,
-        'parse_mode' => 'Markdown',
-    ]);
-}
+        if (empty($instalador->telegram_chat_id)) {
+            Log::warning('⚠️ Chat ID vacío', ['instalador_id' => $instalador->id]);
+            return;
+        }
+
+        $texto = "🔔 *Nueva instalación asignada*\n\n" .
+            "📋 Instalación #{$instalacion->id}\n" .
+            "📌 Proyecto: {$instalacion->nombre_proyecto}\n" .
+            "📍 Dirección: {$instalacion->ubicacion_actual}\n\n" .
+            'Selecciona una opción para reportar tu ubicación:';
+
+        $inlineKeyboard = Keyboard::make()
+            ->inline()
+            ->row([
+                Keyboard::inlineButton([
+                    'text' => '▶️ Iniciar Jornada',
+                    'callback_data' => "inicio|{$instalacion->id}",
+                ]),
+                Keyboard::inlineButton([
+                    'text' => '⏹️ Finalizar Jornada',
+                    'callback_data' => "fin|{$instalacion->id}",
+                ]),
+            ]);
+
+        try {
+            $this->telegram->sendMessage([
+                'chat_id' => $instalador->telegram_chat_id,
+                'text' => $texto,
+                'reply_markup' => $inlineKeyboard,
+                'parse_mode' => 'Markdown',
+            ]);
+            Log::info('✅ Mensaje enviado correctamente', ['chat_id' => $instalador->telegram_chat_id]);
+        } catch (\Exception $e) {
+            Log::error('❌ Error al enviar mensaje de Telegram', [
+                'chat_id' => $instalador->telegram_chat_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     /**
      * Maneja el callback de los botones (Iniciar/Finalizar)
      */
-    public function handleCallbackQuery($callbackQuery): void
+    public function handleCallbackQuery(array $callbackQuery): void
     {
         $chatId = $callbackQuery['message']['chat']['id'] ?? null;
         $callbackData = $callbackQuery['data'] ?? null;
@@ -108,7 +118,7 @@ class TelegramService
             return;
         }
 
-        // ✅ Control de jornada corregido (sin whereDoesntHave)
+        // ✅ Control de jornada corregido (sin whereColumn)
         if ($tipo === 'fin') {
             $inicioExistente = UbicacionUsuario::where('usuario_id', $usuario->id)
                 ->where('instalacion_id', $instalacionId)
@@ -127,7 +137,7 @@ class TelegramService
                 ->where('tipo', 'inicio')
                 ->whereNotExists(function ($query) use ($usuario, $instalacionId) {
                     $query->from('ubicaciones_usuarios')
-                        ->whereColumn('ubicaciones_usuarios.usuario_id', $usuario->id)
+                        ->where('ubicaciones_usuarios.usuario_id', $usuario->id) // ✅ CORREGIDO
                         ->where('instalacion_id', $instalacionId)
                         ->where('tipo', 'fin');
                 })
@@ -215,7 +225,7 @@ class TelegramService
         $instalacionId = $solicitud->instalacion_id;
         $usuarioId = $usuario->id;
 
-        // Validación de jornada
+        // ✅ Validación de jornada corregida (sin whereColumn)
         if ($solicitud->tipo === 'fin') {
             $tieneInicio = UbicacionUsuario::where('usuario_id', $usuarioId)
                 ->where('instalacion_id', $instalacionId)
@@ -235,7 +245,7 @@ class TelegramService
                 ->where('tipo', 'inicio')
                 ->whereNotExists(function ($query) use ($usuarioId, $instalacionId) {
                     $query->from('ubicaciones_usuarios')
-                        ->whereColumn('ubicaciones_usuarios.usuario_id', $usuarioId)
+                        ->where('ubicaciones_usuarios.usuario_id', $usuarioId) // ✅ CORREGIDO
                         ->where('instalacion_id', $instalacionId)
                         ->where('tipo', 'fin');
                 })
