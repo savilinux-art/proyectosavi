@@ -13,9 +13,6 @@ use Illuminate\Support\Facades\Log;
 
 class AsignacionInstalacionController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
         if (Session::get('user_rol') !== 'Administrador') {
@@ -43,9 +40,6 @@ class AsignacionInstalacionController extends Controller
         return view('asignaciones.index', compact('instalacionesPendientes', 'instaladores', 'estadisticas'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
         if (Session::get('user_rol') !== 'Administrador') {
@@ -67,9 +61,6 @@ class AsignacionInstalacionController extends Controller
         return view('asignaciones.create', compact('instalacionesDisponibles', 'instaladores'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request, TelegramService $telegramService)
     {
         if (Session::get('user_rol') !== 'Administrador') {
@@ -99,17 +90,17 @@ class AsignacionInstalacionController extends Controller
                 'observaciones' => $request->observaciones
             ]);
 
-            // Enviar notificación a cada instalador
+            // Enviar notificación
             foreach ($instalacion->instaladores as $instalador) {
                 try {
                     $telegramService->notifyInstalacionAsignada($instalador, $instalacion);
-                    Log::info('✅ Notificación enviada a instalador', [
+                    Log::info('✅ Notificación enviada a instalador (store)', [
                         'instalador_id' => $instalador->id,
                         'chat_id' => $instalador->telegram_chat_id,
                         'instalacion_id' => $instalacion->id
                     ]);
                 } catch (\Exception $e) {
-                    Log::error('❌ Error al enviar notificación a instalador', [
+                    Log::error('❌ Error al enviar notificación a instalador (store)', [
                         'instalador_id' => $instalador->id,
                         'error' => $e->getMessage()
                     ]);
@@ -128,9 +119,6 @@ class AsignacionInstalacionController extends Controller
         }
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show($id)
     {
         if (Session::get('user_rol') !== 'Administrador') {
@@ -145,9 +133,6 @@ class AsignacionInstalacionController extends Controller
         return view('asignaciones.show', compact('instalador', 'instalaciones'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit($id)
     {
         if (Session::get('user_rol') !== 'Administrador') {
@@ -156,16 +141,13 @@ class AsignacionInstalacionController extends Controller
 
         $instalacion = Instalacion::with(['proyecto', 'instaladores'])->findOrFail($id);
         $instaladores = Usuario::where('rol', 'Instalador')->get();
-        $instaladoresSeleccionados = $instalacion->instaladores->pluck('usuario')->toArray();
+        $instaladoresSeleccionados = $instalacion->instaladores->pluck('usuario')->toArray(); // ← nombres de usuario
         $estatus = ['preparacion', 'en_proceso', 'programacion', 'pruebas', 'entrega'];
 
         return view('asignaciones.edit', compact('instalacion', 'instaladores', 'instaladoresSeleccionados', 'estatus'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, $id)
+    public function update(Request $request, $id, TelegramService $telegramService) // ← INYECTAR SERVICIO
     {
         if (Session::get('user_rol') !== 'Administrador') {
             return redirect()->route('dashboard')->with('error', 'No autorizado');
@@ -186,6 +168,23 @@ class AsignacionInstalacionController extends Controller
             $instalacion->update($request->only(['estatus_instalacion', 'fecha_hora_inicio', 'fecha_hora_fin']));
             $instalacion->instaladores()->sync($request->instaladores);
 
+            // 🔥 NUEVO: Enviar notificación a los instaladores que quedaron asignados
+            foreach ($instalacion->instaladores as $instalador) {
+                try {
+                    $telegramService->notifyInstalacionAsignada($instalador, $instalacion);
+                    Log::info('✅ Notificación enviada a instalador (update)', [
+                        'instalador_id' => $instalador->id,
+                        'chat_id' => $instalador->telegram_chat_id,
+                        'instalacion_id' => $instalacion->id
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('❌ Error al enviar notificación a instalador (update)', [
+                        'instalador_id' => $instalador->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
             DB::commit();
 
             return redirect()->route('asignaciones.index')
@@ -193,13 +192,11 @@ class AsignacionInstalacionController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('❌ Error al actualizar asignación: ' . $e->getMessage());
             return back()->with('error', 'Error al actualizar la asignación: ' . $e->getMessage());
         }
     }
 
-    /**
-     * Remove the specified resource from storage (liberar instalación).
-     */
     public function destroy($id)
     {
         if (Session::get('user_rol') !== 'Administrador') {
@@ -219,6 +216,7 @@ class AsignacionInstalacionController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('❌ Error al liberar instalación: ' . $e->getMessage());
             return back()->with('error', 'Error al liberar la instalación: ' . $e->getMessage());
         }
     }
