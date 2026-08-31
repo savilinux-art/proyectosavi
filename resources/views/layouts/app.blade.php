@@ -39,7 +39,7 @@
 
         .sidebar-brand {
             padding: 20px 25px; border-bottom: 1px solid var(--sidebar-border);
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0a0d20 0%, #070713 100%);
         }
         .sidebar-brand h3 { color: white; font-weight: 700; margin: 0; font-size: 20px; }
         .sidebar-brand small { color: rgba(255,255,255,0.7); font-size: 12px; }
@@ -116,7 +116,7 @@
 
     <nav class="sidebar" id="sidebar">
         <div class="sidebar-brand">
-            <h3><i class="bi bi-boxes"></i> ProyectoSAVI</h3>
+            <h3><img src="{{ asset('images/logo.svg') }}" alt="ProyectosAVI" style="width: 150px;"> ProyectoSAVI</h3>
             <small>v0.1.1 - Sistema de Gestión</small>
         </div>
 

@@ -7,8 +7,41 @@
         <form action="{{ route('instalaciones.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
             <div class="row">
-                <div class="col-md-6 mb-3"><label for="nombre_proyecto" class="form-label">Proyecto *</label><select class="form-select @error('nombre_proyecto') is-invalid @enderror" id="nombre_proyecto" name="nombre_proyecto" required><option value="">Seleccionar</option>@foreach($proyectos as $p)<option value="{{ $p->nombre_proyecto }}" {{ old('nombre_proyecto')==$p->nombre_proyecto?'selected':'' }}>{{ $p->nombre_proyecto }}</option>@endforeach</select>@error('nombre_proyecto')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
-                <div class="col-md-6 mb-3"><label for="estatus_instalacion" class="form-label">Estatus *</label><select class="form-select @error('estatus_instalacion') is-invalid @enderror" id="estatus_instalacion" name="estatus_instalacion" required>@foreach($estatus as $e)<option value="{{ $e }}" {{ old('estatus_instalacion')==$e?'selected':'' }}>{{ ucfirst($e) }}</option>@endforeach</select>@error('estatus_instalacion')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+                <div class="col-md-6 mb-3">
+    <label for="nombre_proyecto" class="form-label">Proyecto *</label>
+    <select class="form-select @error('nombre_proyecto') is-invalid @enderror" id="nombre_proyecto" name="nombre_proyecto" required>
+        <option value="">Seleccionar</option>
+        @foreach($proyectos as $p)
+            <option value="{{ $p->nombre_proyecto }}" {{ old('nombre_proyecto') == $p->nombre_proyecto ? 'selected' : '' }}>
+                {{ $p->nombre_proyecto }}
+            </option>
+        @endforeach
+    </select>
+    @error('nombre_proyecto')
+        <div class="invalid-feedback">{{ $message }}</div>
+    @enderror
+    </div>
+               
+               
+               
+               
+               
+               
+                <div class="col-md-6 mb-3">
+                    <label for="nombre_instalacion" class="form-label">Nombre de la Instalación *</label>
+                    <input type="text" class="form-control @error('nombre_instalacion') is-invalid @enderror" 
+                    id="nombre_instalacion" name="nombre_instalacion" 
+                    value="{{ old('nombre_instalacion', $instalacion->nombre_instalacion ?? '') }}" 
+                    placeholder="Ej: Instalación Eléctrica, Redes, Iluminación..." required>
+            @error('nombre_instalacion')
+                <div class="invalid-feedback">{{ $message }}</div>
+            @enderror
+            </div>          
+                          
+                
+                
+                
+            <div class="col-md-6 mb-3"><label for="estatus_instalacion" class="form-label">Estatus *</label><select class="form-select @error('estatus_instalacion') is-invalid @enderror" id="estatus_instalacion" name="estatus_instalacion" required>@foreach($estatus as $e)<option value="{{ $e }}" {{ old('estatus_instalacion')==$e?'selected':'' }}>{{ ucfirst($e) }}</option>@endforeach</select>@error('estatus_instalacion')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
             </div>
 
 

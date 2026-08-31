@@ -46,6 +46,7 @@ class AsignacionInstalacionController extends Controller
             return redirect()->route('dashboard')->with('error', 'No tienes permisos para acceder a este módulo');
         }
 
+
         $instalacionesDisponibles = Instalacion::whereDoesntHave('instaladores')
             ->whereIn('estatus_instalacion', ['preparacion', 'en_proceso', 'programacion'])
             ->with(['proyecto'])
@@ -57,6 +58,7 @@ class AsignacionInstalacionController extends Controller
             }])
             ->orderBy('instalaciones_count')
             ->get();
+
 
         return view('asignaciones.create', compact('instalacionesDisponibles', 'instaladores'));
     }

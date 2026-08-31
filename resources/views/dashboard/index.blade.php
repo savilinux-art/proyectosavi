@@ -4,14 +4,14 @@
 
 @section('content')
 <div class="row">
-    <div class="col-12">
-        <h1 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard <small class="text-muted fs-6">Bienvenido, {{ session('user_nombre') }}</small></h1>
-    </div>
+    
+        <h1 class="mb-4"> Dashboard <small class="text-muted fs-6">Bienvenido, {{ session('user_nombre') }}</small></h1>
+    
 </div>
 
 <!-- ==================== NOTIFICACIONES ==================== -->
 @if(isset($notificaciones) && count($notificaciones) > 0)
-<div class="row mb-4">
+<div class="row">
     <div class="col-12">
         <div class="card border-warning">
             <div class="card-header bg-warning text-dark"><h5><i class="bi bi-bell-fill"></i> Notificaciones</h5></div>
@@ -22,7 +22,7 @@
                     @endforeach
                 </ul>
             </div>
-        </div>
+       </div>
     </div>
 </div>
 @endif

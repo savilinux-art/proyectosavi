@@ -39,9 +39,13 @@ class TelegramService
             return;
         }
 
+        // ✅ Variable definida correctamente
+        $nombreInstalacion = $instalacion->nombre_instalacion ?? 'Principal';
+
         $texto = "🔔 *Nueva instalación asignada*\n\n" .
             "📋 Instalación #{$instalacion->id}\n" .
             "📌 Proyecto: {$instalacion->nombre_proyecto}\n" .
+            "🔧 Instalación: {$nombreInstalacion}\n" .
             "📍 Dirección: {$instalacion->ubicacion_actual}\n\n" .
             'Presiona el botón para iniciar la jornada y reportar tu ubicación:';
 
@@ -83,7 +87,6 @@ class TelegramService
             return;
         }
 
-        // Extraer tipo e instalación
         [$tipo, $instalacionId] = array_pad(explode('|', $callbackData, 2), 2, null);
 
         if (!in_array($tipo, ['inicio', 'fin']) || !is_numeric($instalacionId)) {
@@ -91,27 +94,12 @@ class TelegramService
             return;
         }
 
-        // Si es inicio, eliminar el mensaje original con el botón
-        if ($tipo === 'inicio' && $messageId) {
-            try {
-                $this->telegram->deleteMessage([
-                    'chat_id' => $chatId,
-                    'message_id' => $messageId,
-                ]);
-                Log::info('🗑️ Mensaje de inicio eliminado', ['chat_id' => $chatId, 'message_id' => $messageId]);
-            } catch (\Exception $e) {
-                Log::warning('No se pudo eliminar el mensaje de inicio', ['chat_id' => $chatId, 'message_id' => $messageId]);
-            }
-        }
-
-        // Buscar usuario
         $usuario = Usuario::where('telegram_chat_id', $chatId)->first();
         if (!$usuario) {
             $this->sendMessage($chatId, '❌ No estás registrado.');
             return;
         }
 
-        // Verificar instalación y permiso
         $instalacion = Instalacion::find($instalacionId);
         if (!$instalacion || !$instalacion->instaladores->contains($usuario)) {
             $this->sendMessage($chatId, '❌ No tienes permiso para esta instalación.');
@@ -156,6 +144,19 @@ class TelegramService
             'tipo' => $tipo,
             'instalacion_id' => $instalacionId,
         ]);
+
+        // Si es inicio, eliminar mensaje original
+        if ($tipo === 'inicio' && $messageId) {
+            try {
+                $this->telegram->deleteMessage([
+                    'chat_id' => $chatId,
+                    'message_id' => $messageId,
+                ]);
+                Log::info('🗑️ Mensaje de inicio eliminado', ['chat_id' => $chatId, 'message_id' => $messageId]);
+            } catch (\Exception $e) {
+                Log::warning('No se pudo eliminar el mensaje de inicio', ['chat_id' => $chatId, 'message_id' => $messageId]);
+            }
+        }
 
         // Enviar mensaje con botón de ubicación
         $this->sendLocationRequest($chatId, $tipo);
@@ -225,10 +226,9 @@ class TelegramService
 
         $instalacionId = $solicitud->instalacion_id;
         $usuarioId = $usuario->id;
-        $tipo = $solicitud->tipo;
 
-        // Validaciones de jornada (seguridad)
-        if ($tipo === 'fin') {
+        // Validaciones de jornada
+        if ($solicitud->tipo === 'fin') {
             $tieneInicio = UbicacionUsuario::where('usuario_id', $usuarioId)
                 ->where('instalacion_id', $instalacionId)
                 ->where('tipo', 'inicio')
@@ -241,7 +241,7 @@ class TelegramService
             }
         }
 
-        if ($tipo === 'inicio') {
+        if ($solicitud->tipo === 'inicio') {
             $tieneInicioSinFin = UbicacionUsuario::where('usuario_id', $usuarioId)
                 ->where('instalacion_id', $instalacionId)
                 ->where('tipo', 'inicio')
@@ -268,33 +268,28 @@ class TelegramService
             'longitud' => $lng,
             'fecha_hora' => now(),
             'fuente' => 'telegram',
-            'tipo' => $tipo,
+            'tipo' => $solicitud->tipo,
             'detalles' => json_encode($message ?? []),
         ]);
 
-        $solicitud->delete();
-
-        // Mensaje de confirmación según tipo
-        if ($tipo === 'inicio') {
+        // Enviar confirmación según tipo
+        if ($solicitud->tipo === 'inicio') {
             $this->sendMessage($chatId, '✅ Ubicación de inicio guardada. ¡Buen trabajo!');
-            // Enviar botón de finalizar
-            $instalacion = Instalacion::find($instalacionId);
-            if ($instalacion) {
-                $this->sendFinishButton($chatId, $instalacion);
-            }
+            $this->sendFinButton($chatId, $instalacionId);
         } else {
             $this->sendMessage($chatId, '✅ Ubicación de fin guardada. ¡Hasta luego!');
         }
+
+        $solicitud->delete();
     }
 
     /**
-     * Envía un mensaje con el botón "Finalizar Jornada" después de un inicio exitoso
+     * Envía un mensaje con el botón "Finalizar Jornada"
      */
-    private function sendFinishButton(string $chatId, Instalacion $instalacion): void
+    private function sendFinButton(string $chatId, int $instalacionId): void
     {
         $texto = "✅ Has iniciado la jornada.\n\n" .
-            "📋 Instalación #{$instalacion->id}\n" .
-            "📌 Proyecto: {$instalacion->nombre_proyecto}\n\n" .
+            "📋 Instalación #{$instalacionId}\n\n" .
             "Cuando termines, presiona el botón para finalizar:";
 
         $inlineKeyboard = Keyboard::make()
@@ -302,7 +297,7 @@ class TelegramService
             ->row([
                 Keyboard::inlineButton([
                     'text' => '⏹️ Finalizar Jornada',
-                    'callback_data' => "fin|{$instalacion->id}",
+                    'callback_data' => "fin|{$instalacionId}",
                 ]),
             ]);
 
@@ -313,7 +308,7 @@ class TelegramService
                 'reply_markup' => $inlineKeyboard,
                 'parse_mode' => 'Markdown',
             ]);
-            Log::info('📤 Botón de FIN enviado', ['chat_id' => $chatId, 'instalacion_id' => $instalacion->id]);
+            Log::info('📤 Botón de FIN enviado', ['chat_id' => $chatId, 'instalacion_id' => $instalacionId]);
         } catch (\Exception $e) {
             Log::error('❌ Error enviando botón de FIN', ['chat_id' => $chatId, 'error' => $e->getMessage()]);
         }

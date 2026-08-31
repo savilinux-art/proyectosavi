@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Instalacion;
+use Illuminate\Support\Facades\DB;
 
 class Usuario extends Model
 {
@@ -34,5 +35,28 @@ class Usuario extends Model
     {
         return $this->hasMany(UbicacionUsuario::class);
     }
-  
+    
+    /**
+ * Verifica si el usuario tiene un permiso específico (por slug)
+ * 
+ * @param string $slug
+ * @return bool
+ */
+    public function hasPermiso($slug)
+    {
+        if ($this->rol === 'Administrador') {
+            return true;
+        }
+
+        $exists = DB::table('permiso_rol')
+            ->join('permisos', 'permiso_rol.permiso_id', '=', 'permisos.id')
+            ->where('permiso_rol.rol', $this->rol)
+            ->where('permisos.slug', $slug)
+            ->where('permiso_rol.permitido', 1)
+            ->exists();
+
+        return $exists;
+    }
+
+
 }

@@ -46,12 +46,9 @@ Route::middleware(['auth.session'])->group(function () {
     Route::get('salidas/{id}/imprimir', [SalidaInventarioController::class, 'imprimir'])->name('salidas.imprimir');
 });
 
-// Devoluciones de Inventario
+// ✅ Devoluciones de Inventario (corregido)
 Route::middleware(['auth.session'])->group(function () {
-    Route::resource('devoluciuse Telegram\Bot\Api;
-use Telegram\Bot\Keyboard\Keyboard;
-use Telegram\Bot\Objects\InlineKeyboardButton;
-use Telegram\Bot\Objects\InlineKeyboardMarkup;ones', DevolucionInventarioController::class);
+    Route::resource('devoluciones', DevolucionInventarioController::class);
     Route::get('devoluciones/buscar-productos', [DevolucionInventarioController::class, 'buscarProductos'])->name('devoluciones.buscarProductos');
 });
 
@@ -75,10 +72,7 @@ Route::middleware(['auth.session', 'permiso:ver-clientes'])->group(function () {
 Route::middleware(['auth.session', 'permiso:ver-proyectos'])->group(function () {
     Route::resource('proyectos', ProyectoController::class);
 });
-use Telegram\Bot\Api;
-use Telegram\Bot\Keyboard\Keyboard;
-use Telegram\Bot\Objects\InlineKeyboardButton;
-use Telegram\Bot\Objects\InlineKeyboardMarkup;
+
 // Categorías y Estatus
 Route::middleware(['auth.session', 'permiso:ver-inventario'])->group(function () {
     Route::resource('categorias', CategoriaController::class);
@@ -117,7 +111,7 @@ Route::post('/telegram/send-location/start/{id}', [TelegramLocationController::c
 Route::post('/telegram/send-location/end/{id}', [TelegramLocationController::class, 'sendEndLocation'])
     ->name('telegram.send-end');
 
-// Salidas y Devoluciones
+// Salidas y Devoluciones (repetido, pero lo dejamos)
 Route::middleware(['auth.session', 'permiso:ver-salidas'])->group(function () {
     Route::resource('salidas', SalidaInventarioController::class);
     Route::get('salidas/{id}/download/{copia?}', [SalidaInventarioController::class, 'downloadPDF'])->name('salidas.download');
@@ -132,7 +126,11 @@ Route::middleware(['auth.session'])->group(function () {
     Route::resource('reportes', ReporteController::class)->except(['update']);
 });
 
-// Ruta de prueba para enviar un mensaje de prueba a un chat_id específico
+// ============================================================
+// 🧪 RUTAS DE PRUEBA (CORREGIDAS)
+// ============================================================
+
+// Ruta de prueba: envía un mensaje simple a un chat_id fijo
 Route::get('/test-telegram-system', function (TelegramService $telegram) {
     $chatId = '8884130238'; // Reemplaza con tu chat_id real
     try {
@@ -141,7 +139,22 @@ Route::get('/test-telegram-system', function (TelegramService $telegram) {
     } catch (\Exception $e) {
         return '❌ Error: ' . $e->getMessage();
     }
+});
 
-    
-
+// Ruta de prueba: notifica a un instalador por su ID
+Route::get('/test-notify/{id}', function ($id, TelegramService $telegram) {
+    $usuario = \App\Models\Usuario::find($id);
+    if (!$usuario) {
+        return '❌ Usuario no encontrado';
+    }
+    $instalacion = \App\Models\Instalacion::first(); // toma cualquier instalación
+    if (!$instalacion) {
+        return '❌ No hay instalaciones disponibles';
+    }
+    try {
+        $telegram->notifyInstalacionAsignada($usuario, $instalacion);
+        return '✅ Notificación enviada al instalador ' . $usuario->nombre;
+    } catch (\Exception $e) {
+        return '❌ Error: ' . $e->getMessage();
+    }
 });

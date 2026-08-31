@@ -8,7 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #fa9c21 0%, #99631b 100%);
             min-height: 100vh; display: flex; align-items: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         .login-container { max-width: 420px; margin: 0 auto; width: 100%; padding: 20px; }
@@ -26,10 +26,10 @@
         .input-group-text { background: #f7fafc; border: 2px solid #e2e8f0; border-right: none; border-radius: 10px 0 0 10px; color: #718096; }
         .input-group .form-control { border-radius: 0 10px 10px 0; border-left: none; }
         .btn-login {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white;
+            background: linear-gradient(135deg, #2144df 0%, #2c2581 100%); border: none; color: white;
             padding: 14px; font-weight: 600; border-radius: 10px; width: 100%; transition: all 0.3s; font-size: 16px;
         }
-        .btn-login:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4); }
+        .btn-login:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(19, 59, 235, 0.4); }
         .login-footer { text-align: center; margin-top: 25px; color: #a0aec0; font-size: 13px; }
         .version-badge { position: fixed; bottom: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; backdrop-filter: blur(10px); }
     </style>
@@ -38,7 +38,7 @@
     <div class="login-container">
         <div class="login-card">
             <div class="login-header">
-                <div class="icon"><i class="bi bi-boxes"></i></div>
+                <div class="icon"> <img src="{{ asset('images/login.svg') }}" alt="{{ config('app.name') }}" style="max-width: 150px;"></i></div>
                 <h1>ProyectoSAVI</h1>
                 <p>Sistema de Gestión de Proyectos</p>
                 <span class="badge bg-primary">v0.1.1</span>

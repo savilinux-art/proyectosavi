@@ -10,9 +10,16 @@ class Instalacion extends Model
     protected $table = 'instalaciones';
 
     protected $fillable = [
-        'nombre_proyecto', 'ubicacion_actual', 'evidencia_inicio',
-        'incidencias', 'evidencia_fin', 'check_list',
-        'fecha_hora_inicio', 'fecha_hora_fin', 'estatus_instalacion'
+        'nombre_proyecto', 
+        'nombre_instalacion', // ← NUEVO
+        'ubicacion_actual', 
+        'evidencia_inicio',
+        'incidencias', 
+        'evidencia_fin', 
+        'check_list',
+        'fecha_hora_inicio', 
+        'fecha_hora_fin', 
+        'estatus_instalacion'
     ];
 
     // Relación con instaladores (tabla pivote)

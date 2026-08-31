@@ -55,12 +55,13 @@ class InstalacionController extends Controller
     }
 
     /**
-     * Crear instalación
+     * guardar instalación
      */
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'nombre_proyecto' => 'required|exists:ventas,nombre_proyecto',
+            'nombre_instalacion' => 'required|string|max:255', // ← NUEVO
             'id_usuario_asignado' => 'nullable|exists:usuarios,usuario',
             'fecha_hora_inicio' => 'required|date',
             'estatus_instalacion' => 'required|string'
@@ -109,62 +110,54 @@ class InstalacionController extends Controller
         }
     }
 
+
+
     /**
      * Actualizar instalación
-     */
-    public function update(Request $request, $id)
-    {
-        $validator = Validator::make($request->all(), [
-            'nombre_proyecto' => 'required|exists:ventas,nombre_proyecto',
-            'id_usuario_asignado' => 'nullable|exists:usuarios,usuario',
-            'fecha_hora_inicio' => 'required|date',
-            'fecha_hora_fin' => 'nullable|date|after:fecha_hora_inicio',
-            'estatus_instalacion' => 'required|string'
-        ]);
+ */
+public function update(Request $request, $id)
+{
+    // 1. Validar los datos
+    $validated = $request->validate([
+        'nombre_proyecto' => 'required|exists:ventas,nombre_proyecto',
+        'nombre_instalacion' => 'required|string|max:255',
+        'fecha_hora_inicio' => 'required|date',
+        'fecha_hora_fin' => 'nullable|date|after:fecha_hora_inicio',
+        'estatus_instalacion' => 'required|exists:estatus,estatus',
+        'instaladores' => 'nullable|array',
+        'instaladores.*' => 'exists:usuarios,id',
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
+    // 2. Buscar la instalación por ID (¡AQUÍ SE DEFINE LA VARIABLE!)
+    $instalacion = Instalacion::findOrFail($id);
+
+    // 3. Actualizar los campos básicos
+    $instalacion->update($validated);
+
+    // 4. Gestionar los instaladores (sincronizar)
+    if ($request->has('instaladores') && is_array($request->instaladores)) {
+        // Filtrar valores nulos o vacíos
+        $instaladorIds = array_filter($request->instaladores, function($val) {
+            return !empty($val) && is_numeric($val);
+        });
+
+        if (count($instaladorIds) > 0) {
+            // Convertir IDs a nombres de usuario (porque la tabla pivote usa 'usuario')
+            $instaladorUsuarios = Usuario::whereIn('id', $instaladorIds)->pluck('usuario')->toArray();
+            // Sincronizar (reemplaza los existentes)
+            $instalacion->instaladores()->sync($instaladorUsuarios);
+        } else {
+            // Si el array está vacío, eliminar todos
+            $instalacion->instaladores()->detach();
         }
-
-        DB::beginTransaction();
-        try {
-            $instalacion = Instalacion::findOrFail($id);
-            $data = $request->all();
-            $data['check_list'] = json_encode($request->check_list ?? []);
-
-            if ($request->hasFile('evidencia_inicio')) {
-                $data['evidencia_inicio'] = file_get_contents($request->file('evidencia_inicio')->getRealPath());
-            }
-
-            if ($request->hasFile('incidencias')) {
-                $data['incidencias'] = file_get_contents($request->file('incidencias')->getRealPath());
-            }
-
-            if ($request->hasFile('evidencia_fin')) {
-                $data['evidencia_fin'] = file_get_contents($request->file('evidencia_fin')->getRealPath());
-            }
-
-            $instalacion->update($data);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Instalación actualizada exitosamente',
-                'data' => $instalacion
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al actualizar instalación: ' . $e->getMessage()
-            ], 500);
-        }
+    } else {
+        // Si no se envió el campo 'instaladores', eliminar todos
+        $instalacion->instaladores()->detach();
     }
+
+    // 5. Redirigir con mensaje de éxito (sin notificación de Telegram)
+    return redirect()->route('instalaciones.index')->with('success', 'Instalación actualizada correctamente');
+}
 
     /**
      * Eliminar instalación

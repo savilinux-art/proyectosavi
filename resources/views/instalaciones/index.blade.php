@@ -11,6 +11,7 @@
             <tr>
                 <th>ID</th>
                 <th>Proyecto</th>
+                <th>Nombre Instalación</th>
                 <th>Instaladores</th>
                 <th>Inicio</th>
                 <th>Fin</th>
@@ -25,6 +26,7 @@
             <tr>
                 <td>{{ $instalacion->id }}</td>
                 <td>{{ $instalacion->proyecto->nombre_proyecto ?? 'N/A' }}</td>
+                <td>{{ $instalacion->nombre_instalacion ?? 'Principal' }}</td>
                 <td>
                     @foreach($instalacion->instaladores as $inst)
                         <span class="badge bg-primary">{{ $inst->nombre }}</span>
