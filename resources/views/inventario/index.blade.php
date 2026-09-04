@@ -108,13 +108,13 @@
                     <tr>
                         <td>{{ $item->id }}</td>
                         <td>
-                            @if($item->imagen)
-                                <img src="data:image/jpeg;base64,{{ base64_encode($item->imagen) }}" 
-                                     width="50" height="50" class="img-thumbnail" alt="Imagen" 
-                                     style="object-fit: cover;">
-                            @else
-                                <i class="bi bi-image" style="font-size: 24px; color: #ccc;"></i>
-                            @endif
+                           @if($item->imagen)
+    <img src="{{ asset('img/productos/' . $item->imagen) }}" 
+         width="50" height="50" class="img-thumbnail" alt="Imagen" 
+         style="object-fit: cover;">
+@else
+    <i class="bi bi-image" style="font-size: 24px; color: #ccc;"></i>
+@endif
                         </td>
                         <td>
                             <strong>{{ $item->modelo }}</strong>

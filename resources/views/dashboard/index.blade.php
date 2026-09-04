@@ -467,12 +467,41 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 @if(isset($ventas_por_estatus) && $ventas_por_estatus->count() > 0)
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const ctx = document.getElementById('ventasChart');
-        if (ctx) {
-            const labels = {!! json_encode($ventas_por_estatus->pluck('estatus')->map(function($item){ return ucfirst($item); })) !!};
-            const data = {!! json_encode($ventas_por_estatus->pluck('total')) !!};
+    @php
+        $labelsVentas = $ventas_por_estatus
+            ->pluck('estatus')
+            ->map(fn($item) => ucfirst($item))
+            ->values()
+            ->all();
+        $dataVentas = $ventas_por_estatus->pluck('total')->values()->all();
+        
+        // Generar colores dinámicos
+        $paleta = ['#36a2eb', '#ffce56', '#ff9f40', '#4bc0c0', '#ff6384', '#9966ff', '#ff9f40', '#00d4ff'];
+        $colores = array_slice($paleta, 0, count($dataVentas));
+        $bordes = array_slice(['#36a2eb', '#ffce56', '#ff9f40', '#4bc0c0', '#ff6384', '#9966ff', '#ff9f40', '#00d4ff'], 0, count($dataVentas));
+    @endphp
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const ctx = document.getElementById('ventasChart');
+            if (!ctx) {
+                console.warn('Canvas #ventasChart no encontrado');
+                return;
+            }
+
+        const labels = @json($labelsVentas, JSON_HEX_TAG);
+        const data = @json($dataVentas, JSON_HEX_TAG);
+        const backgroundColor = @json($colores, JSON_HEX_TAG);
+        const borderColor = @json($bordes, JSON_HEX_TAG);
+
+            // Depuración en consola
+            console.log('Labels:', labels);
+            console.log('Data:', data);
+
+            if (data.length === 0) {
+                console.warn('No hay datos para el gráfico');
+                return;
+            }
+
             new Chart(ctx.getContext('2d'), {
                 type: 'bar',
                 data: {
@@ -480,19 +509,30 @@
                     datasets: [{
                         label: 'Ventas',
                         data: data,
-                        backgroundColor: ['rgba(54,162,235,0.8)', 'rgba(255,206,86,0.8)', 'rgba(255,159,64,0.8)', 'rgba(75,192,192,0.8)'],
-                        borderColor: ['#36a2eb', '#ffce56', '#ff9f40', '#4bc0c0'],
+                        backgroundColor: backgroundColor,
+                        borderColor: borderColor,
                         borderWidth: 2
                     }]
                 },
                 options: {
                     responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
                 }
             });
-        }
-    });
-</script>
+        });
+    </script>
+@else
+    <div class="alert alert-info mt-3">
+        <i class="bi bi-info-circle"></i> No hay datos de ventas para mostrar.
+    </div>
 @endif
 @endpush
