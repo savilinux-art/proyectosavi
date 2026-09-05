@@ -12,9 +12,10 @@ class Usuario extends Model
     protected $primaryKey = 'id';
     public $timestamps = true;
 
+    // ✅ Agregar 'traccar_device_id' a fillable
     protected $fillable = [
         'usuario', 'nombre', 'correo', 'telegram_chat_id',
-        'contraseña', 'rol'
+        'contraseña', 'rol', 'traccar_device_id'  // ← NUEVO
     ];
 
     // Relación inversa con instalaciones (a través de pivote)
@@ -35,13 +36,13 @@ class Usuario extends Model
     {
         return $this->hasMany(UbicacionUsuario::class);
     }
-    
+
     /**
- * Verifica si el usuario tiene un permiso específico (por slug)
- * 
- * @param string $slug
- * @return bool
- */
+     * Verifica si el usuario tiene un permiso específico (por slug)
+     *
+     * @param string $slug
+     * @return bool
+     */
     public function hasPermiso($slug)
     {
         if ($this->rol === 'Administrador') {
@@ -58,5 +59,52 @@ class Usuario extends Model
         return $exists;
     }
 
+    /**
+     * Accessor: Obtiene el dispositivo Traccar asociado al usuario
+     *
+     * @return string|null
+     */
+    public function getTraccarDeviceIdAttribute($value)
+    {
+        return $value;
+    }
 
+    /**
+     * Verifica si el usuario tiene un dispositivo Traccar asignado
+     *
+     * @return bool
+     */
+    public function hasTraccarDevice()
+    {
+        return !is_null($this->traccar_device_id);
+    }
+
+    /**
+     * Obtiene la última ubicación del usuario (desde la tabla ubicaciones_usuarios)
+     *
+     * @return \App\Models\UbicacionUsuario|null
+     */
+    public function ultimaUbicacion()
+    {
+        return $this->ubicaciones()
+            ->latest('fecha_hora')
+            ->first();
+    }
+
+    /**
+     * Obtiene la ubicación en tiempo real desde Traccar (si tiene dispositivo)
+     * Requiere inyectar TraccarService en el controlador, pero aquí solo definimos el método
+     *
+     * @return array|null
+     */
+    public function obtenerUbicacionTraccar()
+    {
+        if (!$this->traccar_device_id) {
+            return null;
+        }
+
+        // Este método será usado desde el controlador
+        // app(\App\Services\TraccarService::class)->getLatestPosition($this->traccar_device_id)
+        return null; // Placeholder
+    }
 }

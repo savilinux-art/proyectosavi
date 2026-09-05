@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\TraccarService;
+use App\Services\TraccarService;  // Usa tu servicio personalizado
 use Illuminate\Http\Request;
 
 class TraccarController extends Controller
@@ -14,29 +14,68 @@ class TraccarController extends Controller
         $this->traccar = $traccar;
     }
 
+    /**
+     * Muestra el mapa con los dispositivos
+     */
     public function index()
     {
-        $devices = $this->traccar->getDevicesWithPositions();
-        return view('traccar.map', compact('devices'));
+        $devices = $this->traccar->getDevices(); // Usa el método que ya tienes
+        $positions = [];
+
+        foreach ($devices as $device) {
+            $pos = $this->traccar->getLatestPosition($device['id'] ?? $device['uniqueId']);
+            if ($pos) {
+                $positions[] = [
+                    'device' => $device,
+                    'position' => $pos,
+                ];
+            }
+        }
+
+        return view('traccar.map', compact('positions'));
     }
 
+    /**
+     * Devuelve las posiciones en JSON
+     */
     public function getPositions()
     {
-        $devices = $this->traccar->getDevicesWithPositions();
-        return response()->json($devices);
+        $devices = $this->traccar->getDevices();
+        $positions = [];
+
+        foreach ($devices as $device) {
+            $pos = $this->traccar->getLatestPosition($device['id'] ?? $device['uniqueId']);
+            if ($pos) {
+                $positions[] = [
+                    'device' => $device,
+                    'position' => $pos,
+                ];
+            }
+        }
+
+        return response()->json($positions);
     }
 
+    /**
+     * Obtiene la posición de un dispositivo específico
+     */
     public function getDevicePosition($deviceId)
     {
-        $position = $this->traccar->getDevicePosition($deviceId);
+        $position = $this->traccar->getLatestPosition($deviceId);
         return response()->json($position);
     }
 
+    /**
+     * Obtiene el historial de un dispositivo (requiere implementar en TraccarService)
+     */
     public function getHistory($deviceId, Request $request)
     {
         $from = $request->get('from', now()->subDay()->toIso8601String());
         $to = $request->get('to', now()->toIso8601String());
+        
+        // Implementa este método en tu servicio o usa la API directamente
         $history = $this->traccar->getDeviceHistory($deviceId, $from, $to);
+        
         return response()->json($history);
     }
 }

@@ -9,8 +9,7 @@ use App\Models\Inventario;
 use App\Models\Usuario;
 use App\Models\Cliente;
 use App\Models\Proyecto;
-use App\Models\Notificacion;
-use App\Models\UbicacionUsuario;  // ← Importante
+use App\Models\UbicacionUsuario;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
 
@@ -100,14 +99,25 @@ class DashboardController extends Controller
             ->get();
 
         // Ubicaciones recientes (últimas 24 horas)
-        $data['ubicacionesRecientes'] = UbicacionUsuario::with(['usuario', 'instalacion'])
+        $data['ubicacionesRecientes'] = UbicacionUsuario::with(['usuario', 'instalacion.proyecto'])
             ->where('fecha_hora', '>=', now()->subDay())
             ->orderBy('fecha_hora', 'desc')
             ->limit(10)
             ->get();
 
         // =====================================================
-        // 4. RETORNAR VISTA CON TODOS LOS DATOS
+        // 4. NUEVO: Ubicaciones activas (con dispositivo Traccar)
+        // =====================================================
+        // Contar usuarios que tienen traccar_device_id asignado
+        $data['ubicaciones_activas'] = Usuario::whereNotNull('traccar_device_id')->count();
+
+        // Opcional: también podemos contar los que han reportado ubicación en la última hora
+        // $data['ubicaciones_recientes_count'] = UbicacionUsuario::where('fecha_hora', '>=', now()->subHour())
+        //     ->distinct('usuario_id')
+        //     ->count('usuario_id');
+
+        // =====================================================
+        // 5. RETORNAR VISTA CON TODOS LOS DATOS
         // =====================================================
         return view('dashboard.index', $data);
     }
@@ -144,6 +154,12 @@ class DashboardController extends Controller
         $inventario_bajo = Inventario::where('existencia', '<', 10)->count();
         if ($inventario_bajo > 0) {
             $notificaciones[] = "⚠️ Hay {$inventario_bajo} producto(s) con inventario bajo";
+        }
+
+        // Notificación de ubicaciones activas
+        $ubicaciones_activas = Usuario::whereNotNull('traccar_device_id')->count();
+        if ($ubicaciones_activas > 0) {
+            $notificaciones[] = "📍 {$ubicaciones_activas} instalador(es) con seguimiento GPS activo";
         }
 
         return $notificaciones;

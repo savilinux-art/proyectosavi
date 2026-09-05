@@ -4,9 +4,7 @@
 
 @section('content')
 <div class="row">
-    
-        <h1 class="mb-4"> Dashboard <small class="text-muted fs-6">Bienvenido, {{ session('user_nombre') }}</small></h1>
-    
+    <h1 class="mb-4"> Dashboard <small class="text-muted fs-6">Bienvenido, {{ session('user_nombre') }}</small></h1>
 </div>
 
 <!-- ==================== NOTIFICACIONES ==================== -->
@@ -22,7 +20,7 @@
                     @endforeach
                 </ul>
             </div>
-       </div>
+        </div>
     </div>
 </div>
 @endif
@@ -49,6 +47,17 @@
                         <div class="col-md-2"><a href="{{ route('proyectos.create') }}" class="text-decoration-none"><div class="card h-100 border-warning hover-shadow"><div class="card-body text-center"><i class="bi bi-folder-plus" style="font-size:36px;color:#ffc107;"></i><h6 class="mt-2">Nuevo Proyecto</h6></div></div></a></div>
                         <div class="col-md-2"><a href="{{ route('instalaciones.create') }}" class="text-decoration-none"><div class="card h-100 border-danger hover-shadow"><div class="card-body text-center"><i class="bi bi-tools" style="font-size:36px;color:#dc3545;"></i><h6 class="mt-2">Nueva Instalación</h6></div></div></a></div>
                         <div class="col-md-2"><a href="{{ route('asignaciones.index') }}" class="text-decoration-none"><div class="card h-100 border-dark hover-shadow"><div class="card-body text-center"><i class="bi bi-person-plus" style="font-size:36px;color:#212529;"></i><h6 class="mt-2">Asignaciones</h6></div></div></a></div>
+                        <!-- 👇 NUEVO: ENLACE A UBICACIONES -->
+                        <div class="col-md-2">
+                            <a href="{{ route('ubicaciones.index') }}" class="text-decoration-none">
+                                <div class="card h-100 border-info hover-shadow">
+                                    <div class="card-body text-center">
+                                        <i class="bi bi-geo-alt" style="font-size:36px;color:#0dcaf0;"></i>
+                                        <h6 class="mt-2">Ubicaciones</h6>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
                     @elseif($userRol == 'Inventarios')
                         @if($hasPermiso('crear-producto'))
                         <div class="col-md-3"><a href="{{ route('inventario.create') }}" class="text-decoration-none"><div class="card h-100 border-primary hover-shadow"><div class="card-body text-center"><i class="bi bi-box" style="font-size:36px;color:#0d6efd;"></i><h6 class="mt-2">Nuevo Producto</h6></div></div></a></div>
@@ -351,6 +360,21 @@
     </div>
 </div>
 
+<!-- 👇 NUEVA TARJETA DE UBICACIONES ACTIVAS -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-info stat-card">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-geo-alt"></i> Ubicaciones Activas</h6>
+                <h2>{{ $ubicaciones_activas ?? 0 }}</h2>
+                <a href="{{ route('ubicaciones.index') }}" class="text-white text-decoration-none">
+                    <small>Ver mapa <i class="bi bi-arrow-right"></i></small>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 @if(isset($ventas_por_estatus) && $ventas_por_estatus->count() > 0)
 <div class="row mb-4">
     <div class="col-md-8">
@@ -488,10 +512,10 @@
                 return;
             }
 
-        const labels = @json($labelsVentas, JSON_HEX_TAG);
-        const data = @json($dataVentas, JSON_HEX_TAG);
-        const backgroundColor = @json($colores, JSON_HEX_TAG);
-        const borderColor = @json($bordes, JSON_HEX_TAG);
+            const labels = @json($labelsVentas, JSON_HEX_TAG);
+            const data = @json($dataVentas, JSON_HEX_TAG);
+            const backgroundColor = @json($colores, JSON_HEX_TAG);
+            const borderColor = @json($bordes, JSON_HEX_TAG);
 
             // Depuración en consola
             console.log('Labels:', labels);

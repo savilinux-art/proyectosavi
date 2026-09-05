@@ -10,12 +10,12 @@ class TraccarService
     protected $username;
     protected $password;
 
-    public function __construct()
-    {
-        $this->baseUrl = env('TRACCAR_BASE_URL', 'http://localhost:8082/');
-        $this->username = env('TRACCAR_USERNAME', 'savilinux@gamil.com');
-        $this->password = env('TRACCAR_PASSWORD', 'Is660222..');
-    }
+   public function __construct()
+{
+    $this->baseUrl = config('traccar.base_url');
+    $this->username = config('traccar.auth.username');
+    $this->password = config('traccar.auth.password');
+}
 
     public function login()
     {

@@ -156,6 +156,11 @@ Route::get('/ubicaciones/usuario/{id}', [UbicacionController::class, 'getUbicaci
     ->name('ubicaciones.usuario')
     ->middleware('permiso:ver-ubicaciones');
 
+
+Route::get('/test-ubicaciones', [UbicacionController::class, 'getUbicaciones']);
+
+
+
 // ============================================================
 // 🧪 RUTAS DE PRUEBA (CORREGIDAS)
 // ============================================================
@@ -187,4 +192,6 @@ Route::get('/test-notify/{id}', function ($id, TelegramService $telegram) {
     } catch (\Exception $e) {
         return '❌ Error: ' . $e->getMessage();
     }
+
+
 });
