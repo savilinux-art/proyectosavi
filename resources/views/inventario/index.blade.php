@@ -107,15 +107,15 @@
                     @foreach($inventario as $item)
                     <tr>
                         <td>{{ $item->id }}</td>
-                        <td>
-                           @if($item->imagen)
-    <img src="{{ asset('img/productos/' . $item->imagen) }}" 
-         width="50" height="50" class="img-thumbnail" alt="Imagen" 
-         style="object-fit: cover;">
-@else
-    <i class="bi bi-image" style="font-size: 24px; color: #ccc;"></i>
-@endif
-                        </td>
+                       <td>
+    @if($item->imagen_url)
+        <img src="{{ $item->imagen_url }}" 
+             width="50" height="50" class="img-thumbnail" 
+             alt="Imagen del producto" style="object-fit: cover;">
+    @else
+        <i class="bi bi-image" style="font-size: 24px; color: #ccc;"></i>
+    @endif
+</td>
                         <td>
                             <strong>{{ $item->modelo }}</strong>
                             <br>

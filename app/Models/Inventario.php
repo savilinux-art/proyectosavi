@@ -17,9 +17,9 @@ class Inventario extends Model
         'descripcion',
         'marca',
         'categoria',
-        'almacen',
+        'almacen_url',
         'apea',
-        'imagen',
+        'imagen_url',
         'fecha_modificacion',
         'comentarios',
         'apartados',
@@ -41,4 +41,22 @@ class Inventario extends Model
     {
         return $this->hasMany(MovimientoInventario::class, 'inventario_id');
     }
+
+    public function getImagenUrlAttribute($value)
+{
+    // Si no hay valor, retorna null o una imagen por defecto
+    if (empty($value)) {
+        return null; // o asset('img/default-product.png')
+    }
+
+    // Si ya es una URL completa (http o https), la devolvemos tal cual
+    if (filter_var($value, FILTER_VALIDATE_URL)) {
+        return $value;
+    }
+
+    // Si comienza con /img/... la convertimos a URL usando asset()
+    // asset() genera la URL completa de tu aplicación
+    return asset($value);
+}
+
 }

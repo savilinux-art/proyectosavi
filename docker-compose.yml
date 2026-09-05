@@ -1,0 +1,22 @@
+services:
+  traccar:
+    image: traccar/traccar:latest
+    container_name: traccar-server
+    restart: always
+    ports:
+      - "8082:8082"    # Web y API
+      - "5000-5150:5000-5150/udp"  # Puertos para dispositivos GPS
+    volumes:
+      - ./traccar-data:/opt/traccar/data   # Persistencia de datos
+      - ./traccar-logs:/opt/traccar/logs   # Logs
+    environment:
+      - TRACCAR_DEBUG=true
+      - TRACCAR_CONFIG_DEFAULT=true
+    networks:
+      - proyectosavi-network
+
+  # Si ya tienes otros servicios como MySQL, Redis, etc., agrégalos aquí
+
+networks:
+  proyectosavi-network:
+    driver: bridge

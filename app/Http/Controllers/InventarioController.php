@@ -31,20 +31,21 @@ class InventarioController extends Controller
             'marca' => 'required|string',
             'categoria' => 'required|exists:categorias,nombre_categoria',
             'existencia' => 'required|integer|min:0',
-            'almacen' => 'required|string',
+            'almacen_url' => 'required|string',
             'apea' => 'required|string',
             'comentarios' => 'nullable|string',
-            'imagen' => 'nullable|image|max:2048'
+            'imagen_url' => 'nullable|string'
         ]);
 
         DB::beginTransaction();
+        
         try {
             $data = $request->all();
             $data['fecha_modificacion'] = now();
             $data['modificado_por'] = Session::get('user_usuario');
 
             if ($request->hasFile('imagen')) {
-                $data['imagen'] = file_get_contents($request->file('imagen')->getRealPath());
+                $data['imagen_url'] = file_get_contents($request->file('imagen')->getRealPath());
             }
 
             $inventario = Inventario::create($data);
@@ -64,12 +65,28 @@ class InventarioController extends Controller
         }
     }
 
-    public function show($id)
-    {
-        $inventario = Inventario::with(['categoriaRelacion', 'modificadoPor'])->findOrFail($id);
-        $movimientos = MovimientoInventario::where('inventario_id', $id)->with('modificadoPor')->get();
-        return view('inventario.show', compact('inventario', 'movimientos'));
-    }
+   public function show($id)
+{
+    $inventario = Inventario::with(['categoriaRelacion', 'modificadoPor'])->findOrFail($id);
+    $movimientos = MovimientoInventario::where('inventario_id', $id)->with('modificadoPor')->get();
+
+    // Calcular totales de movimientos
+    $totalEntradas = $movimientos->sum('entrada');
+    $totalSalidas = $movimientos->sum('salida');
+    $totalAjustes = $movimientos->sum('ajuste');
+    $totalApartados = $movimientos->sum('apartado');
+    $totalDevoluciones = $movimientos->sum('devolucion');
+
+    return view('inventario.show', compact(
+        'inventario',
+        'movimientos',
+        'totalEntradas',
+        'totalSalidas',
+        'totalAjustes',
+        'totalApartados',
+        'totalDevoluciones'
+    ));
+}
 
     public function edit($id)
     {

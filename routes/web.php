@@ -20,7 +20,10 @@ use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\EstatusController;
 use App\Http\Controllers\TelegramWebhookController;
 use App\Http\Controllers\TelegramLocationController;
-use App\Services\TelegramService;
+use App\Services\TelegramService; 
+use APP\Services\TraccarService;
+use App\Http\Controllers\TraccarController;
+use App\Http\Controllers\UbicacionController;
 
 // Auth
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
@@ -125,6 +128,33 @@ Route::middleware(['auth.session', 'permiso:ver-devoluciones'])->group(function 
 Route::middleware(['auth.session'])->group(function () {
     Route::resource('reportes', ReporteController::class)->except(['update']);
 });
+
+// ============================================================
+// 🛰️ RUTAS DE TRACCAR (MAPA Y POSICIONES)
+// ============================================================
+
+ Route::middleware(['auth', 'permiso:ver-ubicaciones'])->group(function () {
+    Route::get('/mapa', [App\Http\Controllers\TraccarController::class, 'index'])->name('mapa.index');
+    Route::get('/mapa/posiciones', [App\Http\Controllers\TraccarController::class, 'getPositions'])->name('mapa.positions');
+    Route::get('/mapa/dispositivo/{deviceId}', [App\Http\Controllers\TraccarController::class, 'getDevicePosition'])->name('mapa.device');
+    Route::get('/mapa/historial/{deviceId}', [App\Http\Controllers\TraccarController::class, 'getHistory'])->name('mapa.history');
+});
+
+
+
+
+// Ubicaciones
+Route::get('/ubicaciones', [UbicacionController::class, 'index'])
+    ->name('ubicaciones.index')
+    ->middleware('permiso:ver-ubicaciones');
+
+Route::get('/ubicaciones/data', [UbicacionController::class, 'getUbicaciones'])
+    ->name('ubicaciones.data')
+    ->middleware('permiso:ver-ubicaciones');
+
+Route::get('/ubicaciones/usuario/{id}', [UbicacionController::class, 'getUbicacion'])
+    ->name('ubicaciones.usuario')
+    ->middleware('permiso:ver-ubicaciones');
 
 // ============================================================
 // 🧪 RUTAS DE PRUEBA (CORREGIDAS)
