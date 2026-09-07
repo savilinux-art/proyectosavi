@@ -125,10 +125,6 @@ public function destroy($id)
         ->with('success', 'Venta eliminada exitosamente.');
 }
 
-// En app/Models/Venta.php
-public function instalaciones()
-{
-    return $this->hasMany(Instalacion::class, 'nombre_proyecto', 'nombre_proyecto');
-}
+
 
 }

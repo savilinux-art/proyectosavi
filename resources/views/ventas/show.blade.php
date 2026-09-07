@@ -3,7 +3,8 @@
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-cart"></i> Detalle de Venta</h1>
-    <div><a href="{{ route('ventas.edit', $venta->id) }}" class="btn btn-warning"><i class="bi bi-pencil"></i> Editar</a><a href="{{ route('ventas.index') }}" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Volver</a></div>
+    <div><a href="{{ route('ventas.edit', $venta) }}" class="btn btn-warning">Editar</a>
+    <a href="{{ route('ventas.index') }}" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Volver</a></div>
 </div>
 <div class="row">
     <div class="col-md-8">

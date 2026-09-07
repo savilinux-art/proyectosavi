@@ -21,7 +21,8 @@
                         <th>Nombre</th>
                         <th>Correo</th>
                         <th>Rol</th>
-                        <th>Telegram Chat ID</th>  <!-- ← Nueva columna -->
+                        <th>Telegram Chat ID</th>
+                        <th>Traccar Device ID</th>   <!-- ← NUEVA COLUMNA -->
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -43,7 +44,17 @@
                             @endif
                         </td>
                         <td>
+                            @if($usuario->traccar_device_id)
+                                <span class="badge bg-info">{{ $usuario->traccar_device_id }}</span>
+                            @else
+                                <span class="badge bg-secondary">No asignado</span>
+                            @endif
+                        </td>
+                        <td>
                             <div class="btn-group">
+                                <a href="{{ route('usuarios.show', $usuario->id) }}" class="btn btn-sm btn-info">
+                                    <i class="bi bi-eye"></i>
+                                </a>
                                 <a href="{{ route('usuarios.edit', $usuario->id) }}" class="btn btn-sm btn-warning">
                                     <i class="bi bi-pencil"></i>
                                 </a>

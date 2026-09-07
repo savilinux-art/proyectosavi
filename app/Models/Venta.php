@@ -75,4 +75,8 @@ class Venta extends Model
     {
         return $query->where('venta_ganada', false);
     }
+
+    
+
+
 }

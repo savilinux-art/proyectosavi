@@ -26,6 +26,29 @@ class DevolucionInventarioController extends Controller
         return view('devoluciones.create', compact('proyectos', 'usuarios', 'productos'));
     }
 
+    // Método para buscar productos en el inventario con existencia mayor a 0
+   public function buscarProductos(Request $request)
+    {
+    $q = $request->get('q');
+
+    // Si la búsqueda tiene menos de 2 caracteres, no devolver nada
+    if (empty($q) || strlen($q) < 2) {
+        return response()->json([]);
+    }
+
+    // 🔥 Eliminamos la condición where('existencia', '>', 0)
+    $productos = Inventario::where(function ($query) use ($q) {
+            $query->where('modelo', 'LIKE', "%{$q}%")
+                  ->orWhere('descripcion', 'LIKE', "%{$q}%")
+                  ->orWhere('marca', 'LIKE', "%{$q}%")
+                  ->orWhere('codigo_origen', 'LIKE', "%{$q}%");
+        })
+        ->orderBy('modelo')
+        ->limit(20)
+        ->get();
+
+    return response()->json($productos);
+    }
     public function store(Request $request)
     {
         $request->validate([

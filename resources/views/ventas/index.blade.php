@@ -18,7 +18,19 @@
 
 <div class="card"><div class="card-body">
     <table class="table table-striped" id="ventasTable">
-        <thead><tr><th>ID</th><th>Título</th><th>Proyecto</th><th>Moneda</th><th>Monto</th><th>Vendedor</th><th>Estatus</th><th>Ganada</th><th>Acciones</th></tr></thead>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Título</th>
+                <th>Proyecto</th>
+                <th>Moneda</th>
+                <th>Monto</th>
+                <th>Vendedor</th>
+                <th>Estatus</th>
+                <th>Ganada</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
         <tbody>
             @foreach($ventas as $venta)
             <tr>
@@ -32,9 +44,12 @@
                 <td>@if($venta->venta_ganada)<span class="badge bg-success"><i class="bi bi-check-circle"></i> Sí</span>@else<span class="badge bg-danger"><i class="bi bi-x-circle"></i> No</span>@endif</td>
                 <td>
                     <div class="btn-group">
-                        <a href="{{ route('ventas.show', $venta->id) }}" class="btn btn-sm btn-info"><i class="bi bi-eye"></i></a>
-                        <a href="{{ route('ventas.edit', $venta->id) }}" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i></a>
-                        <form action="{{ route('ventas.destroy', $venta->id) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Eliminar esta venta?')">@csrf @method('DELETE')<button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button></form>
+                        <a href="{{ route('ventas.show', $venta->nombre_proyecto) }}" class="btn btn-sm btn-info"><i class="bi bi-eye"></i></a>
+                        <a href="{{ route('ventas.edit', $venta->nombre_proyecto) }}" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i></a>
+                        <form action="{{ route('ventas.destroy', $venta->nombre_proyecto) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Eliminar esta venta?')">
+                            @csrf @method('DELETE')
+                            <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
+                        </form>
                     </div>
                 </td>
             </tr>

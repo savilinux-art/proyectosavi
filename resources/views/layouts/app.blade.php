@@ -140,6 +140,12 @@
                 <i class="bi bi-speedometer2"></i> Dashboard
             </a>
 
+<li class="nav-item">
+    <a class="nav-link" href="{{ route('geocercas.index') }}">
+        <i class="bi bi-pin-map"></i> Geocercas
+    </a>
+</li>
+
             <!-- ==================== INVENTARIO ==================== -->
             @if(in_array(session('user_rol'), ['Administrador', 'Ventas', 'Inventarios']) || (session('user_usuario') && \App\Models\Usuario::find(session('user_usuario'))?->hasPermiso('ver-inventario')))
             <div class="menu-label mt-3">Inventario</div>

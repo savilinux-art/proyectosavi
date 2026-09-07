@@ -7,7 +7,7 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
-## About Laravel
+## Acerca de  Laravel
 
 Laravel es un framework para aplicaciones web con una sintaxis expresiva y elegante. Creemos que el desarrollo debe ser una experiencia creativa y agradable para resultar verdaderamente gratificante. Laravel elimina las complicaciones del desarrollo al facilitar tareas comunes en muchos proyectos web, tales como:
 
@@ -21,7 +21,7 @@ Laravel es un framework para aplicaciones web con una sintaxis expresiva y elega
 
 Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
-## Learning Laravel
+## Aprendiendo Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
 
@@ -56,3 +56,63 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+
+
+# 🏗️ ProyectoSAVI - Sistema de Gestión de Instalaciones Tecnológicas
+
+Sistema empresarial para la gestión integral de **ventas, proyectos, instalaciones, inventario y seguimiento en tiempo real de instaladores** mediante GPS y Telegram.
+
+---
+
+## 🎯 **Objetivo**
+
+Gestionar el ciclo completo de una empresa de instalaciones tecnológicas, desde la **prospección de ventas** hasta la **finalización de instalaciones**, con seguimiento de **inventario** y **ubicaciones en tiempo real**.
+
+---
+
+## 🧱 **Arquitectura Técnica**
+
+| Componente | Tecnología |
+|------------|------------|
+| **Backend** | Laravel 13 (PHP 8.3.6) |
+| **Base de Datos** | MariaDB 10.11 |
+| **Frontend** | Blade + Bootstrap 5 + jQuery + DataTables + Leaflet.js |
+| **Autenticación** | Sesiones nativas + Middleware personalizado |
+| **WebSockets** | Laravel Reverb (tiempo real) |
+| **Notificaciones** | Telegram Bot API |
+| **GPS / Seguimiento** | Traccar (servidor GPS) |
+| **Mapas** | Leaflet.js + OpenStreetMap |
+| **Exportaciones** | Laravel Excel, Dompdf (PDF) |
+| **Control de acceso** | Sistema propio basado en roles y permisos |
+
+---
+
+## 📂 **Estructura de Base de Datos**
+
+### 🧩 Principales Tablas y Relaciones
+
+```sql
+usuarios (id, usuario, nombre, correo, telegram_chat_id, traccar_device_id, rol)
+roles (id, rol)
+permisos (id, nombre, slug, modulo)
+permiso_rol (rol, permiso_id, permitido)
+
+ventas (id, titulo_venta, nombre_proyecto, monto_venta, estatus, vendedor)
+proyectos (id, nombre_proyecto, correo_electronico, ubicacion)
+
+instalaciones (id, nombre_proyecto, fecha_hora_inicio, estatus_instalacion, check_list)
+instalacion_instalador (instalacion_id, instalador_usuario, es_principal)
+
+inventario (id, existencia, modelo, descripcion, marca, categoria, imagen_url)
+movimientos_inventario (id, inventario_id, entrada, salida, ajuste)
+salidas_inventario (id, nombre_proyecto, entregado_por, entregado_a, productos)
+devoluciones_inventario (id, nombre_proyecto, devuelto_por, recibido_por, productos)
+
+ubicaciones_usuarios (id, usuario_id, latitud, longitud, tipo, instalacion_id)
+solicitudes_ubicacion (id, usuario_id, chat_id, tipo, instalacion_id)
+
+geocercas (id, nombre, latitud, longitud, radio, proyecto_id)
+geocerca_alertas (id, geocerca_id, usuario_id, tipo, fecha_hora)
+
+traccar_devices (id, name, uniqueId, lastUpdate)

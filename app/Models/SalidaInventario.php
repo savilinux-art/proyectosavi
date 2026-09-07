@@ -25,6 +25,26 @@ class SalidaInventario extends Model
         'fecha_hora_salida' => 'datetime',
     ];
 
+    public function imprimir($id)
+    {
+         return $this->downloadPDF($id);
+    }
+
+    public function show($id)
+    {
+    $salida = SalidaInventario::with(['proyecto', 'entregadoPor', 'entregadoA'])->findOrFail($id);
+    
+    // Decodificar productos (JSON string → array)
+    $productos = json_decode($salida->productos, true);
+    if (!is_array($productos)) {
+        $productos = [];
+    }
+
+    return view('salidas.show', compact('salida', 'productos'));
+    }
+
+
+
     public function proyecto()
     {
         return $this->belongsTo(Venta::class, 'nombre_proyecto', 'nombre_proyecto');

@@ -24,6 +24,14 @@ class UsuarioController extends Controller
     $usuarios = Usuario::all(); // o con orden, filtros, etc.
     return view('usuarios.index', compact('usuarios'));
 }
+/**
+ * Display the specified user.
+ */
+public function show($id)
+{
+    $usuario = Usuario::findOrFail($id);
+    return view('usuarios.show', compact('usuario'));
+}
 
     public function create()
     {
@@ -36,14 +44,15 @@ class UsuarioController extends Controller
     {
         if ($redir = $this->verificarAdmin()) return $redir;
 
-        $request->validate([
-            'usuario' => 'required|string|unique:usuarios',
-            'nombre' => 'required|string',
-            'correo' => 'required|email|unique:usuarios',
-            'contraseña' => 'required|string|min:6|confirmed',
-            'telegram_chat_id' => 'nullable|string',
-            'rol' => 'required|exists:roles,rol'
-        ]);
+       $request->validate([
+    'usuario' => 'required|unique:usuarios,usuario,' . $usuario->id,
+    'nombre' => 'required',
+    'correo' => 'required|email|unique:usuarios,correo,' . $usuario->id,
+    'telegram_chat_id' => 'nullable|unique:usuarios,telegram_chat_id,' . $usuario->id,
+    'traccar_device_id' => 'nullable|unique:usuarios,traccar_device_id,' . $usuario->id,
+    'rol' => 'required|exists:roles,rol',
+    'contraseña' => 'required|min:6',
+]);
 
         DB::beginTransaction();
         try {
@@ -72,34 +81,36 @@ class UsuarioController extends Controller
     }
 public function update(Request $request, $id)
 {
-    $usuario = Usuario::findOrFail($id);
-
+    // 1. Validar los datos
     $request->validate([
-        'usuario' => 'required|string|max:255|unique:usuarios,usuario,' . $id,
-        'nombre' => 'required|string|max:255',
-        'correo' => 'required|email|max:255|unique:usuarios,correo,' . $id,
-        'telegram_chat_id' => 'nullable|string|max:255', // ← Opcional
-        'contraseña' => 'nullable|string|min:6',
-        'rol' => 'required|string|exists:roles,rol',
+        'usuario' => 'required|unique:usuarios,usuario,' . $id,
+        'nombre' => 'required',
+        'correo' => 'required|email|unique:usuarios,correo,' . $id,
+        'telegram_chat_id' => 'nullable|unique:usuarios,telegram_chat_id,' . $id,
+        'traccar_device_id' => 'nullable|unique:usuarios,traccar_device_id,' . $id,  // ← Validación
+        'rol' => 'required|exists:roles,rol',
     ]);
 
-    $data = $request->all();
+    // 2. Buscar el usuario
+    $usuario = Usuario::findOrFail($id);
 
-    // Si no se envió contraseña, la eliminamos del array para no actualizarla
-    if (empty($data['contraseña'])) {
-        unset($data['contraseña']);
-    } else {
-        $data['contraseña'] = bcrypt($data['contraseña']);
+    // 3. Asignar los valores
+    $usuario->usuario = $request->usuario;
+    $usuario->nombre = $request->nombre;
+    $usuario->correo = $request->correo;
+    $usuario->telegram_chat_id = $request->telegram_chat_id;
+    $usuario->traccar_device_id = $request->traccar_device_id;  // ← Aquí se asigna el valor
+    $usuario->rol = $request->rol;
+
+    // Si estás actualizando la contraseña
+    if ($request->filled('contraseña')) {
+        $usuario->contraseña = bcrypt($request->contraseña);
     }
 
-    // Si telegram_chat_id está vacío, lo guardamos como null
-    if (empty($data['telegram_chat_id'])) {
-        $data['telegram_chat_id'] = null;
-    }
+    // 4. Guardar en la base de datos
+    $usuario->save();  // ← Aquí se guarda el campo en la tabla
 
-    $usuario->update($data);
-
-    return redirect()->route('usuarios.index')->with('success', 'Usuario actualizado exitosamente.');
+    return redirect()->route('usuarios.index')->with('success', 'Usuario actualizado correctamente');
 }
    
 

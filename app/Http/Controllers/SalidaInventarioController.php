@@ -19,6 +19,10 @@ class SalidaInventarioController extends Controller
         return view('salidas.index', compact('salidas'));
     }
 
+    /**
+     * Show the form for creating a new salida.
+     */
+
     public function create()
     {
         $proyectos = Venta::where('venta_ganada', true)->get();
@@ -26,6 +30,33 @@ class SalidaInventarioController extends Controller
         $productos = Inventario::where('existencia', '>', 0)->get();
         return view('salidas.create', compact('proyectos', 'usuarios', 'productos'));
     }
+
+    // Buscar productos con stock positivo para Select2
+    public function buscarProductos(Request $request)
+{
+    $search = $request->get('q');
+
+    // Si la búsqueda tiene menos de 2 caracteres, no devolver nada
+    if (empty($search) || strlen($search) < 2) {
+        return response()->json([]);
+    }
+
+    $productos = Inventario::where('existencia', '>', 0)
+        ->where(function ($query) use ($search) {
+            $query->where('modelo', 'LIKE', "%{$search}%")
+                  ->orWhere('descripcion', 'LIKE', "%{$search}%")
+                  ->orWhere('marca', 'LIKE', "%{$search}%")
+                  ->orWhere('codigo_origen', 'LIKE', "%{$search}%");
+        })
+        ->orderBy('modelo')
+        ->limit(20)
+        ->get();
+
+    // Devolver los productos directamente (con todas sus columnas)
+    return response()->json($productos);
+}
+
+    // Store a newly created salida in storage.
 
     public function store(Request $request)
     {
@@ -65,28 +96,33 @@ class SalidaInventarioController extends Controller
         }
     }
 
+
+    // Display the specified salida.
     public function show($id)
     {
-        $salida = SalidaInventario::with(['proyecto', 'entregadoPor', 'entregadoA'])->findOrFail($id);
-        return view('salidas.show', compact('salida'));
+    $salida = SalidaInventario::with(['proyecto', 'entregadoPor', 'entregadoA'])->findOrFail($id);
+    
+    // Decodificar productos
+    $productos = json_decode($salida->productos, true);
+    if (!is_array($productos)) {
+        $productos = [];
     }
 
-    public function destroy($id)
-    {
-        // Restaurar stock antes de eliminar
-        $salida = SalidaInventario::findOrFail($id);
-        $productos = json_decode($salida->productos, true);
-        foreach ($productos as $item) {
-            $producto = Inventario::find($item['inventario_id']);
-            if ($producto) {
-                $producto->existencia += $item['cantidad'];
-                $producto->save();
+    // Enriquecer productos con datos del inventario
+    foreach ($productos as &$item) {
+        if (isset($item['inventario_id'])) {
+            $inv = Inventario::find($item['inventario_id']);
+            if ($inv) {
+                $item['modelo'] = $inv->modelo ?? 'N/A';
+                $item['descripcion'] = $inv->descripcion ?? 'N/A';
+                $item['marca'] = $inv->marca ?? 'N/A';
             }
         }
-        $salida->delete();
-        return redirect()->route('salidas.index')->with('success', 'Salida eliminada y stock restaurado.');
     }
 
+    return view('salidas.show', compact('salida', 'productos'));
+}
+    // Generate and download PDF for the specified salida.
     public function downloadPDF($id, $copia = null)
     {
         $salida = SalidaInventario::with(['proyecto', 'entregadoPor', 'entregadoA'])->findOrFail($id);

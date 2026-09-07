@@ -24,6 +24,7 @@ use App\Services\TelegramService;
 use APP\Services\TraccarService;
 use App\Http\Controllers\TraccarController;
 use App\Http\Controllers\UbicacionController;
+use App\Http\Controllers\GeocercaController;
 
 // Auth
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
@@ -41,18 +42,18 @@ Route::middleware(['auth.session', 'permiso:ver-inventario'])->group(function ()
     Route::get('inventario/export', [InventarioController::class, 'export'])->name('inventario.export');
 });
 
-// Salidas de Inventario
-Route::middleware(['auth.session'])->group(function () {
-    Route::resource('salidas', SalidaInventarioController::class);
-    Route::get('salidas/buscar-productos', [SalidaInventarioController::class, 'buscarProductos'])->name('salidas.buscarProductos');
-    Route::get('salidas/{id}/download/{copia?}', [SalidaInventarioController::class, 'downloadPDF'])->name('salidas.download');
-    Route::get('salidas/{id}/imprimir', [SalidaInventarioController::class, 'imprimir'])->name('salidas.imprimir');
-});
+//
+
+
 
 // ✅ Devoluciones de Inventario (corregido)
 Route::middleware(['auth.session'])->group(function () {
+    // ⚠️ PRIMERO las rutas específicas (ANTES del resource)
+    Route::get('devoluciones/buscar-productos', [DevolucionInventarioController::class, 'buscarProductos'])
+        ->name('devoluciones.buscarProductos');
+
+    // ⚠️ DESPUÉS el resource (captura devoluciones/{id})
     Route::resource('devoluciones', DevolucionInventarioController::class);
-    Route::get('devoluciones/buscar-productos', [DevolucionInventarioController::class, 'buscarProductos'])->name('devoluciones.buscarProductos');
 });
 
 // Ventas
@@ -115,10 +116,14 @@ Route::post('/telegram/send-location/end/{id}', [TelegramLocationController::cla
     ->name('telegram.send-end');
 
 // Salidas y Devoluciones (repetido, pero lo dejamos)
+
+Route::get('salidas/buscar-productos', [SalidaInventarioController::class, 'buscarProductos'])->name('salidas.buscarProductos');
+
 Route::middleware(['auth.session', 'permiso:ver-salidas'])->group(function () {
     Route::resource('salidas', SalidaInventarioController::class);
     Route::get('salidas/{id}/download/{copia?}', [SalidaInventarioController::class, 'downloadPDF'])->name('salidas.download');
 });
+Route::get('salidas/{id}/imprimir', [SalidaInventarioController::class, 'imprimir'])->name('salidas.imprimir');
 
 Route::middleware(['auth.session', 'permiso:ver-devoluciones'])->group(function () {
     Route::resource('devoluciones', DevolucionInventarioController::class);
@@ -138,6 +143,7 @@ Route::middleware(['auth.session'])->group(function () {
     Route::get('/mapa/posiciones', [App\Http\Controllers\TraccarController::class, 'getPositions'])->name('mapa.positions');
     Route::get('/mapa/dispositivo/{deviceId}', [App\Http\Controllers\TraccarController::class, 'getDevicePosition'])->name('mapa.device');
     Route::get('/mapa/historial/{deviceId}', [App\Http\Controllers\TraccarController::class, 'getHistory'])->name('mapa.history');
+
 });
 
 
@@ -158,6 +164,9 @@ Route::get('/ubicaciones/usuario/{id}', [UbicacionController::class, 'getUbicaci
 
 
 Route::get('/test-ubicaciones', [UbicacionController::class, 'getUbicaciones']);
+
+Route::resource('geocercas', GeocercaController::class);
+Route::get('geocercas/activas', [GeocercaController::class, 'activas'])->name('geocercas.activas');
 
 
 
@@ -195,3 +204,4 @@ Route::get('/test-notify/{id}', function ($id, TelegramService $telegram) {
 
 
 });
+

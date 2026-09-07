@@ -1,0 +1,621 @@
+RESUMEN TÉCNICO – SISTEMA PROYECTOSAVI
+Última actualización: Septiembre 2026
+Versión:	2.0.0
+Repositorio: https://github.com/savilinux-art/proyectosavi
+Base de datos: proyectosavi.sql (incluido)
+
+🎯 PROPÓSITO GENERAL
+Sistema de gestión empresarial especializado en instalaciones tecnológicas (domótica, audiovisuales, redes, seguridad, etc.). Permite administrar el ciclo completo:
+    • Ventas (desde prospección hasta cierre)
+    • Proyectos (derivados de ventas ganadas)
+    • Instalaciones (planificación, ejecución, reporte de evidencias  e incidencias, checklist)
+    • Inventario (productos, movimientos, apartados, salidas, devoluciones)
+    • Asignación de instaladores con notificaciones vía Telegram con reporte de inicio y fin de jornada
+    • Seguimiento GPS en tiempo real (integración con Traccar para teléfonos u automóviles)
+    • Roles y permisos granulares para distintos perfiles (Administrador, Ventas, Inventarios, Instalador, Contabilidad, Sistemas)
+
+🧱 ARQUITECTURA TÉCNICA
+Componente
+Tecnología
+Backend
+Laravel 13 (PHP 8.3.6)
+Base de datos
+MariaDB 10.11
+Frontend
+Blade, Bootstrap 5, jQuery, DataTables, Leaflet.js
+Autenticación
+Sesiones nativas + Middleware personalizado
+Notificaciones
+Telegram Bot API (paquete irazasyed/telegram-bot-sdk)
+GPS / Seguimiento
+Traccar (servidor independiente, sin Docker) + Servicio propio
+Mapas
+Leaflet.js + OpenStreetMap
+Exportaciones
+Laravel Excel, Dompdf (PDF)  automáticos sin limites
+Control de acceso
+Sistema propio basado en tablas permisos y permiso_rol
+
+📁 ESTRUCTURA DE LA BASE DE DATOS (PRINCIPALES TABLAS Y RELACIONES)
+🔐 Usuarios y Roles
+    • usuarios: id, usuario, nombre, correo, telegram_chat_id, traccar_device_id, contraseña, rol (FK a roles.rol).
+    • roles: id, rol (Administrador, Contabilidad, Inventarios, Instalador, Ventas, Sistemas).
+    • permisos: id, nombre, slug, descripción, módulo.
+    • permiso_rol: relación muchos a muchos entre rol y permiso, con campo
+       permitido.
+    • Proyectos e instalaciones:  con  relación muchos a muchos
+📦 Ventas y Proyectos
+    • ventas: id, titulo_venta, nombre_proyecto (único), moneda, monto_venta, requerimiento, vendedor (FK a usuarios.usuario), estatus (FK a estatus.estatus), cotización (BLOB), levantamiento (BLOB), ubicación (point), fechas.
+    • proyectos: id, nombre_proyecto (FK a ventas.nombre_proyecto), correo, ubicación (point), propuesta_economica, archivo_as_built, credenciales, salida_inventario, devolucion_inventario, modificado_por (FK a usuarios.usuario).
+    • estatus: id, estatus (ej. prospeccion, cierre_venta, en_proceso), tipo (venta, instalacion, proyecto).
+🔧 Instalaciones y Asignaciones
+    • instalaciones: id, nombre_proyecto (FK a ventas.nombre_proyecto), ubicacion_actual (point), evidencia_inicio (BLOB), incidencias (BLOB), evidencia_fin (BLOB), check_list (JSON), fecha_hora_inicio, fecha_hora_fin, estatus_instalacion (FK a estatus.estatus), nombre_instalacion.
+    • instalacion_instalador: tabla pivote con instalacion_id, instalador_usuario (FK a usuarios.usuario), es_principal.
+📍 Ubicaciones y Telegram
+    • ubicaciones_usuarios: registra latitud, longitud, tipo (inicio/fin), instalacion_id, usuario_id, fecha_hora, detalles (JSON).
+    • solicitudes_ubicacion: almacena solicitudes pendientes de ubicación para asociar con instalaciones.
+📦 Inventario y Movimientos
+    • inventario: id, existencia, modelo, descripción, marca, categoria (FK a categorias.nombre_categoria), almacén, apeas, imagen (BLOB), imagen_url, fecha_modificacion, comentarios, apartados (string), cantidad_apartados, modificado_por (FK a usuarios.usuario), codigo_origen, fecha_alta, precio.
+    • movimientos_inventario: id, inventario_id, entrada, salida, ajuste, devolucion, apartado, instalacion (FK a ventas.nombre_proyecto), devolucion_proveedor, modificado_por, comentarios.
+    • salidas_inventario: id, nombre_proyecto (FK a ventas.nombre_proyecto), entregado_por, entregado_a (FK a usuarios), productos (JSON), fecha_hora_salida, observaciones.
+    • devoluciones_inventario: similar a salidas.
+🗺️ Integración Traccar
+    • traccar_devices: creada por migración, almacena dispositivos sincronizados con Traccar (name, uniqueId, status, etc.).
+    • usuarios.traccar_device_id: vincula cada usuario con su dispositivo en Traccar.
+📊 Otras tablas
+    • categorias: catálogo de categorías de productos.
+    • clientes: datos de clientes (rfc, razón social, nombre_proyecto, etc.).
+    • sessions: sesiones de Laravel.
+    • notificaciones: para alertas internas  y externas
+
+🧩 MÓDULOS FUNCIONALES (CONTROLADORES Y SERVICIOS)
+Módulo
+Controlador / Servicio
+Funcionalidad
+Autenticación
+AuthController
+Login, logout, sesión por usuario
+Dashboard
+DashboardController
+Estadísticas según rol, notificaciones, acceso rápido
+Usuarios
+UsuarioController
+CRUD de usuarios, asignación de rol y Telegram Chat ID
+Ventas
+VentaController
+Gestión de oportunidades, cambio de estatus, cotizaciones
+Proyectos
+ProyectoController
+Proyectos derivados de ventas ganadas
+Instalaciones
+InstalacionController
+Creación, edición, checklist, evidencias
+Asignaciones
+AsignacionInstalacionController
+Asignar instaladores a instalaciones y enviar notificaciones Telegram
+Inventario
+InventarioController
+CRUD de productos, movimientos, stock bajo
+Salidas / Devoluciones
+SalidaInventarioController, DevolucionInventarioController
+Control de inventario por proyecto
+Ubicaciones (GPS)
+UbicacionController
+Muestra mapa con posiciones de instaladores (Leaflet)
+Traccar (Servicio)
+TraccarService
+Consume API REST de Traccar para obtener dispositivos y posiciones
+Telegram
+TelegramService, TelegramWebhookController
+Notificaciones y recepción de ubicaciones
+Rutas clave (web.php):
+    • /ventas, /proyectos, /instalaciones, /asignaciones, /inventario, /ubicaciones, /dashboard, /usuarios
+Middleware de permisos: Cada ruta importante usa permiso:slug para controlar acceso.
+
+🔄 FLUJO CLAVE: INSTALACIONES + TELEGRAM + UBICACIONES
+    1. Administrador crea una instalación (sin instaladores) y la asigna a un proyecto.
+    2. Administrador va a Asignaciones, selecciona la instalación y elige uno o más instaladores (con telegram_chat_id y Traccer).
+    3. Al guardar, se envía un mensaje vía Telegram a cada instalador con dos botones: Iniciar Jornada y Finalizar Jornada.
+    4. Al pulsar un botón, Telegram solicita al instalador compartir su ubicación.
+    5. El webhooks (/api/telegram/webhook) recibe la ubicación, la asocia a la instalación y al tipo (inicio/fin), y la guarda en ubicaciones_usuarios.
+    6. En el Dashboard y en el detalle de instalación se muestran las ubicaciones recientes con enlace a Google Maps.
+
+🛰️ INTEGRACIÓN CON TRACCAR (GPS EN TIEMPO REAL)
+    • Servidor  Traccar se ejecuta en localhost:8082 (sin Docker, instalado como servicio systemd).
+    • Servicio propio App\Services\TraccarService consume la API REST de Traccar usando Guzzle (Http facade).
+    • Métodos principales:
+        ◦ login(): obtiene el JSESSIONID.
+        ◦ getDevices(): lista de dispositivos.
+        ◦ getLatestPosition($deviceId): última posición de un dispositivo.
+    • Controlador UbicacionController:
+        ◦ index(): muestra el mapa Leaflet.
+        ◦ getUbicaciones(): devuelve JSON con posiciones de usuarios que tienen traccar_device_id asignado.
+    • Vista ubicaciones/index.blade.php: mapa Leaflet con marcadores y tabla de instaladores activos, actualización automática cada 15 segundos.
+    • Dashboard incluye estadísticas de ubicaciones activas y enlaces directos al mapa.
+
+🔐 SISTEMA DE PERMISOS Y ROLES
+    • Roles disponibles: Administrador, Contabilidad, Inventarios, Instalador, Ventas, Sistemas.
+    • Permisos: cada acción (ver, crear, editar, eliminar, exportar) se asigna por rol a través de la tabla permiso_rol.
+    • Middleware PermisoMiddleware verifica que el usuario tenga el permiso requerido para acceder a cada ruta.
+    • Método hasPermiso($slug) en el modelo Usuario permite verificar permisos en las vistas.
+
+🚀 MEJORAS REALIZADAS (ÚLTIMOS PASOS)
+    • Corrección de imágenes en inventario: se usa imagen_url en lugar de imagen (BLOB), y se creó un accessor para normalizar URLs.
+    • Integración Traccar sin Docker: Traccar instalado directamente en el servidor (localhost).
+    • Módulo de ubicaciones en el dashboard: se agregaron tarjetas con estadísticas y acceso rápido.
+    • Servicio de Traccar personalizado: se eliminó la dependencia del paquete mr-wolf-gb/traccar para mayor control.
+    • Separación de controladores: UbicacionController y TraccarController para manejar la lógica de GPS y mapa.
+
+📌 ÁREAS DE OPORTUNIDAD (MEJORAS FUTURAS)
+    • Normalizar inventario: crear tablas marcas, modelos para evitar redundancia.
+    • Migrar BLOB a almacenamiento en disco: imágenes, cotizaciones, evidencias, etc., usar Storage de Laravel.
+    • Unificar movimientos de inventario: reemplazar columnas entrada, salida, ajuste, devolucion, apartado por una sola columna tipo y cantidad.
+    • Optimizar instalacion_instalador: cambiar instalador_usuario (string) por instalador_id (FK) para integridad referencial.
+    • Implementar historial de precios: tabla precios_historial para control de costos.
+    • WebSockets: usar Laravel Reverb para actualizar mapa en tiempo real sin recarga manual.
+    • Testing: agregar pruebas unitarias para servicios críticos.
+
+🗂️ ARCHIVOS RELEVANTES PARA EL DESARROLLADOR
+Archivo / Ruta
+Descripción
+app/Http/Controllers/
+Controladores principales
+app/Models/
+Modelos Eloquent
+app/Services/TraccarService.php
+Servicio de integración con Traccar
+app/Http/Middleware/PermisoMiddleware.php
+Control de permisos
+config/traccar.php
+Configuración de Traccar (base_url, auth)
+routes/web.php
+Rutas principales
+routes/api.php
+Webhook de Telegram
+resources/views/
+Vistas Blade (dashboard, inventario, ubicaciones, etc.)
+public/img/productos/
+Imágenes de productos (referenciadas en imagen_url)
+.env
+Variables de entorno (incluye TRACCAR_BASE_URL, credenciales, etc.)
+
+🔧 COMANDOS ÚTILES
+bash
+# Migraciones (si se agregan nuevas)
+php artisan migrate
+
+# Seeders (para datos iniciales)
+php artisan db:seed
+
+# Limpiar caché
+php artisan config:clear
+php artisan cache:clear
+php artisan view:clear
+
+# Servicio Traccar (si se detiene)
+sudo systemctl start traccar   # o stop, status
+
+# Recargar autoload
+composer dump-autoload
+
+1.	instalacion por pimera vez
+
+# Clonar repositorio
+git clone https://github.com/savilinux-art/proyectosavi.git
+cd proyectosavi
+
+# Instalar dependencias PHP
+composer install
+
+# Instalar dependencias Node.js
+npm install
+
+# Crear archivo de entorno
+cp .env.example .env
+
+# Generar clave de aplicación
+php artisan key:generate
+ 
+ 2.	Bases de datos
+
+# Ejecutar migraciones (crear tablas)
+php artisan migrate
+
+# (Opcional) Seeders para datos iniciales
+php artisan db:seed
+
+# Crear tabla específica
+php artisan make:migration nombre_de_la_migracion
+
+# Ejecutar migración específica
+php artisan migrate --path=database/migrations/2026_09_05_add_traccar_device_id_to_usuarios_table.php
+
+# Revertir migraciones
+php artisan migrate:rollback
+
+3.	Servidor de desarrollo
+
+# Servidor PHP integrado
+php artisan serve
+
+# Servidor en puerto específico
+php artisan serve --port=8000
+
+# Servidor con host específico
+php artisan serve --host=0.0.0.0 --port=8000
+4.	Compilar Assets (Frontend)
+
+# Instalar dependencias frontend (si no lo hiciste)
+npm install
+
+# Compilar assets para desarrollo (con recarga automática)
+npm run dev
+
+# Compilar assets para producción
+npm run build
+
+# Si usas Vite y quieres ver el puerto
+npm run dev -- --host
+
+6. Telegram Bot
+
+# Configurar Webhook de Telegram (¡una sola vez!)
+# Reemplaza TU_TOKEN y TU_URL
+curl -F "url=https://tu-dominio.com/api/telegram/webhook" https://api.telegram.org/bot<TU_TOKEN>/setWebhook
+
+# Verificar Webhook
+curl -X GET "https://api.telegram.org/bot<TU_TOKEN>/getWebhookInfo"
+
+# Probar webhook manualmente
+curl -X POST "https://tu-dominio.com/api/telegram/webhook" \
+  -H "Content-Type: application/json" \
+  -d '{"update_id":123,"message":{"chat":{"id":8884130238},"location":{"latitude":20.77276,"longitude":-105.22004}}}'
+
+
+7. Traccar (GPS)
+# Verificar estado de Traccar
+sudo systemctl status traccar
+
+# Iniciar Traccar
+sudo systemctl start traccar
+
+# Detener Traccar
+sudo systemctl stop traccar
+
+# Reiniciar Traccar
+sudo systemctl restart traccar
+
+# Ver logs de Traccar en tiempo real
+sudo journalctl -u traccar -f
+
+# O alternativamente
+sudo tail -f /opt/traccar/logs/tracker-server.log
+
+# Verificar que Traccar esté escuchando
+sudo netstat -tlnp | grep 8082
+
+8. Limpieza y Mantenimiento (Laravel)
+# Limpiar caché
+php artisan cache:clear
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+
+# Limpiar todo de una vez (Laravel 11+)
+php artisan optimize:clear
+
+# Recargar autoloader
+composer dump-autoload
+
+# Optimizar para producción
+php artisan optimize
+9. Consultas y Depuración
+
+# Ver rutas registradas
+php artisan route:list
+
+# Filtrar rutas
+php artisan route:list | grep ventas
+
+# Abrir Tinker (REPL de Laravel)
+php artisan tinker
+
+# Ver logs en tiempo real
+tail -f storage/logs/laravel.log
+
+# Ver variables de entorno
+php artisan env
+10. Pruebas y Validación
+
+# Ejecutar pruebas (si existen)
+php artisan test
+
+# Verificar que el sistema está funcionando (health check)
+curl http://localhost:8000/health
+
+11. Git y Despliegue
+# Ver estado del repositorio
+git status
+
+# Agregar cambios
+git add .
+
+# Crear commit
+git commit -m "Descripción del cambio"
+
+# Subir cambios
+git push origin main
+
+# Traer cambios del repositorio
+git pull origin main
+
+12	Resumen Rápido (Comandos Diarios)
+
+# 👉 Iniciar sistema completo (desarrollo)
+# 1. Servidor Laravel
+php artisan serve
+
+# 2. Reverb (WebSockets)
+php artisan reverb:start --host=127.0.0.1 --port=8080 &
+
+# 3. Frontend (Vite)
+npm run dev
+
+# 4. Traccar (si no está corriendo)
+sudo systemctl start traccar
+
+# 👉 Detener todo
+# 1. Servidor Laravel: Ctrl+C
+# 2. Reverb: pkill -f "php artisan reverb"
+# 3. Vite: Ctrl+C
+# 4. Traccar: sudo systemctl stop traccar
+
+13.	Variables de Entorno (.env) Esenciales
+# Aplicación
+APP_NAME=ProyectosAVI
+APP_ENV=local
+APP_DEBUG=true
+APP_URL=http://localhost:8000
+
+# Base de datos
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=proyectosavi
+DB_USERNAME=root
+DB_PASSWORD=
+
+# Telegram
+TELEGRAM_BOT_TOKEN=8707500603:AAF_L_peg7MVCys6Jro7QEC25A0RKgS5UWI
+TELEGRAM_BOT_USERNAME=Proyectosavibot
+npm run dev
+# Traccar
+TRACCAR_BASE_URL=http://localhost:8082/
+TRACCAR_USERNAME=savilinux@gmail.com
+TRACCAR_PASSWORD=Is660222..
+
+# Reverb
+REVERB_APP_ID=123456
+REVERB_APP_KEY=abcdefghijklmnopqrstuvwxyz
+REVERB_APP_SECRET=abcdefghijklmnopqrstuvwxyz
+REVERB_HOST=127.0.0.1
+REVERB_PORT=8080
+VITE_REVERB_APP_KEY=${REVERB_APP_KEY}
+VITE_REVERB_HOST=${REVERB_HOST}
+VITE_REVERB_PORT=${REVERB_PORT}
+
+📋 RESUMEN DE REQUERIMIENTOS TÉCNICOS – SISTEMA PROYECTOSAVI
+
+1. 🐧 Requerimientos del Sistema Operativo
+Componente
+Versión Mínima
+Recomendada
+Sistema Operativo
+Linux (Ubuntu 22.04/24.04)
+Ubuntu 24.04 LTS
+Servidor Web
+Apache 2.4 / Nginx 1.18
+Nginx 1.26
+PHP
+8.2
+8.3.6+
+Base de Datos
+MariaDB 10.6 / MySQL 8.0
+MariaDB 10.11+
+Node.js
+18.x
+20.x
+Composer
+2.0
+2.7+
+Git
+2.25
+2.43+
+
+2. 🔧 Extensiones de PHP Requeridas
+# Extensiones obligatorias
+php8.3-cli
+php8.3-common
+php8.3-mysql
+php8.3-zip
+php8.3-gd
+php8.3-mbstring
+php8.3-curl
+php8.3-xml
+php8.3-bcmath
+php8.3-json
+php8.3-tokenizer
+php8.3-fileinfo
+php8.3-openssl
+php8.3-pdo
+php8.3-session
+php8.3-ctype
+php8.3-dom
+php8.3-simplexml
+
+# Extensiones recomendadas (para rendimiento)
+php8.3-opcache
+php8.3-apcu
+php8.3-redis   # si usas caché Redis
+Comando para instalar todas en Ubuntu:
+sudo apt install php8.3-cli php8.3-common php8.3-mysql php8.3-zip php8.3-gd php8.3-mbstring php8.3-curl php8.3-xml php8.3-bcmath php8.3-json php8.3-tokenizer php8.3-fileinfo php8.3-openssl php8.3-pdo php8.3-session php8.3-ctype php8.3-dom php8.3-simplexml php8.3-opcache php8.3-apcu
+
+
+
+3. 📦 Dependencias de Composer (Backend)
+Estas son las dependencias definidas en composer.json:
+Paquete
+Versión
+Propósito
+PHP
+^8.2
+Lenguaje base
+Laravel Framework
+^13.0
+Framework principal
+laravel/reverb
+^1.11
+WebSockets en tiempo real
+irazasyed/telegram-bot-sdk
+^3.0
+Integración con Telegram Bot API
+barryvdh/laravel-dompdf
+^2.0
+Generación de PDF
+maatwebsite/excel
+^3.1
+Exportación a Excel
+yajra/laravel-datatables-oracle
+^11.0
+Tablas dinámicas con DataTables
+laravel/sanctum
+^4.0
+Autenticación API (opcional)
+laravel/tinker
+^2.9
+REPL para depuración
+laravel/pail
+^1.0
+Logging mejorado
+nesbot/carbon
+^3.0
+Manejo de fechas (incluido en Laravel)
+nunomaduro/termwind
+^2.0
+Estilo para Artisan
+nunomaduro/collision
+^8.0
+Mejora de errores en consola
+
+Instalación:
+bash
+composer install
+
+5. 🗄️ Base de Datos (MariaDB/MySQL)
+
+Requerimiento
+Especificación
+Versión
+MariaDB 10.6+ / MySQL 8.0+
+Motor de almacenamiento
+InnoDB
+Collation
+utf8mb4_unicode_ci
+Tamaño de paquete
+max_allowed_packet = 256M
+Tiempo de espera
+wait_timeout = 600
+Charcater set
+UTF-8
+
+Configuración recomendada en my.cnf:
+
+[mysqld]
+character-set-server=utf8mb4
+collation-server=utf8mb4_unicode_ci
+max_allowed_packet=256M
+innodb_buffer_pool_size=1G
+
+6. ⚙️ Configuraciones de Laravel
+a) Archivos de Configuración Clave
+Archivo
+Propósito
+config/app.php
+Zona horaria, locale, proveedores
+config/database.php
+Conexión a base de datos
+config/broadcasting.php
+Driver de WebSocket (reverb)
+config/cache.php
+Driver de caché (file/redis)
+config/filesystems.php
+Almacenamiento (local/public)
+config/telegram.php
+Token y configuración del bot
+config/traccar.php
+Credenciales de Traccar
+config/reverb.php
+Configuración de WebSocket
+
+b) Variables de Entorno (.env) Obligatorias
+# Aplicación
+APP_NAME=ProyectosAVI
+APP_ENV=local|production
+APP_DEBUG=true|false
+APP_URL=http://localhost:8000
+
+# Base de Datos
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=proyectosavi
+DB_USERNAME=root
+DB_PASSWORD=
+
+# Telegram
+TELEGRAM_BOT_TOKEN=8707500603:AAF_L_peg7MVCys6Jro7QEC25A0RKgS5UWI
+TELEGRAM_BOT_USERNAME=Proyectosavibot
+
+# Traccar
+TRACCAR_BASE_URL=http://localhost:8082/
+TRACCAR_USERNAME=savilinux@gmail.com
+TRACCAR_PASSWORD=Is660222..
+
+# Reverb (WebSocket)
+REVERB_APP_ID=123456
+REVERB_APP_KEY=abcdefghijklmnopqrstuvwxyz
+REVERB_APP_SECRET=abcdefghijklmnopqrstuvwxyz
+REVERB_HOST=127.0.0.1
+REVERB_PORT=8080
+REVERB_SCHEME=http
+
+# Vite (Frontend)
+VITE_REVERB_APP_KEY=${REVERB_APP_KEY}
+VITE_REVERB_HOST=${REVERB_HOST}
+VITE_REVERB_PORT=${REVERB_PORT}
+🚧 11. MEJORAS FUTURAS PLANEADAS
+    • Geocercas y alertas automáticas (en desarrollo).
+    • Módulo de presupuestos (cotizaciones) y facturación CFDI 4.0 (en espera).
+    • Historial de rutas en el mapa (polilíneas).
+    • Notificaciones push para instaladores.
+    • API pública para aplicaciones móviles.
+    • Optimización de imágenes con almacenamiento en disco (eliminar BLOB).
+    • Sincronización periódica automática con Traccar.
+    • Auditoría de acciones (tabla auditoria).
+
+📌 12. INFORMACIÓN DE CONTACTO (RESPALDOS)
+Recurso
+Enlace
+Repositorio GitHub
+https://github.com/savilinux-art/proyectosavi
+Base de datos
+Archivo proyectosavi.sql incluido
+Documentación
+Este resumen + archivos en docs/
+Servidor de desarrollo
+http://localhost:8000
+
+🎯 CONCLUSIÓN
+El sistema ProyectoSAVI es una plataforma completa para la gestión de proyectos de instalaciones tecnológicas, con integración avanzada de Telegram para notificaciones y seguimiento en tiempo real y Traccar para localización GPS. Su arquitectura basada en Laravel 13 y WebSockets garantiza una experiencia fluida y moderna para administradores, instaladores y clientes.
+Con las mejoras planeadas (geocercas, facturación electrónica, historial de rutas), el sistema está en camino de convertirse en una solución todo-en-uno para empresas de instalaciones tecnológicas.
+

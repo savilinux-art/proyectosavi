@@ -25,54 +25,58 @@ class UbicacionController extends Controller
 
     /**
      * Devuelve las ubicaciones en tiempo real en formato JSON
-     */
-    public function getUbicaciones()
-    {
-        $usuarios = Usuario::whereNotNull('traccar_device_id')->get();
-        $ubicaciones = [];
+     */public function getUbicaciones()
+{
+    $usuarios = Usuario::whereNotNull('traccar_device_id')->get();
+    \Log::info('Usuarios con traccar_device_id:', $usuarios->pluck('usuario', 'traccar_device_id')->toArray());
 
-        foreach ($usuarios as $usuario) {
-            try {
-                // Usa el método de TU servicio
-                $posicion = $this->traccar->getLatestPosition($usuario->traccar_device_id);
-                
-                if ($posicion && isset($posicion['latitude'])) {
-                    $ubicaciones[] = [
-                        'id' => $usuario->id,
-                        'nombre' => $usuario->nombre,
-                        'usuario' => $usuario->usuario,
-                        'lat' => $posicion['latitude'],
-                        'lng' => $posicion['longitude'],
-                        'velocidad' => $posicion['speed'] ?? 0,
-                        'fecha' => $posicion['deviceTime'] ?? now(),
-                        'device_id' => $usuario->traccar_device_id,
-                    ];
-                }
-            } catch (\Exception $e) {
-                // Si el dispositivo no existe o hay error, lo ignoramos
-                continue;
+    $ubicaciones = [];
+
+    foreach ($usuarios as $usuario) {
+        try {
+            \Log::info('Buscando posición para dispositivo: ' . $usuario->traccar_device_id);
+            $posicion = $this->traccar->getLatestPosition($usuario->traccar_device_id);
+            
+            if ($posicion && isset($posicion['latitude'])) {
+                \Log::info('Posición encontrada:', $posicion);
+                $ubicaciones[] = [
+                    'id' => $usuario->id,
+                    'nombre' => $usuario->nombre,
+                    'usuario' => $usuario->usuario,
+                    'lat' => $posicion['latitude'],
+                    'lng' => $posicion['longitude'],
+                    'velocidad' => $posicion['speed'] ?? 0,
+                    'fecha' => $posicion['deviceTime'] ?? now(),
+                    'device_id' => $usuario->traccar_device_id,
+                ];
+            } else {
+                \Log::warning('No se encontró posición para dispositivo: ' . $usuario->traccar_device_id);
             }
+        } catch (\Exception $e) {
+            \Log::error('Error al obtener ubicación del usuario ' . $usuario->id . ': ' . $e->getMessage());
+            continue;
         }
-
-        // Si no hay ubicaciones reales, devolver datos de prueba
-        if (empty($ubicaciones)) {
-            return response()->json([
-                [
-                    'id' => 999,
-                    'nombre' => 'Dispositivo de Prueba',
-                    'usuario' => 'test',
-                    'lat' => 20.6597,
-                    'lng' => -105.2252,
-                    'velocidad' => 0,
-                    'fecha' => now(),
-                    'device_id' => 'TEST123'
-                ]
-            ]);
-        }
-
-        return response()->json($ubicaciones);
     }
 
+    // Si no hay ubicaciones reales, devolver datos de prueba
+    if (empty($ubicaciones)) {
+        \Log::warning('No hay ubicaciones reales, devolviendo datos de prueba.');
+        return response()->json([
+            [
+                'id' => 999,
+                'nombre' => 'Dispositivo de Prueba',
+                'usuario' => 'test',
+                'lat' => 20.6597,
+                'lng' => -105.2252,
+                'velocidad' => 0,
+                'fecha' => now(),
+                'device_id' => 'TEST123'
+            ]
+        ]);
+    }
+
+    return response()->json($ubicaciones);
+}
     /**
      * Obtiene la ubicación de un instalador específico
      */
@@ -103,4 +107,7 @@ class UbicacionController extends Controller
             return response()->json(['error' => 'No se pudo obtener la ubicación'], 500);
         }
     }
+
+
+    
 }
