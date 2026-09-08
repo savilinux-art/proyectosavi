@@ -4,13 +4,10 @@
 
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="bi bi-cart"></i> Detalle de Venta</h1>
+    <h1><i class="bi bi-box"></i> Detalle de Producto</h1>
     <div>
-        <a href="{{ route('ventas.edit', $venta) }}" class="btn btn-warning">
-            <i class="bi bi-pencil"></i> Editar
-        </a>
-        <a href="{{ route('ventas.index') }}" class="btn btn-secondary">
-            <i class="bi bi-arrow-left"></i> Volver
+        <a href="{{ route('inventario.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Volver al inventario
         </a>
     </div>
 </div>
@@ -29,7 +26,7 @@
 
             <!-- Datos del producto -->
             <div class="col-md-9">
-                <h3>{{ $inventario->modelo }}</h3>
+                <h3>{{ $inventario->modelo ?? 'Sin modelo' }}</h3>
                 <p><strong>Descripción:</strong> {{ $inventario->descripcion }}</p>
                 <p><strong>Marca:</strong> {{ $inventario->marca }}</p>
                 <p><strong>Categoría:</strong> {{ $inventario->categoriaRelacion->nombre_categoria ?? 'N/A' }}</p>
@@ -91,7 +88,7 @@
         </div>
 
         <!-- Tabla de movimientos detallados (opcional) -->
-        @if($movimientos->count() > 0)
+        @if(isset($movimientos) && $movimientos->count() > 0)
         <div class="mt-4">
             <h5><i class="bi bi-list-ul"></i> Historial de movimientos</h5>
             <div class="table-responsive">

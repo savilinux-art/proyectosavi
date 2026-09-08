@@ -48,7 +48,7 @@
             </div>
         </div>
 
-        <!-- Tabla de productos -->
+        <!-- Tabla de productos (usando la relación detalles) -->
         <h5 class="mt-4">Productos entregados</h5>
         <div class="table-responsive">
             <table class="table table-striped table-hover">
@@ -62,14 +62,14 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($productos as $index => $item)
+                    @forelse($productos as $index => $detalle)
                         <tr>
                             <td>{{ $index + 1 }}</td>
-                            <td><strong>{{ $item['modelo'] ?? 'N/A' }}</strong></td>
-                            <td>{{ $item['descripcion'] ?? 'N/A' }}</td>
-                            <td>{{ $item['marca'] ?? 'N/A' }}</td>
+                            <td><strong>{{ $detalle->inventario->modelo ?? 'N/A' }}</strong></td>
+                            <td>{{ $detalle->inventario->descripcion ?? 'N/A' }}</td>
+                            <td>{{ $detalle->inventario->marca ?? 'N/A' }}</td>
                             <td class="text-end">
-                                <span class="badge bg-info">{{ $item['cantidad'] ?? 0 }}</span>
+                                <span class="badge bg-info">{{ $detalle->cantidad }}</span>
                             </td>
                         </tr>
                     @empty
@@ -89,16 +89,6 @@
                 </tfoot>
             </table>
         </div>
-
-@foreach($productos as $detalle)
-    <tr>
-        <td>{{ $detalle->inventario->modelo ?? 'N/A' }}</td>
-        <td>{{ $detalle->inventario->descripcion ?? 'N/A' }}</td>
-        <td>{{ $detalle->cantidad }}</td>
-        <td>{{ $detalle->precio_unitario ?? 'N/A' }}</td>
-    </tr>
-@endforeach
-
 
         <!-- Observaciones -->
         @if($salida->observaciones)

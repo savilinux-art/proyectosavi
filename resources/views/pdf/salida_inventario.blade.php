@@ -238,13 +238,16 @@
         </thead>
         <tbody>
             @foreach($productos as $index => $item)
-            <tr>
-                <td class="text-center">{{ $index + 1 }}</td>
-                <td>{{ $item['descripcion'] ?? 'N/A' }}</td>
-                <td class="text-center">{{ number_format($item['cantidad'] ?? 0, 2) }}</td>
-                <td class="text-center">PZA</td>
-            </tr>
-            @endforeach
+<tr>
+    <td class="text-center">{{ $index + 1 }}</td>
+    <td>
+       <small>{{ $item->inventario->descripcion ?? 'N/A'}}</small>
+    </td>
+    <td class="text-center">{{ number_format($item->cantidad, 0) }}</td>
+    <td class="text-center">PZA</td>
+</tr>
+@endforeach
+        </tbo
         </tbody>
     </table>
 
@@ -298,14 +301,22 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($productos as $index => $item)
-            <tr>
-                <td class="text-center">{{ $index + 1 }}</td>
-                <td>{{ $item['descripcion'] ?? 'N/A' }}</td>
-                <td class="text-center">{{ number_format($item['cantidad'] ?? 0, 2) }}</td>
-                <td class="text-center">PZA</td>
-            </tr>
-            @endforeach
+          @foreach($productos as $index => $item)
+<tr>
+    <td class="text-center">{{ $index + 1 }}</td>
+    <td>
+       <small>{{ $item->inventario->descripcion ?? 'N/A'}}</small>
+    </td>
+    <td class="text-center">{{ number_format($item->cantidad, 0) }}</td>
+    <td class="text-center">PZA</td>
+</tr>
+
+    </td>
+    <td class="text-center">{{ number_format($item->cantidad, 0) }}</td>
+    <td class="text-center">PZA</td>
+</tr>
+@endforeach
+        </tbo
         </tbody>
     </table>
 
@@ -360,14 +371,21 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($productos as $index => $item)
-            <tr>
-                <td class="text-center">{{ $index + 1 }}</td>
-                <td>{{ $item['descripcion'] ?? 'N/A' }}</td>
-                <td class="text-center">{{ number_format($item['cantidad'] ?? 0, 2) }}</td>
-                <td class="text-center">PZA</td>
-            </tr>
-            @endforeach
+           @foreach($productos as $index => $item)
+<tr>
+    <td class="text-center">{{ $index + 1 }}</td>
+    <td>
+       <small>{{ $item->inventario->descripcion ?? 'N/A'}}</small>
+    </td>
+    <td class="text-center">{{ number_format($item->cantidad, 0) }}</td>
+    <td class="text-center">PZA</td>
+</tr>
+
+    </td>
+    <td class="text-center">{{ number_format($item->cantidad, 0) }}</td>
+    <td class="text-center">PZA</td>
+</tr>
+@endforeach
         </tbody>
     </table>
 

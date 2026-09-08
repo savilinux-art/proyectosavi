@@ -16,7 +16,7 @@
                 <td>{{ $salida->entregadoPor->nombre ?? 'N/A' }}</td>
                 <td>{{ $salida->entregadoA->nombre ?? 'N/A' }}</td>
                 <td>{{ \Carbon\Carbon::parse($salida->fecha_hora_salida)->format('d/m/Y H:i') }}</td>
-                <td><span class="badge bg-info">{{ count(json_decode($salida->productos, true)) }}</span></td>
+                <td><span class="badge bg-info">{{ $salida->detalles->count() }}</span></td>
                 <td>
                     <div class="btn-group">
                         <a href="{{ route('salidas.show', $salida->id) }}" class="btn btn-sm btn-info"><i class="bi bi-eye"></i></a>

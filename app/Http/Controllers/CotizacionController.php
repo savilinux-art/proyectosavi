@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Cotizacion;
 use App\Models\CotizacionDetalle;
 use App\Models\Cliente;
+use App\Models\Proyecto;
 use App\Models\Inventario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
@@ -19,12 +20,15 @@ class CotizacionController extends Controller
         return view('cotizaciones.index', compact('cotizaciones'));
     }
 
-    public function create()
+        public function create()
     {
-        $clientes = Cliente::all();
-        $proyectos = Proyecto::all();  // ← Agregar esta línea
-        $productos = Inventario::all();
-        return view('cotizaciones.create', compact('clientes', 'proyectos', 'productos'));
+        // Obtener listados para los selects
+        $proyectos = Proyecto::all();          // ← Esto es lo que faltaba
+        $clientes = Cliente::all();            // Si también necesitas clientes
+        $productos = Inventario::all();        // Para agregar productos a la cotización
+
+        // Pasar todas las variables a la vista
+        return view('cotizaciones.create', compact('proyectos', 'clientes', 'productos'));
     }
 
     public function store(Request $request)
