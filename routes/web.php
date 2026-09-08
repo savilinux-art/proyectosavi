@@ -25,6 +25,7 @@ use APP\Services\TraccarService;
 use App\Http\Controllers\TraccarController;
 use App\Http\Controllers\UbicacionController;
 use App\Http\Controllers\GeocercaController;
+use App\Http\Controllers\CotizacionController;
 
 // Auth
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
@@ -167,6 +168,15 @@ Route::get('/test-ubicaciones', [UbicacionController::class, 'getUbicaciones']);
 
 Route::resource('geocercas', GeocercaController::class);
 Route::get('geocercas/activas', [GeocercaController::class, 'activas'])->name('geocercas.activas');
+
+
+
+
+Route::group(['middleware' => ['permiso:ver-ventas']], function () {
+    Route::resource('cotizaciones', CotizacionController::class);
+    Route::get('cotizaciones/{cotizacion}/pdf', [CotizacionController::class, 'pdf'])->name('cotizaciones.pdf');
+    Route::get('cotizaciones/buscar/productos', [CotizacionController::class, 'buscarProductos'])->name('cotizaciones.buscarProductos');
+});
 
 
 

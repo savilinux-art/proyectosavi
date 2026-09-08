@@ -10,6 +10,7 @@ use App\Models\Usuario;
 use App\Models\Cliente;
 use App\Models\Proyecto;
 use App\Models\UbicacionUsuario;
+use App\Models\Cotizacion;  // ← IMPORTANTE: Agregar esta línea
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
 
@@ -44,6 +45,14 @@ class DashboardController extends Controller
                     ->whereNotNull('estatus')
                     ->groupBy('estatus')
                     ->get();
+
+                // =============================================
+                // ✅ ESTADÍSTICAS DE COTIZACIONES (AQUÍ DENTRO)
+                // =============================================
+                $data['total_cotizaciones'] = Cotizacion::count();
+                $data['cotizaciones_enviadas'] = Cotizacion::where('estatus', 'enviada')->count();
+                $data['cotizaciones_aprobadas'] = Cotizacion::where('estatus', 'aprobada')->count();
+                $data['cotizaciones_rechazadas'] = Cotizacion::where('estatus', 'rechazada')->count();
                 break;
 
             case 'Inventarios':
@@ -106,15 +115,9 @@ class DashboardController extends Controller
             ->get();
 
         // =====================================================
-        // 4. NUEVO: Ubicaciones activas (con dispositivo Traccar)
+        // 4. UBICACIONES ACTIVAS (con dispositivo Traccar)
         // =====================================================
-        // Contar usuarios que tienen traccar_device_id asignado
         $data['ubicaciones_activas'] = Usuario::whereNotNull('traccar_device_id')->count();
-
-        // Opcional: también podemos contar los que han reportado ubicación en la última hora
-        // $data['ubicaciones_recientes_count'] = UbicacionUsuario::where('fecha_hora', '>=', now()->subHour())
-        //     ->distinct('usuario_id')
-        //     ->count('usuario_id');
 
         // =====================================================
         // 5. RETORNAR VISTA CON TODOS LOS DATOS

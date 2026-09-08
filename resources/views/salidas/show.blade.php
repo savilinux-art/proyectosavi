@@ -90,6 +90,16 @@
             </table>
         </div>
 
+@foreach($productos as $detalle)
+    <tr>
+        <td>{{ $detalle->inventario->modelo ?? 'N/A' }}</td>
+        <td>{{ $detalle->inventario->descripcion ?? 'N/A' }}</td>
+        <td>{{ $detalle->cantidad }}</td>
+        <td>{{ $detalle->precio_unitario ?? 'N/A' }}</td>
+    </tr>
+@endforeach
+
+
         <!-- Observaciones -->
         @if($salida->observaciones)
             <div class="mt-4">

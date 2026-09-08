@@ -1,8 +1,23 @@
+{{-- 
+    ============================================================
+    VISTA: Ubicaciones en Tiempo Real
+    ============================================================
+    Esta vista muestra un mapa con las ubicaciones de los instaladores
+    y una tabla con sus datos. Se actualiza automáticamente mediante:
+      1. AJAX (cada 15 segundos, como respaldo)
+      2. WebSocket (actualizaciones instantáneas cuando llega una nueva ubicación)
+      3. WebSocket para geocercas (alertas de entrada/salida)
+--}}
+
 @extends('layouts.app')
 
 @section('page-title', 'Ubicaciones en Tiempo Real')
 
 @section('content')
+
+{{-- Contenedor para notificaciones de geocercas (flotante) --}}
+<div id="notificaciones-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px;"></div>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-geo-alt"></i> Ubicaciones de Instaladores</h1>
     <div>
@@ -57,48 +72,62 @@
 </div>
 @endsection
 
+{{-- ============================================================
+     SCRIPTS (se cargan al final con @push)
+     ============================================================ --}}
 @push('scripts')
-<!-- Leaflet CSS y JS -->
+
+{{-- Bibliotecas de Leaflet y MarkerCluster --}}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- Leaflet.markercluster -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <script>
-    // Variables globales para el mapa
+    // =============================================================
+    // 1. CONFIGURACIÓN INICIAL DEL MAPA
+    // =============================================================
+    // Se crea el mapa con centro en Puerto Vallarta (coordenadas de prueba)
     var map = L.map('map').setView([20.6597, -105.2252], 13);
-    var markers = L.markerClusterGroup();
-    var markersMap = new Map(); // Para almacenar marcadores por usuario_id
 
     // Capa de OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Función para cargar ubicaciones iniciales (AJAX)
+    // Agrupador de marcadores (para mejorar rendimiento cuando hay muchos)
+    var markers = L.markerClusterGroup();
+
+    // Mapa para guardar referencias de marcadores por ID de usuario (para actualizarlos rápidamente)
+    var markersMap = new Map();
+
+    // =============================================================
+    // 2. FUNCIÓN: Cargar ubicaciones iniciales (vía AJAX)
+    // =============================================================
     function cargarUbicacionesIniciales() {
         $.ajax({
-            url: "{{ route('ubicaciones.data') }}",
+            url: "{{ route('ubicaciones.data') }}", // Ruta que devuelve JSON con ubicaciones
             type: 'GET',
             dataType: 'json',
             success: function(data) {
                 // Limpiar marcadores anteriores
                 markers.clearLayers();
                 markersMap.clear();
-                
-                // Actualizar tabla
+
+                // Limpiar tabla
                 var tbody = $('#instaladoresBody');
                 tbody.empty();
 
+                // Si no hay datos, mostrar mensaje
                 if (data.length === 0) {
                     tbody.append('<tr><td colspan="5" class="text-center text-muted">No hay instaladores con ubicación disponible</td></tr>');
                     return;
                 }
 
+                // Recorrer cada ubicación
                 data.forEach(function(item) {
-                    // Crear marcador
+                    // Crear marcador en el mapa
                     var marker = L.marker([item.lat, item.lng])
                         .bindPopup(`
                             <strong>${item.nombre}</strong><br>
@@ -113,7 +142,7 @@
                     var estado = item.velocidad > 0 ? 
                         '<span class="badge bg-success">En movimiento</span>' : 
                         '<span class="badge bg-info">Detenido</span>';
-                    
+
                     tbody.append(`
                         <tr id="fila-usuario-${item.id}">
                             <td><strong>${item.nombre}</strong></td>
@@ -125,7 +154,10 @@
                     `);
                 });
 
+                // Agregar los marcadores al mapa
                 map.addLayer(markers);
+
+                // Ajustar el mapa para mostrar todos los marcadores
                 if (data.length > 0) {
                     map.fitBounds(markers.getBounds());
                 }
@@ -137,10 +169,12 @@
         });
     }
 
-    // Función para actualizar un marcador individual (desde WebSocket)
+    // =============================================================
+    // 3. FUNCIÓN: Actualizar un marcador individual (desde WebSocket)
+    // =============================================================
     function actualizarMarcador(ubicacion) {
-        // Buscar si ya existe un marcador para este usuario
-        var marker = markersMap.get(ubicacion.id);
+        // Extraer datos de la ubicación
+        var id = ubicacion.id;
         var lat = ubicacion.lat;
         var lng = ubicacion.lng;
         var nombre = ubicacion.nombre;
@@ -148,8 +182,11 @@
         var velocidad = ubicacion.velocidad || 0;
         var fecha = new Date(ubicacion.fecha).toLocaleString();
 
+        // Buscar si ya existe un marcador para este usuario
+        var marker = markersMap.get(id);
+
         if (marker) {
-            // Actualizar posición y popup
+            // Si existe, actualizar posición y popup
             marker.setLatLng([lat, lng]);
             marker.getPopup().setContent(`
                 <strong>${nombre}</strong><br>
@@ -158,7 +195,7 @@
                 Última actualización: ${fecha}
             `);
         } else {
-            // Crear nuevo marcador
+            // Si no existe, crear uno nuevo
             var nuevoMarker = L.marker([lat, lng])
                 .bindPopup(`
                     <strong>${nombre}</strong><br>
@@ -167,22 +204,23 @@
                     Última actualización: ${fecha}
                 `);
             markers.addLayer(nuevoMarker);
-            markersMap.set(ubicacion.id, nuevoMarker);
+            markersMap.set(id, nuevoMarker);
         }
 
-        // Actualizar fila en la tabla
+        // Actualizar la fila de la tabla
         var estado = velocidad > 0 ? 
             '<span class="badge bg-success">En movimiento</span>' : 
             '<span class="badge bg-info">Detenido</span>';
-        
-        var fila = $(`#fila-usuario-${ubicacion.id}`);
+
+        var fila = $(`#fila-usuario-${id}`);
         if (fila.length) {
+            // Actualizar fila existente
             fila.find('td:eq(3)').text(lat.toFixed(6) + ', ' + lng.toFixed(6));
             fila.find('td:eq(4)').html(estado);
         } else {
-            // Si no existe, agregar nueva fila
+            // Agregar nueva fila si no existe
             $('#instaladoresBody').append(`
-                <tr id="fila-usuario-${ubicacion.id}">
+                <tr id="fila-usuario-${id}">
                     <td><strong>${nombre}</strong></td>
                     <td>${usuario}</td>
                     <td><code>${ubicacion.device_id || 'N/A'}</code></td>
@@ -191,40 +229,61 @@
                 </tr>
             `);
         }
-
-        // Ajustar mapa si es necesario (opcional)
-        // map.fitBounds(markers.getBounds());
     }
 
-    // Cargar ubicaciones iniciales
-    cargarUbicacionesIniciales();
+    // =============================================================
+    // 4. FUNCIÓN: Mostrar notificaciones de geocercas
+    // =============================================================
+    function mostrarNotificacion(alerta) {
+        // Extraer datos de la alerta
+        const tipo = alerta.tipo === 'entrada' ? '🟢 ENTRÓ' : '🔴 Salió de';
+        const nombre = alerta.geocerca?.nombre || 'zona';
+        const usuario = alerta.usuario?.nombre || 'Instalador';
 
-    // ======================== WEBSOCKETS ========================
-    // Escuchar eventos WebSocket (si está disponible)
-    if (typeof window.Echo !== 'undefined') {
+        console.log(`📍 ${tipo} la zona: ${nombre} - ${usuario}`);
+
+        // Crear un toast de Bootstrap
+        const toastHtml = `
+            <div class="toast align-items-center text-white bg-${alerta.tipo === 'entrada' ? 'success' : 'danger'} border-0 show" role="alert" aria-live="assertive" aria-atomic="true" style="position: relative; margin-bottom: 10px; min-width: 300px;">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <strong>${tipo}</strong> la zona <strong>${nombre}</strong><br>
+                        👤 ${usuario}<br>
+                        📅 ${new Date(alerta.fecha_hora).toLocaleString()}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            </div>
+        `;
+
+        // Agregar la notificación al contenedor
+        $('#notificaciones-container').append(toastHtml);
+
+        // Auto-eliminar después de 10 segundos
+        setTimeout(() => {
+            $('.toast').last().remove();
+        }, 10000);
+    }
+
+    // =============================================================
+    // 5. WEBSOCKET: Escuchar eventos en tiempo real
+    // =============================================================
+
+    // 5.1. Escuchar actualizaciones de ubicaciones (canal "ubicaciones")
+    function iniciarWebSocketUbicaciones() {
+        if (typeof window.Echo === 'undefined') {
+            console.warn('⚠️ Laravel Echo no está disponible. Las actualizaciones en tiempo real no funcionarán.');
+            return;
+        }
+
         window.Echo.channel('ubicaciones')
             .listen('ubicacion.actualizada', (e) => {
-                console.log('Nueva ubicación recibida (WebSocket):', e.ubicacion);
-                // Convertir el objeto a formato esperado
-                var ubicacion = e.ubicacion;
-                actualizarMarcador(ubicacion);
+                console.log('📍 Nueva ubicación recibida (WebSocket):', e.ubicacion);
+                actualizarMarcador(e.ubicacion);
             });
-    } else {
-        console.warn('Laravel Echo no está disponible. Las actualizaciones en tiempo real no funcionarán.');
     }
 
-    // ======================== BOTÓN DE ACTUALIZACIÓN MANUAL ========================
-    $('#refreshBtn').on('click', function() {
-        $(this).html('<i class="bi bi-arrow-clockwise spinner-border spinner-border-sm"></i> Actualizando...');
-        cargarUbicacionesIniciales();
-        setTimeout(() => {
-            $(this).html('<i class="bi bi-arrow-clockwise"></i> Actualizar');
-        }, 1000);
-    });
-
-    // =====================================================
-    // 🚀 WEBSOCKET PARA GEOCERCAS
-    // =====================================================
+    // 5.2. Escuchar alertas de geocercas (canal "geocercas")
     function iniciarWebSocketGeocercas() {
         if (typeof window.Echo === 'undefined') {
             console.warn('⚠️ Laravel Echo no está disponible. Las alertas de geocercas no funcionarán.');
@@ -238,41 +297,29 @@
             });
     }
 
-    // Función para mostrar notificaciones en la interfaz
-    function mostrarNotificacion(alerta) {
-        const tipo = alerta.tipo === 'entrada' ? '🟢 ENTRÓ' : '🔴 Salió de';
-        const nombre = alerta.geocerca?.nombre || 'zona';
-        const usuario = alerta.usuario?.nombre || 'Instalador';
+    // =============================================================
+    // 6. INICIALIZACIÓN
+    // =============================================================
 
-        // Mostrar en consola
-        console.log(`📍 ${tipo} la zona: ${nombre} - ${usuario}`);
+    // Cargar ubicaciones iniciales
+    cargarUbicacionesIniciales();
 
-        // Crear una notificación visual (Bootstrap toast o alerta)
-        const toastHtml = `
-            <div class="toast align-items-center text-white bg-${alerta.tipo === 'entrada' ? 'success' : 'danger'} border-0 show" role="alert" aria-live="assertive" aria-atomic="true" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
-                <div class="d-flex">
-                    <div class="toast-body">
-                        <strong>${tipo}</strong> la zona <strong>${nombre}</strong><br>
-                        👤 ${usuario}<br>
-                        📅 ${new Date(alerta.fecha_hora).toLocaleString()}
-                    </div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                </div>
-            </div>
-        `;
-
-        // Agregar la notificación al DOM
-        $('#notificaciones-container').append(toastHtml);
-
-        // Auto-eliminar después de 10 segundos
-        setTimeout(() => {
-            $('.toast').last().remove();
-        }, 10000);
-    }
-
-    // Iniciar WebSocket de geocercas al cargar la página
+    // Iniciar WebSockets (ubicaciones y geocercas) después de que la página esté lista
     $(document).ready(function() {
+        iniciarWebSocketUbicaciones();
         iniciarWebSocketGeocercas();
     });
+
+    // Actualización manual con el botón "Actualizar"
+    $('#refreshBtn').on('click', function() {
+        $(this).html('<i class="bi bi-arrow-clockwise spinner-border spinner-border-sm"></i> Actualizando...');
+        cargarUbicacionesIniciales();
+        setTimeout(() => {
+            $(this).html('<i class="bi bi-arrow-clockwise"></i> Actualizar');
+        }, 1000);
+    });
+
+    // (Opcional) Actualización automática cada 15 segundos como respaldo
+    // setInterval(cargarUbicacionesIniciales, 15000);
 </script>
 @endpush

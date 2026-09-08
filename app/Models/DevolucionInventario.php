@@ -15,26 +15,32 @@ class DevolucionInventario extends Model
         'nombre_proyecto',
         'devuelto_por',
         'recibido_por',
-        'productos',
         'fecha_hora_devolucion',
         'observaciones'
+        // 👈 ELIMINADO: 'productos'
     ];
 
-    protected $casts = [
-        'productos' => 'array',
-        'fecha_hora_devolucion' => 'datetime',
-    ];
+    // 👈 ELIMINADO: protected $casts = [ 'productos' => 'array' ]
 
+    // Relación con los detalles de la devolución
+    public function detalles()
+    {
+        return $this->hasMany(DevolucionDetalle::class, 'devolucion_id');
+    }
+
+    // Relación con el proyecto (venta)
     public function proyecto()
     {
         return $this->belongsTo(Venta::class, 'nombre_proyecto', 'nombre_proyecto');
     }
 
+    // Relación con el usuario que devuelve
     public function devueltoPor()
     {
         return $this->belongsTo(Usuario::class, 'devuelto_por', 'usuario');
     }
 
+    // Relación con el usuario que recibe
     public function recibidoPor()
     {
         return $this->belongsTo(Usuario::class, 'recibido_por', 'usuario');

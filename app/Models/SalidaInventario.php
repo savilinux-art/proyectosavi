@@ -15,35 +15,16 @@ class SalidaInventario extends Model
         'nombre_proyecto',
         'entregado_por',
         'entregado_a',
-        'productos',
         'fecha_hora_salida',
         'observaciones'
+        // 'productos' eliminado
     ];
 
-    protected $casts = [
-        'productos' => 'array',
-        'fecha_hora_salida' => 'datetime',
-    ];
-
-    public function imprimir($id)
+    // Relación con los detalles
+    public function detalles()
     {
-         return $this->downloadPDF($id);
+        return $this->hasMany(SalidaDetalle::class, 'salida_id');
     }
-
-    public function show($id)
-    {
-    $salida = SalidaInventario::with(['proyecto', 'entregadoPor', 'entregadoA'])->findOrFail($id);
-    
-    // Decodificar productos (JSON string → array)
-    $productos = json_decode($salida->productos, true);
-    if (!is_array($productos)) {
-        $productos = [];
-    }
-
-    return view('salidas.show', compact('salida', 'productos'));
-    }
-
-
 
     public function proyecto()
     {

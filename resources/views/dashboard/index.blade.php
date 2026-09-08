@@ -58,6 +58,20 @@
                                 </div>
                             </a>
                         </div>
+@if($userRol == 'Administrador')
+    {{-- ... otros botones ... --}}
+    <div class="col-md-2">
+        <a href="{{ route('cotizaciones.create') }}" class="text-decoration-none">
+            <div class="card h-100 border-info hover-shadow">
+                <div class="card-body text-center">
+                    <i class="bi bi-file-earmark-plus" style="font-size:36px;color:#0dcaf0;"></i>
+                    <h6 class="mt-2">Nueva Cotización</h6>
+                </div>
+            </div>
+        </a>
+    </div>
+@endif
+
                     @elseif($userRol == 'Inventarios')
                         @if($hasPermiso('crear-producto'))
                         <div class="col-md-3"><a href="{{ route('inventario.create') }}" class="text-decoration-none"><div class="card h-100 border-primary hover-shadow"><div class="card-body text-center"><i class="bi bi-box" style="font-size:36px;color:#0d6efd;"></i><h6 class="mt-2">Nuevo Producto</h6></div></div></a></div>
@@ -370,6 +384,44 @@
                 <a href="{{ route('ubicaciones.index') }}" class="text-white text-decoration-none">
                     <small>Ver mapa <i class="bi bi-arrow-right"></i></small>
                 </a>
+            </div>
+        </div>
+    </div>
+</div>{{-- ==== NUEVA FILA: COTIZACIONES ==== --}}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-info stat-card">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-file-earmark-text"></i> Cotizaciones</h6>
+                <h2>{{ $total_cotizaciones ?? 0 }}</h2>
+                <a href="{{ route('cotizaciones.index') }}" class="text-white text-decoration-none"><small>Ver todas <i class="bi bi-arrow-right"></i></small></a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-primary stat-card">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-send"></i> Enviadas</h6>
+                <h2>{{ $cotizaciones_enviadas ?? 0 }}</h2>
+                <small>Esperando respuesta</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success stat-card">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-check-circle"></i> Aprobadas</h6>
+                <h2>{{ $cotizaciones_aprobadas ?? 0 }}</h2>
+                <small>Listas para facturar</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-danger stat-card">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-x-circle"></i> Rechazadas</h6>
+                <h2>{{ $cotizaciones_rechazadas ?? 0 }}</h2>
+                <small>Revisar motivo</small>
             </div>
         </div>
     </div>

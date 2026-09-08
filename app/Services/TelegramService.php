@@ -340,7 +340,7 @@ class TelegramService
             'tipo' => $tipo,
         ]);
 
-        // 🔍 Procesar geocercas
+       // 🔍 Procesar geocercas
 try {
     $geocercaService = app(GeocercaService::class);
     $geocercaService->procesarUbicacion($ubicacion);
