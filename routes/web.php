@@ -170,7 +170,17 @@ Route::resource('geocercas', GeocercaController::class);
 Route::get('geocercas/activas', [GeocercaController::class, 'activas'])->name('geocercas.activas');
 
 
-
+// Cotizaciones
+Route::get('/cotizaciones', [CotizacionController::class, 'index'])->name('cotizaciones.index');
+Route::get('/cotizaciones/create', [CotizacionController::class, 'create'])->name('cotizaciones.create');
+Route::post('/cotizaciones', [CotizacionController::class, 'store'])->name('cotizaciones.store');
+Route::get('/cotizaciones/{cotizacion}', [CotizacionController::class, 'show'])->name('cotizaciones.show');
+Route::get('/cotizaciones/{cotizacion}/edit', [CotizacionController::class, 'edit'])->name('cotizaciones.edit');
+Route::put('/cotizaciones/{cotizacion}', [CotizacionController::class, 'update'])->name('cotizaciones.update');
+Route::delete('/cotizaciones/{cotizacion}', [CotizacionController::class, 'destroy'])->name('cotizaciones.destroy');
+Route::get('/cotizaciones/{cotizacion}/pdf', [CotizacionController::class, 'pdf'])->name('cotizaciones.pdf');
+Route::patch('/cotizaciones/{cotizacion}/enviar', [CotizacionController::class, 'enviar'])->name('cotizaciones.enviar');
+Route::get('/cotizaciones/buscar-productos', [CotizacionController::class, 'buscarProductos'])->name('cotizaciones.buscarProductos');
 
 Route::group(['middleware' => ['permiso:ver-ventas']], function () {
     Route::resource('cotizaciones', CotizacionController::class);

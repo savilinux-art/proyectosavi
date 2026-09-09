@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class Cotizacion extends Model
 {
-    
     protected $table = 'cotizaciones';
 
     protected $fillable = [
@@ -22,7 +21,6 @@ class Cotizacion extends Model
         'total' => 'decimal:2',
     ];
 
-    // Relaciones
     public function cliente()
     {
         return $this->belongsTo(Cliente::class);
@@ -43,7 +41,6 @@ class Cotizacion extends Model
         return $this->hasMany(CotizacionDetalle::class);
     }
 
-    // Generar folio automático
     public static function generarFolio()
     {
         $ultimo = self::orderBy('id', 'desc')->first();
@@ -51,7 +48,6 @@ class Cotizacion extends Model
         return 'COT-' . str_pad($numero, 6, '0', STR_PAD_LEFT);
     }
 
-    // Recalcular totales
     public function recalcularTotales()
     {
         $this->subtotal = $this->detalles->sum('importe');
