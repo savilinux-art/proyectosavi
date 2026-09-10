@@ -3,6 +3,14 @@
 @section('page-title', 'Cotización ' . $cotizacion->folio)
 
 @section('content')
+
+@if (!$cotizacion)
+    <div class="alert alert-danger">La cotización no existe o ha sido eliminada.</div>
+    <a href="{{ route('cotizaciones.index') }}" class="btn btn-secondary">Volver al listado</a>
+@else
+
+
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-file-earmark-text"></i> Cotización {{ $cotizacion->folio }}</h1>
     <div>
@@ -184,4 +192,5 @@
         </form>
     @endif
 </div>
+@endif
 @endsection

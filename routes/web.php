@@ -20,8 +20,7 @@ use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\EstatusController;
 use App\Http\Controllers\TelegramWebhookController;
 use App\Http\Controllers\TelegramLocationController;
-use App\Services\TelegramService; 
-use APP\Services\TraccarService;
+use App\Services\TelegramService;
 use App\Http\Controllers\TraccarController;
 use App\Http\Controllers\UbicacionController;
 use App\Http\Controllers\GeocercaController;
@@ -32,7 +31,7 @@ Route::get('/', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
 
-// Dashboard y módulos (protegidos por autenticación y permisos)
+// Dashboard
 Route::middleware(['auth.session', 'permiso:ver-dashboard'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 });
@@ -43,17 +42,10 @@ Route::middleware(['auth.session', 'permiso:ver-inventario'])->group(function ()
     Route::get('inventario/export', [InventarioController::class, 'export'])->name('inventario.export');
 });
 
-//
-
-
-
-// ✅ Devoluciones de Inventario (corregido)
+// Devoluciones de Inventario (corregido)
 Route::middleware(['auth.session'])->group(function () {
-    // ⚠️ PRIMERO las rutas específicas (ANTES del resource)
     Route::get('devoluciones/buscar-productos', [DevolucionInventarioController::class, 'buscarProductos'])
         ->name('devoluciones.buscarProductos');
-
-    // ⚠️ DESPUÉS el resource (captura devoluciones/{id})
     Route::resource('devoluciones', DevolucionInventarioController::class);
 });
 
@@ -112,12 +104,10 @@ Route::middleware(['auth.session'])->group(function () {
 // Telegram Location
 Route::post('/telegram/send-location/start/{id}', [TelegramLocationController::class, 'sendStartLocation'])
     ->name('telegram.send-start');
-
 Route::post('/telegram/send-location/end/{id}', [TelegramLocationController::class, 'sendEndLocation'])
     ->name('telegram.send-end');
 
-// Salidas y Devoluciones (repetido, pero lo dejamos)
-
+// Salidas y Devoluciones
 Route::get('salidas/buscar-productos', [SalidaInventarioController::class, 'buscarProductos'])->name('salidas.buscarProductos');
 
 Route::middleware(['auth.session', 'permiso:ver-salidas'])->group(function () {
@@ -138,17 +128,12 @@ Route::middleware(['auth.session'])->group(function () {
 // ============================================================
 // 🛰️ RUTAS DE TRACCAR (MAPA Y POSICIONES)
 // ============================================================
-
- Route::middleware(['auth', 'permiso:ver-ubicaciones'])->group(function () {
-    Route::get('/mapa', [App\Http\Controllers\TraccarController::class, 'index'])->name('mapa.index');
-    Route::get('/mapa/posiciones', [App\Http\Controllers\TraccarController::class, 'getPositions'])->name('mapa.positions');
-    Route::get('/mapa/dispositivo/{deviceId}', [App\Http\Controllers\TraccarController::class, 'getDevicePosition'])->name('mapa.device');
-    Route::get('/mapa/historial/{deviceId}', [App\Http\Controllers\TraccarController::class, 'getHistory'])->name('mapa.history');
-
+Route::middleware(['auth.session', 'permiso:ver-ubicaciones'])->group(function () {
+    Route::get('/mapa', [TraccarController::class, 'index'])->name('mapa.index');
+    Route::get('/mapa/posiciones', [TraccarController::class, 'getPositions'])->name('mapa.positions');
+    Route::get('/mapa/dispositivo/{deviceId}', [TraccarController::class, 'getDevicePosition'])->name('mapa.device');
+    Route::get('/mapa/historial/{deviceId}', [TraccarController::class, 'getHistory'])->name('mapa.history');
 });
-
-
-
 
 // Ubicaciones
 Route::get('/ubicaciones', [UbicacionController::class, 'index'])
@@ -163,40 +148,39 @@ Route::get('/ubicaciones/usuario/{id}', [UbicacionController::class, 'getUbicaci
     ->name('ubicaciones.usuario')
     ->middleware('permiso:ver-ubicaciones');
 
-
 Route::get('/test-ubicaciones', [UbicacionController::class, 'getUbicaciones']);
 
 Route::resource('geocercas', GeocercaController::class);
 Route::get('geocercas/activas', [GeocercaController::class, 'activas'])->name('geocercas.activas');
 
+// ============================================================
+// 📋 COTIZACIONES - RUTAS CORREGIDAS (SIN DUPLICADOS)
+// ============================================================
+Route::middleware(['auth.session', 'permiso:ver-ventas'])->group(function () {
+    // ✅ PRIMERO las rutas específicas sin parámetros
+    Route::get('cotizaciones/buscar-productos', [CotizacionController::class, 'buscarProductos'])
+        ->name('cotizaciones.buscarProductos');
+        
+    // DESPUÉS el resource, forzando el nombre del parámetro
+    Route::resource('cotizaciones', CotizacionController::class, [
+        'parameters' => ['cotizaciones' => 'cotizacion']
+    ]);    
 
-// Cotizaciones
-Route::get('/cotizaciones', [CotizacionController::class, 'index'])->name('cotizaciones.index');
-Route::get('/cotizaciones/create', [CotizacionController::class, 'create'])->name('cotizaciones.create');
-Route::post('/cotizaciones', [CotizacionController::class, 'store'])->name('cotizaciones.store');
-Route::get('/cotizaciones/{cotizacion}', [CotizacionController::class, 'show'])->name('cotizaciones.show');
-Route::get('/cotizaciones/{cotizacion}/edit', [CotizacionController::class, 'edit'])->name('cotizaciones.edit');
-Route::put('/cotizaciones/{cotizacion}', [CotizacionController::class, 'update'])->name('cotizaciones.update');
-Route::delete('/cotizaciones/{cotizacion}', [CotizacionController::class, 'destroy'])->name('cotizaciones.destroy');
-Route::get('/cotizaciones/{cotizacion}/pdf', [CotizacionController::class, 'pdf'])->name('cotizaciones.pdf');
-Route::patch('/cotizaciones/{cotizacion}/enviar', [CotizacionController::class, 'enviar'])->name('cotizaciones.enviar');
-Route::get('/cotizaciones/buscar-productos', [CotizacionController::class, 'buscarProductos'])->name('cotizaciones.buscarProductos');
+    // ✅ DESPUÉS el resource (que incluye show, edit, update, destroy, etc.)
+    Route::resource('cotizacion', CotizacionController::class);
 
-Route::group(['middleware' => ['permiso:ver-ventas']], function () {
-    Route::resource('cotizaciones', CotizacionController::class);
-    Route::get('cotizaciones/{cotizacion}/pdf', [CotizacionController::class, 'pdf'])->name('cotizaciones.pdf');
-    Route::get('cotizaciones/buscar/productos', [CotizacionController::class, 'buscarProductos'])->name('cotizaciones.buscarProductos');
+    // ✅ Rutas con parámetros al final (o después del resource, pero no afectan)
+    Route::get('cotizaciones/{cotizacion}/pdf', [CotizacionController::class, 'pdf'])
+        ->name('cotizaciones.pdf');
+    Route::patch('cotizaciones/{cotizacion}/enviar', [CotizacionController::class, 'enviar'])
+        ->name('cotizaciones.enviar');
 });
 
-
-
 // ============================================================
-// 🧪 RUTAS DE PRUEBA (CORREGIDAS)
+// 🧪 RUTAS DE PRUEBA
 // ============================================================
-
-// Ruta de prueba: envía un mensaje simple a un chat_id fijo
 Route::get('/test-telegram-system', function (TelegramService $telegram) {
-    $chatId = '8884130238'; // Reemplaza con tu chat_id real
+    $chatId = '8884130238';
     try {
         $telegram->sendMessage($chatId, '✅ Mensaje de prueba desde Laravel');
         return '✅ Mensaje enviado correctamente desde Laravel';
@@ -205,13 +189,12 @@ Route::get('/test-telegram-system', function (TelegramService $telegram) {
     }
 });
 
-// Ruta de prueba: notifica a un instalador por su ID
 Route::get('/test-notify/{id}', function ($id, TelegramService $telegram) {
     $usuario = \App\Models\Usuario::find($id);
     if (!$usuario) {
         return '❌ Usuario no encontrado';
     }
-    $instalacion = \App\Models\Instalacion::first(); // toma cualquier instalación
+    $instalacion = \App\Models\Instalacion::first();
     if (!$instalacion) {
         return '❌ No hay instalaciones disponibles';
     }
@@ -221,7 +204,4 @@ Route::get('/test-notify/{id}', function ($id, TelegramService $telegram) {
     } catch (\Exception $e) {
         return '❌ Error: ' . $e->getMessage();
     }
-
-
 });
-

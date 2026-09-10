@@ -24,8 +24,10 @@ class Inventario extends Model
         'comentarios',
         'apartados',
         'cantidad_apartados',
-        'modificado_por'
-    ];
+        'modificado_por',
+        'precio'
+
+        ];
 
     public function categoriaRelacion()
     {
