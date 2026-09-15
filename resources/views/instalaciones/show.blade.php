@@ -1,134 +1,211 @@
 @extends('layouts.app')
-@section('page-title', 'Detalle de Instalación')
+
+@section('page-title', 'Instalación: ' . ($instalacion->nombre_instalacion ?? 'Principal'))
+
 @section('content')
+
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="bi bi-tools"></i> Detalle de Instalación</h1>
-    <div><a href="{{ route('instalaciones.edit', $instalacion->id) }}" class="btn btn-warning"><i class="bi bi-pencil"></i> Editar</a><a href="{{ route('instalaciones.index') }}" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Volver</a></div>
+    <h1><i class="bi bi-tools"></i> {{ $instalacion->nombre_instalacion ?? 'Instalación' }}</h1>
+    <div>
+        <a href="{{ route('instalaciones.edit', $instalacion->id) }}" class="btn btn-warning">
+            <i class="bi bi-pencil"></i> Editar
+        </a>
+        <a href="{{ route('instalaciones.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Volver
+        </a>
+    </div>
 </div>
+
 <div class="row">
-    <div class="col-md-8">
-        <div class="card"><div class="card-header"><h5>Información</h5></div><div class="card-body">
-            <table class="table table-bordered">
-                <tr><th width="30%">ID</th><td>{{ $instalacion->id }}</td></tr>
-                <tr><th>Proyecto</th><td>{{ $instalacion->proyecto->nombre_proyecto ?? 'N/A' }}</td></tr>
-                <tr><th>Instaladores</th><td>@foreach($instalacion->instaladores as $inst)<span class="badge bg-primary">{{ $inst->nombre }}</span>@endforeach @if($instalacion->instaladores->isEmpty())<span class="text-muted">Sin asignar</span>@endif</td></tr>
-                <tr><th>Ubicación</th><td>{{ $instalacion->ubicacion_actual ?? 'No especificada' }}</td></tr>
-                <tr><th>Fecha Inicio</th><td>{{ \Carbon\Carbon::parse($instalacion->fecha_hora_inicio)->format('d/m/Y H:i:s') }}</td></tr>
-                <tr><th>Fecha Fin</th><td>{{ $instalacion->fecha_hora_fin ? \Carbon\Carbon::parse($instalacion->fecha_hora_fin)->format('d/m/Y H:i:s') : 'Pendiente' }}</td></tr>
-                <tr><th>Estatus</th><td><span class="badge bg-{{ $instalacion->estatus_instalacion == 'entrega' ? 'success' : ($instalacion->estatus_instalacion == 'pruebas' ? 'warning' : 'primary') }}">{{ ucfirst($instalacion->estatus_instalacion ?? 'N/A') }}</span></td></tr>
-                <tr><th>Checklist</th><td>@if($instalacion->check_list && count($instalacion->check_list)>0)@foreach($instalacion->check_list as $item)<span class="badge bg-success me-1">✓ {{ str_replace('_', ' ', ucfirst($item)) }}</span>@endforeach@else<span class="text-muted">No hay items</span>@endif</td></tr>
-              
-            </table>
-        </div></div>
-    </div>
-    <div class="col-md-4">
-        <div class="card"><div class="card-header"><h6>Evidencias</h6></div><div class="card-body">
-            <div class="list-group">
-                @if($instalacion->evidencia_inicio)<div class="list-group-item"><i class="bi bi-file-image text-primary"></i> Evidencia Inicio <a href="#" class="btn btn-sm btn-primary float-end"><i class="bi bi-eye"></i></a></div>@endif
-                @if($instalacion->incidencias)<div class="list-group-item"><i class="bi bi-exclamation-triangle text-danger"></i> Incidencias <a href="#" class="btn btn-sm btn-danger float-end"><i class="bi bi-eye"></i></a></div>@endif
-                @if($instalacion->evidencia_fin)<div class="list-group-item"><i class="bi bi-check-circle text-success"></i> Evidencia Fin <a href="#" class="btn btn-sm btn-success float-end"><i class="bi bi-eye"></i></a></div>@endif
-                @if(!$instalacion->evidencia_inicio && !$instalacion->incidencias && !$instalacion->evidencia_fin)<div class="text-center py-3 text-muted"><i class="bi bi-file-earmark" style="font-size:48px;"></i><p>No hay evidencias</p></div>@endif
+    <!-- Información General -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h5><i class="bi bi-info-circle"></i> Información General</h5></div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <th style="width:40%;">Proyecto:</th>
+                        <td>{{ $instalacion->proyecto->nombre_proyecto ?? $instalacion->nombre_proyecto }}</td>
+                    </tr>
+                    <tr>
+                        <th>Nombre Instalación:</th>
+                        <td>{{ $instalacion->nombre_instalacion ?? 'Principal' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Estatus:</th>
+                        <td>
+                            @php
+                                $estatusColors = [
+                                    'preparacion' => 'secondary',
+                                    'en_proceso' => 'primary',
+                                    'programacion' => 'info',
+                                    'pruebas' => 'warning',
+                                    'entrega' => 'success'
+                                ];
+                            @endphp
+                            <span class="badge bg-{{ $estatusColors[$instalacion->estatus_instalacion] ?? 'secondary' }}">
+                                {{ ucfirst(str_replace('_', ' ', $instalacion->estatus_instalacion ?? 'N/A')) }}
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Fecha Inicio:</th>
+                        <td>{{ \Carbon\Carbon::parse($instalacion->fecha_hora_inicio)->format('d/m/Y H:i') }}</td>
+                    </tr>
+                    <tr>
+                        <th>Fecha Fin:</th>
+                        <td>{{ $instalacion->fecha_hora_fin ? \Carbon\Carbon::parse($instalacion->fecha_hora_fin)->format('d/m/Y H:i') : 'En proceso' }}</td>
+                    </tr>
+                </table>
             </div>
-        </div></div>
+        </div>
+    </div>
+
+    <!-- Instaladores Asignados -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h5><i class="bi bi-people"></i> Instaladores Asignados</h5></div>
+            <div class="card-body">
+                @if($instalacion->instaladores->isEmpty())
+                    <p class="text-muted">No hay instaladores asignados.</p>
+                @else
+                    <ul class="list-group">
+                        @foreach($instalacion->instaladores as $inst)
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-person"></i> {{ $inst->nombre }}</span>
+                                @if($inst->pivot->es_principal ?? false)
+                                    <span class="badge bg-success">Principal</span>
+                                @else
+                                    <span class="badge bg-secondary">Apoyo</span>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </div>
+        </div>
     </div>
 </div>
-<h3 class="mt-4">📍 Ubicaciones registradas</h3>
-<table class="table table-bordered">
-    <thead>
-        <tr>
-            <th>Instalador</th>
-            <th>Tipo</th>
-            <th>Fecha/Hora</th>
-            <th>Ubicación</th>
-        </tr>
-    </thead>
-    <tbody>
-        @forelse($instalacion->ubicaciones->sortBy('fecha_hora') as $ubicacion)
-        <tr>
-            <td>{{ $ubicacion->usuario->nombre ?? 'N/A' }}</td>
-            <td>
-                <span class="badge {{ $ubicacion->tipo == 'inicio' ? 'bg-success' : 'bg-danger' }}">
-                    {{ ucfirst($ubicacion->tipo) }}
-                </span>
-            </td>
-            <td>{{ \Carbon\Carbon::parse($ubicacion->fecha_hora)->format('d/m/Y H:i:s') }}</td>
-            <td>
-                <a href="https://www.google.com/maps?q={{ $ubicacion->latitud }},{{ $ubicacion->longitud }}" target="_blank">
-                    <i class="bi bi-geo-alt"></i> Ver en mapa
-                </a>
-            </td>
-        </tr>
-        @empty
-        <tr><td colspan="4" class="text-center text-muted">No hay ubicaciones registradas para esta instalación.</td></tr>
-        @endforelse
-        @section('content')
-<div class="container">
-    <!-- ... datos de la instalación ... -->
 
-    <h3 class="mt-4">📍 Ubicaciones registradas</h3>
-    <div id="map" style="height: 400px; margin-bottom: 20px;"></div>
+<!-- Ubicaciones Registradas -->
+<div class="card mt-4">
+    <div class="card-header"><h5><i class="bi bi-geo-alt"></i> Ubicaciones Registradas</h5></div>
+    <div class="card-body">
+        <div class="row">
+            <!-- Inicio -->
+            <div class="col-md-6">
+                <h6><i class="bi bi-play-circle text-success"></i> Inicio de Jornada</h6>
+                @php
+                    $ubicacionInicio = $instalacion->ubicaciones->where('tipo', 'inicio')->first();
+                @endphp
+                @if($ubicacionInicio)
+                    <p>
+                        <strong>Latitud:</strong> {{ $ubicacionInicio->latitud }}<br>
+                        <strong>Longitud:</strong> {{ $ubicacionInicio->longitud }}<br>
+                        <strong>Fecha:</strong> {{ \Carbon\Carbon::parse($ubicacionInicio->fecha_hora)->format('d/m/Y H:i') }}<br>
+                        @if($ubicacionInicio->usuario)
+                            <strong>Registrado por:</strong> {{ $ubicacionInicio->usuario->nombre ?? $ubicacionInicio->usuario_id }}<br>
+                        @endif
+                        <a href="https://www.google.com/maps?q={{ $ubicacionInicio->latitud }},{{ $ubicacionInicio->longitud }}" target="_blank" class="btn btn-sm btn-primary mt-2">
+                            <i class="bi bi-map"></i> Abrir en Google Maps
+                        </a>
+                    </p>
+                    <div id="mapaInicio" style="height: 250px; border-radius: 8px;" class="mt-2"></div>
+                @else
+                    <p class="text-muted">Sin registrar.</p>
+                @endif
+            </div>
 
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>Instalador</th>
-                <th>Tipo</th>
-                <th>Fecha/Hora</th>
-                <th>Ubicación</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($instalacion->ubicaciones->sortBy('fecha_hora') as $ubicacion)
-            <tr>
-                <td>{{ $ubicacion->usuario->nombre ?? 'N/A' }}</td>
-                <td>
-                    <span class="badge {{ $ubicacion->tipo == 'inicio' ? 'bg-success' : 'bg-danger' }}">
-                        {{ ucfirst($ubicacion->tipo) }}
-                    </span>
-                </td>
-                <td>{{ \Carbon\Carbon::parse($ubicacion->fecha_hora)->format('d/m/Y H:i:s') }}</td>
-                <td>
-                    <a href="https://www.google.com/maps?q={{ $ubicacion->latitud }},{{ $ubicacion->longitud }}" target="_blank">
-                        <i class="bi bi-geo-alt"></i> Ver en mapa
-                    </a>
-                </td>
-            </tr>
-            @empty
-            <tr><td colspan="4" class="text-center text-muted">No hay ubicaciones registradas.</td></tr>
-            @endforelse
-        </tbody>
-    </table>
+            <!-- Fin -->
+            <div class="col-md-6">
+                <h6><i class="bi bi-stop-circle text-danger"></i> Fin de Jornada</h6>
+                @php
+                    $ubicacionFin = $instalacion->ubicaciones->where('tipo', 'fin')->first();
+                @endphp
+                @if($ubicacionFin)
+                    <p>
+                        <strong>Latitud:</strong> {{ $ubicacionFin->latitud }}<br>
+                        <strong>Longitud:</strong> {{ $ubicacionFin->longitud }}<br>
+                        <strong>Fecha:</strong> {{ \Carbon\Carbon::parse($ubicacionFin->fecha_hora)->format('d/m/Y H:i') }}<br>
+                        @if($ubicacionFin->usuario)
+                            <strong>Registrado por:</strong> {{ $ubicacionFin->usuario->nombre ?? $ubicacionFin->usuario_id }}<br>
+                        @endif
+                        <a href="https://www.google.com/maps?q={{ $ubicacionFin->latitud }},{{ $ubicacionFin->longitud }}" target="_blank" class="btn btn-sm btn-primary mt-2">
+                            <i class="bi bi-map"></i> Abrir en Google Maps
+                        </a>
+                    </p>
+                    <div id="mapaFin" style="height: 250px; border-radius: 8px;" class="mt-2"></div>
+                @else
+                    <p class="text-muted">Sin registrar.</p>
+                @endif
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- Historial de Ubicaciones -->
+@if($instalacion->ubicaciones->count() > 0)
+<div class="card mt-4">
+    <div class="card-header"><h5><i class="bi bi-list-ul"></i> Historial de Ubicaciones</h5></div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Latitud</th>
+                        <th>Longitud</th>
+                        <th>Fecha/Hora</th>
+                        <th>Usuario</th>
+                        <th>Ver en mapa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($instalacion->ubicaciones as $ubi)
+                        <tr>
+                            <td>
+                                <span class="badge bg-{{ $ubi->tipo == 'inicio' ? 'success' : 'danger' }}">
+                                    {{ ucfirst($ubi->tipo) }}
+                                </span>
+                            </td>
+                            <td>{{ $ubi->latitud }}</td>
+                            <td>{{ $ubi->longitud }}</td>
+                            <td>{{ \Carbon\Carbon::parse($ubi->fecha_hora)->format('d/m/Y H:i') }}</td>
+                            <td>{{ $ubi->usuario->nombre ?? 'N/A' }}</td>
+                            <td>
+                                <a href="https://www.google.com/maps?q={{ $ubi->latitud }},{{ $ubi->longitud }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-geo-alt"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+@endif
+
+@endsection
 
 @push('scripts')
 <script>
-    // Inicializar mapa
-    var map = L.map('map').setView([20.6597, -103.3496], 12); // Coordenadas de Guadalajara (ajusta según tu región)
+    @if($ubicacionInicio ?? false)
+        var mapaInicio = L.map('mapaInicio').setView([{{ $ubicacionInicio->latitud }}, {{ $ubicacionInicio->longitud }}], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(mapaInicio);
+        L.marker([{{ $ubicacionInicio->latitud }}, {{ $ubicacionInicio->longitud }}]).addTo(mapaInicio)
+            .bindPopup('Inicio de instalación').openPopup();
+    @endif
 
-    // Capa de OpenStreetMap
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
-
-    // Agregar marcadores para cada ubicación
-    @foreach($instalacion->ubicaciones as $ubicacion)
-        L.marker([{{ $ubicacion->latitud }}, {{ $ubicacion->longitud }}])
-            .addTo(map)
-            .bindPopup('{{ $ubicacion->usuario->nombre ?? 'N/A' }} - {{ ucfirst($ubicacion->tipo) }}<br>{{ \Carbon\Carbon::parse($ubicacion->fecha_hora)->format('d/m/Y H:i') }}');
-    @endforeach
-
-    // Ajustar el mapa para mostrar todos los marcadores
-    if ({{ $instalacion->ubicaciones->count() }} > 0) {
-        var group = L.featureGroup([
-            @foreach($instalacion->ubicaciones as $ubicacion)
-                L.marker([{{ $ubicacion->latitud }}, {{ $ubicacion->longitud }}]),
-            @endforeach
-        ]);
-        map.fitBounds(group.getBounds(), { padding: [50, 50] });
-    }
+    @if($ubicacionFin ?? false)
+        var mapaFin = L.map('mapaFin').setView([{{ $ubicacionFin->latitud }}, {{ $ubicacionFin->longitud }}], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(mapaFin);
+        L.marker([{{ $ubicacionFin->latitud }}, {{ $ubicacionFin->longitud }}]).addTo(mapaFin)
+            .bindPopup('Fin de instalación').openPopup();
+    @endif
 </script>
 @endpush
-@endsection
-    </tbody>
-</table>
-@endsection

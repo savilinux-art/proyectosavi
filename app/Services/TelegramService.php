@@ -10,7 +10,6 @@ use App\Events\UbicacionActualizada;
 use Illuminate\Support\Facades\Log;
 use Telegram\Bot\Api;
 use Telegram\Bot\Keyboard\Keyboard;
-use App\Services\GeocercaService;
 
 class TelegramService
 {
@@ -21,7 +20,7 @@ class TelegramService
         $token = config('telegram.bot_token');
         if (empty($token)) {
             throw new \Exception('Token de Telegram no configurado. Agrega TELEGRAM_BOT_TOKEN en .env');
-        }use App\Services\GeocercaService;
+        }
         $this->telegram = new Api($token);
     }
 
@@ -193,202 +192,120 @@ class TelegramService
     /**
      * Maneja la ubicación recibida y emite evento en tiempo real
      */
-   public function handleLocation(array $message): void
-{
-    $chatId = $message['chat']['id'] ?? null;
-    $location = $message['location'] ?? null;
+    public function handleLocation(array $message): void
+    {
+        $chatId = $message['chat']['id'] ?? null;
+        $location = $message['location'] ?? null;
 
-    if (empty($chatId) || empty($location)) {
-        Log::warning('⚠️ Ubicación incompleta', ['chatId' => $chatId, 'location' => $location]);
-        return;
-    }
-
-    $lat = $location['latitude'] ?? null;
-    $lng = $location['longitude'] ?? null;
-
-    if ($lat === null || $lng === null) {
-        Log::warning('⚠️ Coordenadas inválidas', ['lat' => $lat, 'lng' => $lng]);
-        return;
-    }
-
-    $usuario = Usuario::where('telegram_chat_id', $chatId)->first();
-    if (!$usuario) {
-        $this->sendMessage($chatId, '❌ No estás registrado.');
-        Log::warning('⚠️ Usuario no encontrado', ['chatId' => $chatId]);
-        return;
-    }
-
-    // 🔍 LOG: Ver todas las solicitudes para este usuario (activas y expiradas)
-    $todasSolicitudes = SolicitudUbicacion::where('usuario_id', $usuario->id)
-        ->orderBy('created_at', 'desc')
-        ->get();
-    
-    Log::info('📋 Solicitudes encontradas para usuario', [
-        'usuario_id' => $usuario->id,
-        'chat_id' => $chatId,
-        'total' => $todasSolicitudes->count(),
-        'solicitudes' => $todasSolicitudes->map(function($s) {
-            return [
-                'id' => $s->id,
-                'tipo' => $s->tipo,
-                'instalacion_id' => $s->instalacion_id,
-                'created_at' => $s->created_at->toDateTimeString(),
-                'edad_minutos' => $s->created_at->diffInMinutes(now()),
-            ];
-        })->toArray()
-    ]);
-
-    // Buscar solicitud activa (últimos 30 minutos - aumentado de 10 a 30)
-    $solicitud = SolicitudUbicacion::where('usuario_id', $usuario->id)  // Cambié a usuario_id
-        ->where('created_at', '>=', now()->subMinutes(30))  // ⬅️ Aumentado a 30 minutos
-        ->latest()
-        ->first();
-
-    if (!$solicitud) {
-        // Verificar si hay solicitudes expiradas
-        $expiradas = SolicitudUbicacion::where('usuario_id', $usuario->id)
-            ->where('created_at', '<', now()->subMinutes(30))
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        Log::warning('⚠️ No hay solicitud activa', [
-            'usuario_id' => $usuario->id,
-            'chat_id' => $chatId,
-            'expiradas_total' => $expiradas->count(),
-            'ultima_expirada' => $expiradas->first() ? [
-                'id' => $expiradas->first()->id,
-                'created_at' => $expiradas->first()->created_at->toDateTimeString(),
-                'edad_minutos' => $expiradas->first()->created_at->diffInMinutes(now()),
-            ] : null,
-        ]);
-
-        // Si hay solicitudes expiradas, limpiarlas automáticamente
-        if ($expiradas->isNotEmpty()) {
-            $deleted = SolicitudUbicacion::where('usuario_id', $usuario->id)
-                ->where('created_at', '<', now()->subMinutes(30))
-                ->delete();
-            Log::info('🧹 Solicitudes expiradas eliminadas', ['eliminadas' => $deleted]);
-        }
-
-        // Mensaje más amigable
-        $this->sendMessage($chatId, '⏳ No hay una solicitud activa. Por favor, presiona nuevamente el botón "Iniciar Jornada".');
-        return;
-    }
-
-    $instalacionId = $solicitud->instalacion_id;
-    $usuarioId = $usuario->id;
-    $tipo = $solicitud->tipo;
-
-    Log::info('✅ Solicitud activa encontrada', [
-        'solicitud_id' => $solicitud->id,
-        'tipo' => $tipo,
-        'instalacion_id' => $instalacionId,
-        'usuario_id' => $usuarioId,
-    ]);
-
-    // Validaciones de jornada
-    if ($tipo === 'fin') {
-        $tieneInicio = UbicacionUsuario::where('usuario_id', $usuarioId)
-            ->where('instalacion_id', $instalacionId)
-            ->where('tipo', 'inicio')
-            ->exists();
-
-        if (!$tieneInicio) {
-            $this->sendMessage($chatId, '⚠️ No has iniciado la jornada. Debes iniciar antes de finalizar.');
-            $solicitud->delete();
+        if (empty($chatId) || empty($location)) {
+            Log::warning('⚠️ Ubicación incompleta', ['chatId' => $chatId, 'location' => $location]);
             return;
         }
-    }
 
-    if ($tipo === 'inicio') {
-        $tieneInicioSinFin = UbicacionUsuario::where('usuario_id', $usuarioId)
-            ->where('instalacion_id', $instalacionId)
-            ->where('tipo', 'inicio')
-            ->whereNotExists(function ($query) use ($usuarioId, $instalacionId) {
-                $query->from('ubicaciones_usuarios')
-                    ->where('ubicaciones_usuarios.usuario_id', $usuarioId)
-                    ->where('instalacion_id', $instalacionId)
-                    ->where('tipo', 'fin');
-            })
-            ->exists();
+        $lat = $location['latitude'] ?? null;
+        $lng = $location['longitude'] ?? null;
 
-        if ($tieneInicioSinFin) {
-            $this->sendMessage($chatId, '⚠️ Ya tienes una jornada iniciada. Finaliza primero antes de iniciar nuevamente.');
-            $solicitud->delete();
+        if ($lat === null || $lng === null) {
+            Log::warning('⚠️ Coordenadas inválidas', ['lat' => $lat, 'lng' => $lng]);
             return;
         }
-    }
 
-    // Guardar ubicación
-    try {
-        $ubicacion = UbicacionUsuario::create([
-            'usuario_id' => $usuarioId,
-            'instalacion_id' => $instalacionId,
-            'latitud' => $lat,
-            'longitud' => $lng,
-            'fecha_hora' => now(),
-            'fuente' => 'telegram',
-            'tipo' => $tipo,
-            'detalles' => json_encode($message ?? []),
-        ]);
+        $usuario = Usuario::where('telegram_chat_id', $chatId)->first();
+        if (!$usuario) {
+            $this->sendMessage($chatId, '❌ No estás registrado.');
+            Log::warning('⚠️ Usuario no encontrado', ['chatId' => $chatId]);
+            return;
+        }
 
-        Log::info('✅ Ubicación guardada', [
-            'ubicacion_id' => $ubicacion->id,
-            'usuario' => $usuario->nombre,
-            'lat' => $lat,
-            'lng' => $lng,
-            'tipo' => $tipo,
-        ]);
+        // Buscar solicitud activa (últimos 30 minutos)
+        $solicitud = SolicitudUbicacion::where('usuario_id', $usuario->id)
+            ->where('created_at', '>=', now()->subMinutes(30))
+            ->latest()
+            ->first();
 
-       // 🔍 Procesar geocercas
-try {
-    $geocercaService = app(GeocercaService::class);
-    $geocercaService->procesarUbicacion($ubicacion);
-} catch (\Exception $e) {
-    Log::error('❌ Error al procesar geocercas: ' . $e->getMessage());
-}
-
-        // 🚀 EMITIR EVENTO EN TIEMPO REAL
-        try {
-            broadcast(new UbicacionActualizada($ubicacion))->toOthers();
-            Log::info('📡 Evento UbicacionActualizada emitido desde Telegram', [
-                'ubicacion_id' => $ubicacion->id,
+        if (!$solicitud) {
+            Log::warning('⚠️ No hay solicitud activa', [
                 'usuario_id' => $usuario->id,
+                'chat_id' => $chatId,
+            ]);
+            $this->sendMessage($chatId, '⏳ No hay una solicitud activa. Por favor, presiona nuevamente el botón "Iniciar Jornada".');
+            return;
+        }
+
+        $instalacionId = $solicitud->instalacion_id;
+        $usuarioId = $usuario->id;
+        $tipo = $solicitud->tipo;
+
+        Log::info('✅ Solicitud activa encontrada', [
+            'solicitud_id' => $solicitud->id,
+            'tipo' => $tipo,
+            'instalacion_id' => $instalacionId,
+            'usuario_id' => $usuarioId,
+        ]);
+
+        // Validaciones de jornada
+        if ($tipo === 'fin') {
+            $tieneInicio = UbicacionUsuario::where('usuario_id', $usuarioId)
+                ->where('instalacion_id', $instalacionId)
+                ->where('tipo', 'inicio')
+                ->exists();
+
+            if (!$tieneInicio) {
+                $this->sendMessage($chatId, '⚠️ No has iniciado la jornada. Debes iniciar antes de finalizar.');
+                $solicitud->delete();
+                return;
+            }
+        }
+
+        if ($tipo === 'inicio') {
+            $tieneInicioSinFin = UbicacionUsuario::where('usuario_id', $usuarioId)
+                ->where('instalacion_id', $instalacionId)
+                ->where('tipo', 'inicio')
+                ->whereNotExists(function ($query) use ($usuarioId, $instalacionId) {
+                    $query->from('ubicaciones_usuarios')
+                        ->where('ubicaciones_usuarios.usuario_id', $usuarioId)
+                        ->where('instalacion_id', $instalacionId)
+                        ->where('tipo', 'fin');
+                })
+                ->exists();
+
+            if ($tieneInicioSinFin) {
+                $this->sendMessage($chatId, '⚠️ Ya tienes una jornada iniciada. Finaliza primero antes de iniciar nuevamente.');
+                $solicitud->delete();
+                return;
+            }
+        }
+
+        // Guardar ubicación
+        try {
+            $ubicacion = UbicacionUsuario::create([
+                'usuario_id' => $usuarioId,
+                'instalacion_id' => $instalacionId,
+                'latitud' => $lat,
+                'longitud' => $lng,
+                'fecha_hora' => now(),
+                'fuente' => 'telegram',
+                'tipo' => $tipo,
+                'detalles' => json_encode($message ?? []),
+            ]);
+
+            Log::info('✅ Ubicación guardada', [
+                'ubicacion_id' => $ubicacion->id,
+                'usuario' => $usuario->nombre,
                 'lat' => $lat,
                 'lng' => $lng,
                 'tipo' => $tipo,
             ]);
-        } catch (\Exception $e) {
-            Log::error('❌ Error al emitir evento UbicacionActualizada', [
-                'error' => $e->getMessage(),
-                'ubicacion_id' => $ubicacion->id,
-            ]);
-        }
 
-        // Enviar confirmación según tipo
-        if ($tipo === 'inicio') {
-            $this->sendMessage($chatId, '✅ Ubicación de inicio guardada. ¡Buen trabajo!');
-            $this->sendFinButton($chatId, $instalacionId);
-        } else {
-            $this->sendMessage($chatId, '✅ Ubicación de fin guardada. ¡Hasta luego!');
-        }
+            // 🔍 Procesar geocercas
+            try {
+                $geocercaService = app(\App\Services\GeocercaService::class);
+                $geocercaService->procesarUbicacion($ubicacion);
+            } catch (\Exception $e) {
+                Log::error('❌ Error al procesar geocercas: ' . $e->getMessage());
+            }
 
-        $solicitud->delete();
-        Log::info('🗑️ Solicitud de ubicación eliminada', ['solicitud_id' => $solicitud->id]);
-
-    } catch (\Exception $e) {
-        Log::error('❌ Error al guardar ubicación', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-            'usuario_id' => $usuarioId,
-            'chat_id' => $chatId,
-        ]);
-        $this->sendMessage($chatId, '❌ Error al guardar la ubicación. Intenta de nuevo.');
-    }
-
-
-
-            // 🚀 EMITIR EVENTO EN TIEMPO REAL (WebSocket)
+            // 🚀 EMITIR EVENTO EN TIEMPO REAL
             try {
                 broadcast(new UbicacionActualizada($ubicacion))->toOthers();
                 Log::info('📡 Evento UbicacionActualizada emitido desde Telegram', [

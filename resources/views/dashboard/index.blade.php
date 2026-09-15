@@ -136,7 +136,7 @@
 <!-- ==================== ESTADÍSTICAS Y CONTENIDO POR ROL ==================== -->
 
 <!-- ====== INVENTARIOS ====== -->
-@if($userRol == 'Inventarios')
+@if($userRol == 'Inventaarios')
 <div class="row mb-4">
     <div class="col-md-4">
         <div class="card text-white bg-primary stat-card">

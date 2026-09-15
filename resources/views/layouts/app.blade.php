@@ -202,6 +202,19 @@
             </a>
             @endif
             @endif
+<!-- ==================== COTIZACIONES ==================== -->
+@if(in_array(session('user_rol'), ['Administrador', 'Ventas']) || (session('user_usuario') && \App\Models\Usuario::find(session('user_usuario'))?->hasPermiso('ver-ventas')))
+<a href="{{ route('cotizaciones.index') }}" class="nav-link {{ request()->routeIs('cotizaciones.*') ? 'active' : '' }}" style="padding-left: 55px; font-size: 13px;">
+    <i class="bi bi-file-earmark-text"></i> Cotizaciones
+    <span class="badge bg-info ms-auto">{{ \App\Models\Cotizacion::count() }}</span>
+</a>
+@if(in_array(session('user_rol'), ['Administrador', 'Ventas']) || (session('user_usuario') && \App\Models\Usuario::find(session('user_usuario'))?->hasPermiso('crear-venta')))
+<a href="{{ route('cotizaciones.create') }}" class="nav-link {{ request()->routeIs('cotizaciones.create') ? 'active' : '' }}" style="padding-left: 70px; font-size: 13px;">
+    <i class="bi bi-plus-circle"></i> Nueva Cotización
+</a>
+@endif
+@endif
+
 
             <!-- ==================== INSTALACIONES ==================== -->
             @if(in_array(session('user_rol'), ['Administrador', 'Instalador', 'Ventas']) || (session('user_usuario') && \App\Models\Usuario::find(session('user_usuario'))?->hasPermiso('ver-instalaciones')))

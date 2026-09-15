@@ -57,7 +57,8 @@ Route::middleware(['auth.session', 'permiso:ver-ventas'])->group(function () {
 
 // Instalaciones
 Route::middleware(['auth.session', 'permiso:ver-instalaciones'])->group(function () {
-    Route::resource('instalaciones', InstalacionController::class);
+    Route::resource('instalaciones', InstalacionController::class)
+        ->parameters(['instalaciones' => 'instalacion']);
 });
 
 // Clientes

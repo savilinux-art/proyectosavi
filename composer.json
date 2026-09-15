@@ -9,11 +9,13 @@
         "php": "^8.3",
         "barryvdh/laravel-dompdf": "^3.1",
         "irazasyed/telegram-bot-sdk": "*",
+        "laravel/ai": "^0.11.2",
         "laravel/framework": "^13.17",
         "laravel/reverb": "^1.11",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^3.0",
         "maatwebsite/excel": "^4.0",
+        "thingstelemetry/laravel-traccar": "^1.0",
         "yajra/laravel-datatables-oracle": "^13.2"
     },
     "require-dev": {
