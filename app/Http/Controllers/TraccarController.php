@@ -17,23 +17,40 @@ class TraccarController extends Controller
     /**
      * Muestra el mapa con los dispositivos
      */
-    public function index()
-    {
-        $devices = $this->traccar->getDevices(); // Usa el método que ya tienes
-        $positions = [];
+ public function index()
+{
+    // 1. Obtener todos los dispositivos
+    $devices = $this->traccar->getDevices();
 
-        foreach ($devices as $device) {
-            $pos = $this->traccar->getLatestPosition($device['id'] ?? $device['uniqueId']);
-            if ($pos) {
-                $positions[] = [
-                    'device' => $device,
-                    'position' => $pos,
-                ];
-            }
+    // 2. Obtener TODAS las posiciones en una sola llamada (evita N+1)
+    //    Si tu cliente no tiene este método, usa el endpoint /api/positions
+    $allPositions = collect($this->traccar->getPositions() ?? [])
+        ->keyBy(fn($pos) => is_array($pos) ? $pos['deviceId'] : $pos->deviceId);
+
+    // 3. Combinar dispositivos con su última posición
+    $positions = [];
+    foreach ($devices as $device) {
+        // Normalizar: puede venir como array o como DTO/objeto
+        $deviceId = is_array($device) ? ($device['id'] ?? null) : ($device->id ?? null);
+
+        if (!$deviceId) {
+            continue; // Dispositivo sin ID, lo saltamos
         }
 
-        return view('traccar.map', compact('positions'));
+        $position = $allPositions->get($deviceId);
+
+        $positions[] = [
+            'device'   => $device,
+            'position' => $position, // puede ser null si no tiene posición
+        ];
     }
+
+    // 4. URL del socket desde el .env
+    $socketUrl = env('TRACCAR_SOCKET_URL');
+
+    // 5. Pasar TODAS las variables a la vista
+    return view('traccar.map', compact('positions', 'socketUrl'));
+}
 
     /**
      * Devuelve las posiciones en JSON

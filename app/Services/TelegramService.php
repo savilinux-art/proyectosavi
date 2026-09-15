@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Instalacion;
+use App\Models\InstalacionFoto;
 use App\Models\SolicitudUbicacion;
 use App\Models\UbicacionUsuario;
 use App\Models\Usuario;
@@ -24,9 +25,10 @@ class TelegramService
         $this->telegram = new Api($token);
     }
 
-    /**
-     * Notifica a un instalador sobre una instalación asignada
-     */
+    /* ============================================================
+     *  NOTIFICACIONES EXISTENTES (sin cambios)
+     * ============================================================ */
+
     public function notifyInstalacionAsignada(Usuario $instalador, Instalacion $instalacion): void
     {
         Log::info('📨 NOTIFY - INICIO', [
@@ -42,11 +44,17 @@ class TelegramService
 
         $nombreInstalacion = $instalacion->nombre_instalacion ?? 'Principal';
 
+        // NUEVO: usar latitud/longitud o direccion si existen, con fallback a ubicacion_actual
+        $ubicacionTexto = $instalacion->direccion
+            ?? ($instalacion->tieneUbicacion()
+                ? "{$instalacion->latitud}, {$instalacion->longitud}"
+                : ($instalacion->ubicacion_actual ?? 'No especificada'));
+
         $texto = "🔔 *Nueva instalación asignada*\n\n" .
             "📋 Instalación #{$instalacion->id}\n" .
             "📌 Proyecto: {$instalacion->nombre_proyecto}\n" .
             "🔧 Instalación: {$nombreInstalacion}\n" .
-            "📍 Dirección: {$instalacion->ubicacion_actual}\n\n" .
+            "📍 Dirección: {$ubicacionTexto}\n\n" .
             'Presiona el botón para iniciar la jornada y reportar tu ubicación:';
 
         $inlineKeyboard = Keyboard::make()
@@ -74,9 +82,6 @@ class TelegramService
         }
     }
 
-    /**
-     * Maneja el callback de los botones (Iniciar/Finalizar)
-     */
     public function handleCallbackQuery($callbackQuery): void
     {
         $chatId = $callbackQuery['message']['chat']['id'] ?? null;
@@ -106,7 +111,6 @@ class TelegramService
             return;
         }
 
-        // Validaciones de jornada
         if ($tipo === 'fin') {
             $inicioExistente = UbicacionUsuario::where('usuario_id', $usuario->id)
                 ->where('instalacion_id', $instalacionId)
@@ -137,7 +141,6 @@ class TelegramService
             }
         }
 
-        // Crear la solicitud de ubicación
         SolicitudUbicacion::create([
             'usuario_id' => $usuario->id,
             'chat_id' => $chatId,
@@ -145,7 +148,6 @@ class TelegramService
             'instalacion_id' => $instalacionId,
         ]);
 
-        // Si es inicio, eliminar mensaje original
         if ($tipo === 'inicio' && $messageId) {
             try {
                 $this->telegram->deleteMessage([
@@ -158,13 +160,9 @@ class TelegramService
             }
         }
 
-        // Enviar mensaje con botón de ubicación
         $this->sendLocationRequest($chatId, $tipo);
     }
 
-    /**
-     * Envía un mensaje con el botón para compartir ubicación
-     */
     private function sendLocationRequest(string $chatId, string $tipo): void
     {
         $texto = $tipo === 'inicio'
@@ -189,9 +187,6 @@ class TelegramService
         ]);
     }
 
-    /**
-     * Maneja la ubicación recibida y emite evento en tiempo real
-     */
     public function handleLocation(array $message): void
     {
         $chatId = $message['chat']['id'] ?? null;
@@ -217,7 +212,6 @@ class TelegramService
             return;
         }
 
-        // Buscar solicitud activa (últimos 30 minutos)
         $solicitud = SolicitudUbicacion::where('usuario_id', $usuario->id)
             ->where('created_at', '>=', now()->subMinutes(30))
             ->latest()
@@ -243,7 +237,6 @@ class TelegramService
             'usuario_id' => $usuarioId,
         ]);
 
-        // Validaciones de jornada
         if ($tipo === 'fin') {
             $tieneInicio = UbicacionUsuario::where('usuario_id', $usuarioId)
                 ->where('instalacion_id', $instalacionId)
@@ -276,7 +269,6 @@ class TelegramService
             }
         }
 
-        // Guardar ubicación
         try {
             $ubicacion = UbicacionUsuario::create([
                 'usuario_id' => $usuarioId,
@@ -297,7 +289,22 @@ class TelegramService
                 'tipo' => $tipo,
             ]);
 
-            // 🔍 Procesar geocercas
+            // NUEVO: sincronizar lat/lng en la instalación si es tipo inicio
+            if ($tipo === 'inicio') {
+                try {
+                    $instalacion = Instalacion::find($instalacionId);
+                    if ($instalacion) {
+                        $instalacion->update([
+                            'latitud' => $lat,
+                            'longitud' => $lng,
+                            'ubicacion_actualizada_en' => now(),
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('No se pudo sincronizar coordenadas en instalación: ' . $e->getMessage());
+                }
+            }
+
             try {
                 $geocercaService = app(\App\Services\GeocercaService::class);
                 $geocercaService->procesarUbicacion($ubicacion);
@@ -305,7 +312,6 @@ class TelegramService
                 Log::error('❌ Error al procesar geocercas: ' . $e->getMessage());
             }
 
-            // 🚀 EMITIR EVENTO EN TIEMPO REAL
             try {
                 broadcast(new UbicacionActualizada($ubicacion))->toOthers();
                 Log::info('📡 Evento UbicacionActualizada emitido desde Telegram', [
@@ -322,12 +328,14 @@ class TelegramService
                 ]);
             }
 
-            // Enviar confirmación según tipo
             if ($tipo === 'inicio') {
                 $this->sendMessage($chatId, '✅ Ubicación de inicio guardada. ¡Buen trabajo!');
                 $this->sendFinButton($chatId, $instalacionId);
             } else {
                 $this->sendMessage($chatId, '✅ Ubicación de fin guardada. ¡Hasta luego!');
+
+                // NUEVO: si al finalizar, sugerir subir fotos de fin
+                $this->sendFotoRequest($chatId, $instalacionId, 'fin');
             }
 
             $solicitud->delete();
@@ -344,9 +352,6 @@ class TelegramService
         }
     }
 
-    /**
-     * Envía un mensaje con el botón "Finalizar Jornada"
-     */
     private function sendFinButton(string $chatId, int $instalacionId): void
     {
         $texto = "✅ Has iniciado la jornada.\n\n" .
@@ -375,9 +380,6 @@ class TelegramService
         }
     }
 
-    /**
-     * Envía un mensaje simple
-     */
     public function sendMessage(string $chatId, string $text): void
     {
         try {
@@ -389,5 +391,284 @@ class TelegramService
         } catch (\Exception $e) {
             Log::error('❌ Error enviando mensaje', ['chat_id' => $chatId, 'error' => $e->getMessage()]);
         }
+    }
+
+    /* ============================================================
+     *  NUEVOS MÉTODOS (agregados sin romper lo existente)
+     * ============================================================ */
+
+    /**
+     * Notifica un cambio de estatus de instalación (Opción C).
+     * - Notifica a instaladores asignados
+     * - Notifica al admin
+     * - Envía botones contextuales según el nuevo estatus
+     */
+    public function notifyCambioEstatus(Instalacion $instalacion, string $anterior, string $nuevo): void
+    {
+        $emoji = match ($nuevo) {
+            'programacion' => '📅',
+            'preparacion'  => '🛠',
+            'asignada'     => '👷',
+            'en_proceso'   => '🚧',
+            'pruebas'      => '🧪',
+            'entrega'      => '📦',
+            'completada'   => '✅',
+            'cancelada'    => '❌',
+            'pendiente'    => '⏳',
+            default        => '📌',
+        };
+
+        $texto = "{$emoji} *Cambio de estatus*\n\n" .
+            "📋 Instalación #{$instalacion->id}\n" .
+            "📌 Proyecto: {$instalacion->nombre_proyecto}\n" .
+            "🔧 {$instalacion->nombre_instalacion}\n\n" .
+            "De: `{$anterior}`\n" .
+            "A: `{$nuevo}`";
+
+        // Keyboard contextual según nuevo estatus
+        $keyboard = $this->buildEstatusKeyboard($instalacion, $nuevo);
+
+        // Notificar a instaladores asignados
+        foreach ($instalacion->instaladores as $inst) {
+            if (empty($inst->telegram_chat_id)) continue;
+
+            try {
+                $payload = [
+                    'chat_id' => $inst->telegram_chat_id,
+                    'text' => $texto,
+                    'parse_mode' => 'Markdown',
+                ];
+                if ($keyboard) {
+                    $payload['reply_markup'] = $keyboard;
+                }
+                $this->telegram->sendMessage($payload);
+            } catch (\Exception $e) {
+                Log::error('❌ Error notificando cambio estatus a instalador', [
+                    'instalador' => $inst->usuario,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Notificar al admin
+        $adminChat = config('telegram.admin_chat_id');
+        if (!empty($adminChat)) {
+            try {
+                $this->telegram->sendMessage([
+                    'chat_id' => $adminChat,
+                    'text' => $texto,
+                    'parse_mode' => 'Markdown',
+                ]);
+            } catch (\Exception $e) {
+                Log::error('❌ Error notificando cambio estatus a admin', ['error' => $e->getMessage()]);
+            }
+        }
+    }
+
+    /**
+     * Notifica que se subió una foto a una instalación.
+     * Envía la foto real al admin si es posible.
+     */
+    public function notifyFotoSubida(Instalacion $instalacion, string $tipo, ?InstalacionFoto $foto = null): void
+    {
+        $emojiTipo = match ($tipo) {
+            'inicio'     => '🟢',
+            'proceso'    => '🔵',
+            'fin'        => '🔴',
+            'incidencia' => '⚠️',
+            default      => '📷',
+        };
+
+        $texto = "{$emojiTipo} *Nueva evidencia* ({$tipo})\n\n" .
+            "📋 Instalación #{$instalacion->id}\n" .
+            "📌 Proyecto: {$instalacion->nombre_proyecto}\n" .
+            "🔧 {$instalacion->nombre_instalacion}";
+
+        $adminChat = config('telegram.admin_chat_id');
+        if (empty($adminChat)) return;
+
+        try {
+            // Si tenemos el archivo físico, enviar como foto
+            if ($foto && $foto->ruta) {
+                $rutaCompleta = storage_path('app/public/' . $foto->ruta);
+
+                if (file_exists($rutaCompleta)) {
+                    $this->telegram->sendPhoto([
+                        'chat_id' => $adminChat,
+                        'photo'   => \Telegram\Bot\FileUpload\InputFile::create($rutaCompleta),
+                        'caption' => $texto,
+                        'parse_mode' => 'Markdown',
+                    ]);
+                    Log::info('📸 Foto enviada al admin', [
+                        'instalacion_id' => $instalacion->id,
+                        'ruta' => $foto->ruta,
+                    ]);
+                    return;
+                }
+            }
+
+            // Fallback: solo texto
+            $this->telegram->sendMessage([
+                'chat_id' => $adminChat,
+                'text' => $texto,
+                'parse_mode' => 'Markdown',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('❌ Error notificando foto al admin', [
+                'error' => $e->getMessage(),
+                'instalacion_id' => $instalacion->id,
+            ]);
+        }
+    }
+
+    /**
+     * Notifica alerta de geocerca (entrada/salida).
+     * Se llama desde GeocercaService.
+     */
+    public function notifyGeocercaAlerta(
+        Usuario $usuario,
+        string $nombreGeocerca,
+        string $tipo,       // 'entrada' | 'salida'
+        ?float $lat = null,
+        ?float $lng = null
+    ): void {
+        $emoji = $tipo === 'entrada' ? '🟢' : '🔴';
+        $accion = $tipo === 'entrada' ? 'entró a' : 'salió de';
+
+        $texto = "{$emoji} *Alerta de geocerca*\n\n" .
+            "👷 {$usuario->nombre}\n" .
+            "{$accion}: *{$nombreGeocerca}*\n" .
+            "🕒 " . now()->format('d/m/Y H:i');
+
+        if ($lat !== null && $lng !== null) {
+            $texto .= "\n📍 {$lat}, {$lng}";
+        }
+
+        // Notificar al admin
+        $adminChat = config('telegram.admin_chat_id');
+        if (!empty($adminChat)) {
+            try {
+                $this->telegram->sendMessage([
+                    'chat_id' => $adminChat,
+                    'text' => $texto,
+                    'parse_mode' => 'Markdown',
+                ]);
+            } catch (\Exception $e) {
+                Log::error('❌ Error notificando geocerca al admin', ['error' => $e->getMessage()]);
+            }
+        }
+
+        // Notificar al instalador mismo (opcional, útil)
+        if (!empty($usuario->telegram_chat_id)) {
+            try {
+                $this->telegram->sendMessage([
+                    'chat_id' => $usuario->telegram_chat_id,
+                    'text' => $texto,
+                    'parse_mode' => 'Markdown',
+                ]);
+            } catch (\Exception $e) {
+                Log::error('❌ Error notificando geocerca al instalador', ['error' => $e->getMessage()]);
+            }
+        }
+    }
+
+    /**
+     * Envía un mensaje al instalador pidiéndole fotos de evidencia.
+     * Se llama automáticamente al finalizar jornada, o manualmente desde el panel.
+     */
+    public function sendFotoRequest(string $chatId, int $instalacionId, string $tipo = 'fin'): void
+    {
+        $texto = match ($tipo) {
+            'fin'        => "📷 *Sube tus fotos de cierre*\n\nEnvía las fotos del trabajo terminado como respuesta a este mensaje.",
+            'incidencia' => "⚠️ *Reporta una incidencia*\n\nEnvía fotos de la incidencia que encontraste.",
+            default      => "📷 *Sube tus fotos*\n\nEnvía las fotos de la instalación.",
+        };
+
+        $texto .= "\n\n📋 Instalación #{$instalacionId}";
+
+        try {
+            $this->telegram->sendMessage([
+                'chat_id' => $chatId,
+                'text' => $texto,
+                'parse_mode' => 'Markdown',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('❌ Error enviando solicitud de fotos', [
+                'chat_id' => $chatId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Envía un mensaje al admin con resumen de instalaciones activas.
+     * Útil para reportes diarios.
+     */
+    public function notifyResumenDiario(array $stats): void
+    {
+        $adminChat = config('telegram.admin_chat_id');
+        if (empty($adminChat)) return;
+
+        $texto = "📊 *Resumen del día*\n\n" .
+            "🟢 Activas: " . ($stats['activas'] ?? 0) . "\n" .
+            "✅ Completadas: " . ($stats['completadas'] ?? 0) . "\n" .
+            "❌ Canceladas: " . ($stats['canceladas'] ?? 0) . "\n" .
+            "👷 Instaladores activos: " . ($stats['instaladores'] ?? 0) . "\n" .
+            "🕒 " . now()->format('d/m/Y');
+
+        try {
+            $this->telegram->sendMessage([
+                'chat_id' => $adminChat,
+                'text' => $texto,
+                'parse_mode' => 'Markdown',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('❌ Error enviando resumen diario', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Construye el teclado inline contextual según el nuevo estatus.
+     */
+    private function buildEstatusKeyboard(Instalacion $instalacion, string $nuevo): ?Keyboard
+    {
+        $keyboard = Keyboard::make()->inline();
+        $agregado = false;
+
+        // Si pasa a "completada" → pedir fotos de fin
+        if ($nuevo === 'completada') {
+            $keyboard->row([
+                Keyboard::inlineButton([
+                    'text' => '📷 Subir fotos de fin',
+                    'callback_data' => "foto|fin|{$instalacion->id}",
+                ]),
+            ]);
+            $agregado = true;
+        }
+
+        // Si pasa a "pruebas" → pedir fotos de proceso
+        if ($nuevo === 'pruebas') {
+            $keyboard->row([
+                Keyboard::inlineButton([
+                    'text' => '📷 Subir evidencia de pruebas',
+                    'callback_data' => "foto|proceso|{$instalacion->id}",
+                ]),
+            ]);
+            $agregado = true;
+        }
+
+        // Si pasa a "asignada" o "pendiente" → botón de iniciar jornada
+        if (in_array($nuevo, ['asignada', 'pendiente', 'programacion', 'preparacion'])) {
+            $keyboard->row([
+                Keyboard::inlineButton([
+                    'text' => '▶️ Iniciar Jornada',
+                    'callback_data' => "inicio|{$instalacion->id}",
+                ]),
+            ]);
+            $agregado = true;
+        }
+
+        return $agregado ? $keyboard : null;
     }
 }

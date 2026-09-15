@@ -75,7 +75,7 @@ Gestionar el ciclo completo de una empresa de instalaciones tecnológicas, desde
 
 | Componente | Tecnología |
 |------------|------------|
-| **Backend** | Laravel 13 (PHP 8.3.6) |
+| **Backend** | Laravel 13 (PHP 8.4.25 ) |
 | **Base de Datos** | MariaDB 10.11 |
 | **Frontend** | Blade + Bootstrap 5 + jQuery + DataTables + Leaflet.js |
 | **Autenticación** | Sesiones nativas + Middleware personalizado |
@@ -85,7 +85,7 @@ Gestionar el ciclo completo de una empresa de instalaciones tecnológicas, desde
 | **Mapas** | Leaflet.js + OpenStreetMap |
 | **Exportaciones** | Laravel Excel, Dompdf (PDF) |
 | **Control de acceso** | Sistema propio basado en roles y permisos |
-
+lara
 ---
 
 ## 📂 **Estructura de Base de Datos**

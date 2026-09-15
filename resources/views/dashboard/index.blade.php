@@ -58,6 +58,8 @@
                                 </div>
                             </a>
                         </div>
+                        
+    
 @if($userRol == 'Administrador')
     {{-- ... otros botones ... --}}
     <div class="col-md-2">
@@ -70,6 +72,7 @@
             </div>
         </a>
     </div>
+    
 @endif
 
                     @elseif($userRol == 'Inventarios')

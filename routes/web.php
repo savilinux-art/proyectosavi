@@ -40,6 +40,9 @@ Route::middleware(['auth.session', 'permiso:ver-dashboard'])->group(function () 
 Route::middleware(['auth.session', 'permiso:ver-inventario'])->group(function () {
     Route::resource('inventario', InventarioController::class);
     Route::get('inventario/export', [InventarioController::class, 'export'])->name('inventario.export');
+    Route::post('inventario/{id}/ajustar-stock', [InventarioController::class, 'ajustarStock'])
+        ->name('inventario.ajustarStock');
+     
 });
 
 // Devoluciones de Inventario (corregido)
@@ -57,6 +60,18 @@ Route::middleware(['auth.session', 'permiso:ver-ventas'])->group(function () {
 
 // Instalaciones
 Route::middleware(['auth.session', 'permiso:ver-instalaciones'])->group(function () {
+
+    // ⚠️ Las rutas específicas van ANTES del resource para no chocar con {instalacion}
+    Route::get('instalaciones/mapa-data', [InstalacionController::class, 'mapaData'])
+        ->name('instalaciones.mapaData');
+
+    Route::post('instalaciones/{instalacion}/estatus', [InstalacionController::class, 'cambiarEstatus'])
+        ->name('instalaciones.cambiarEstatus');
+
+    Route::delete('instalaciones/{instalacion}/fotos/{foto}', [InstalacionController::class, 'eliminarFoto'])
+        ->name('instalaciones.eliminarFoto');
+
+    // Resource principal
     Route::resource('instalaciones', InstalacionController::class)
         ->parameters(['instalaciones' => 'instalacion']);
 });
@@ -129,12 +144,14 @@ Route::middleware(['auth.session'])->group(function () {
 // ============================================================
 // 🛰️ RUTAS DE TRACCAR (MAPA Y POSICIONES)
 // ============================================================
-Route::middleware(['auth.session', 'permiso:ver-ubicaciones'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     Route::get('/mapa', [TraccarController::class, 'index'])->name('mapa.index');
     Route::get('/mapa/posiciones', [TraccarController::class, 'getPositions'])->name('mapa.positions');
     Route::get('/mapa/dispositivo/{deviceId}', [TraccarController::class, 'getDevicePosition'])->name('mapa.device');
     Route::get('/mapa/historial/{deviceId}', [TraccarController::class, 'getHistory'])->name('mapa.history');
+    Route::get('/traccar', [TraccarController::class, 'index'])->name('traccar.index');
 });
+
 
 // Ubicaciones
 Route::get('/ubicaciones', [UbicacionController::class, 'index'])
