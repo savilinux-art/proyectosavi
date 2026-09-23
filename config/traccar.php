@@ -7,18 +7,23 @@ return [
     |--------------------------------------------------------------------------
     | Traccar Base URL
     |--------------------------------------------------------------------------
-    | The base URL of your Traccar server’s API endpoint.
-    | Example: https://your-traccar-server.com/api
     */
-    'base_url' => env(key: 'TRACCAR_BASE_URL'),
+    'base_url' => env('TRACCAR_BASE_URL', 'http://localhost:8082'),
 
     /*
-     |--------------------------------------------------------------------------
-     | Traccar API Key
-     |--------------------------------------------------------------------------
-     | The API key used to authenticate requests to the Traccar server.
-     | You can obtain this from your Traccar server administrator or
-     | configuration settings.
-     */
-    'api_key' => env(key: 'TRACCAR_API_KEY'),
+    |--------------------------------------------------------------------------
+    | Traccar API Key
+    |--------------------------------------------------------------------------
+    | Nunca debe ser null: el ServiceProvider del paquete tipa estricto
+    | y lanza InvalidArgumentException si el valor es NULL.
+    */
+    'api_key' => env('TRACCAR_API_KEY', ''),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Credenciales opcionales (algunos endpoints las usan)
+    |--------------------------------------------------------------------------
+    */
+    'email'    => env('TRACCAR_EMAIL', ''),
+    'password' => env('TRACCAR_PASSWORD', ''),
 ];

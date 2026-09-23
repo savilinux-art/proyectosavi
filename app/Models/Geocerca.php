@@ -29,4 +29,10 @@ class Geocerca extends Model
     {
         return $this->hasMany(GeocercaAlerta::class);
     }
+
+    public function estados()
+    {
+    return $this->hasMany(GeocercaEstado::class);
+    }
+
 }

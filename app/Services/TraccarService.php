@@ -10,13 +10,16 @@ class TraccarService
     protected string $baseUrl;
     protected ?string $username;
     protected ?string $password;
+    protected ?string $token;
+    protected string $authMethod;
 
     public function __construct()
     {
-        // Normaliza la URL: siempre termina con exactamente un '/'
-        $this->baseUrl  = rtrim(config('traccar.base_url', 'http://localhost:8082'), '/') . '/';
-        $this->username = config('traccar.auth.username');
-        $this->password = config('traccar.auth.password');
+        $this->baseUrl    = rtrim(config('traccar.base_url', 'http://localhost:8082'), '/') . '/';
+        $this->username   = config('traccar.auth.username');
+        $this->password   = config('traccar.auth.password');
+        $this->token      = config('traccar.auth.token');
+        $this->authMethod = config('traccar.auth.method', 'auto');
     }
 
     /* ============================================================
@@ -27,10 +30,30 @@ class TraccarService
         try {
             $url = $this->baseUrl . ltrim($endpoint, '/');
 
-            $response = Http::withBasicAuth($this->username, $this->password)
-                ->timeout(15)
-                ->acceptJson()
-                ->get($url, $params);
+            $http = Http::timeout(15)->acceptJson();
+
+            // Elegir método de autenticación
+            $method = $this->authMethod;
+
+            if ($method === 'auto') {
+                $method = $this->token ? 'token' : 'basic';
+            }
+
+            if ($method === 'token' && $this->token) {
+                // Traccar acepta: Authorization: Bearer <token>
+                $http = $http->withToken($this->token);
+            } elseif ($method === 'basic' && $this->username && $this->password) {
+                $http = $http->withBasicAuth($this->username, $this->password);
+            } else {
+                Log::error('Traccar: no hay credenciales válidas configuradas', [
+                    'method' => $method,
+                    'has_token' => !empty($this->token),
+                    'has_basic' => !empty($this->username) && !empty($this->password),
+                ]);
+                return null;
+            }
+
+            $response = $http->get($url, $params);
 
             if ($response->successful()) {
                 return $response->json();
@@ -40,6 +63,7 @@ class TraccarService
                 'url'    => $url,
                 'status' => $response->status(),
                 'body'   => $response->body(),
+                'method' => $method,
             ]);
             return null;
 
@@ -55,17 +79,11 @@ class TraccarService
      *  MÉTODOS PÚBLICOS
      * ============================================================ */
 
-    /**
-     * Lista todos los dispositivos.
-     */
     public function getDevices(): array
     {
         return $this->request('api/devices') ?? [];
     }
 
-    /**
-     * Última posición de un dispositivo específico.
-     */
     public function getLatestPosition($deviceId): ?array
     {
         $positions = $this->request('api/positions', [
@@ -76,18 +94,11 @@ class TraccarService
         return $positions[0] ?? null;
     }
 
-    /**
-     * Últimas posiciones de TODOS los dispositivos (1 sola llamada HTTP).
-     * Más eficiente que iterar getLatestPosition().
-     */
     public function getAllPositions(): array
     {
         return $this->request('api/positions') ?? [];
     }
 
-    /**
-     * Info del servidor Traccar (diagnóstico).
-     */
     public function getServerInfo(): ?array
     {
         return $this->request('api/server');

@@ -25,6 +25,7 @@ use App\Http\Controllers\TraccarController;
 use App\Http\Controllers\UbicacionController;
 use App\Http\Controllers\GeocercaController;
 use App\Http\Controllers\CotizacionController;
+use App\Http\Controllers\GeocercaAlertaController;
 
 // Auth
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
@@ -136,6 +137,7 @@ Route::middleware(['auth.session', 'permiso:ver-devoluciones'])->group(function 
     Route::resource('devoluciones', DevolucionInventarioController::class);
 });
 
+
 // Reportes
 Route::middleware(['auth.session'])->group(function () {
     Route::resource('reportes', ReporteController::class)->except(['update']);
@@ -144,12 +146,22 @@ Route::middleware(['auth.session'])->group(function () {
 // ============================================================
 // 🛰️ RUTAS DE TRACCAR (MAPA Y POSICIONES)
 // ============================================================
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth.session'])->group(function () {
     Route::get('/mapa', [TraccarController::class, 'index'])->name('mapa.index');
     Route::get('/mapa/posiciones', [TraccarController::class, 'getPositions'])->name('mapa.positions');
     Route::get('/mapa/dispositivo/{deviceId}', [TraccarController::class, 'getDevicePosition'])->name('mapa.device');
     Route::get('/mapa/historial/{deviceId}', [TraccarController::class, 'getHistory'])->name('mapa.history');
     Route::get('/traccar', [TraccarController::class, 'index'])->name('traccar.index');
+});
+
+
+// ============================================================ 
+// 🛰️ RUTAS DE GEOFENCING (GEO-CERCAS Y ALERTAS)
+// ============================================================
+Route::middleware(['auth.session'])->prefix('geocercas/alertas')->group(function () {
+    Route::get('recientes',   [GeocercaAlertaController::class, 'recientes'])->name('geocercas.alertas.recientes');
+    Route::post('{id}/leer',  [GeocercaAlertaController::class, 'marcarLeida'])->name('geocercas.alertas.leer');
+    Route::post('leer-todas', [GeocercaAlertaController::class, 'marcarTodas'])->name('geocercas.alertas.leerTodas');
 });
 
 

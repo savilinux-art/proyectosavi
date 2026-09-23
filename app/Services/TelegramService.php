@@ -8,6 +8,7 @@ use App\Models\SolicitudUbicacion;
 use App\Models\UbicacionUsuario;
 use App\Models\Usuario;
 use App\Events\UbicacionActualizada;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Telegram\Bot\Api;
 use Telegram\Bot\Keyboard\Keyboard;
@@ -26,17 +27,10 @@ class TelegramService
     }
 
     /* ============================================================
-     *  NOTIFICACIONES EXISTENTES (sin cambios)
+     *  NOTIFICAR INSTALACIÓN ASIGNADA
      * ============================================================ */
-
     public function notifyInstalacionAsignada(Usuario $instalador, Instalacion $instalacion): void
     {
-        Log::info('📨 NOTIFY - INICIO', [
-            'instalador_id' => $instalador->id,
-            'chat_id' => $instalador->telegram_chat_id,
-            'instalacion_id' => $instalacion->id,
-        ]);
-
         if (empty($instalador->telegram_chat_id)) {
             Log::warning('⚠️ Chat ID vacío', ['instalador_id' => $instalador->id]);
             return;
@@ -44,7 +38,6 @@ class TelegramService
 
         $nombreInstalacion = $instalacion->nombre_instalacion ?? 'Principal';
 
-        // NUEVO: usar latitud/longitud o direccion si existen, con fallback a ubicacion_actual
         $ubicacionTexto = $instalacion->direccion
             ?? ($instalacion->tieneUbicacion()
                 ? "{$instalacion->latitud}, {$instalacion->longitud}"
@@ -73,24 +66,25 @@ class TelegramService
                 'reply_markup' => $inlineKeyboard,
                 'parse_mode' => 'Markdown',
             ]);
-            Log::info('✅ Mensaje enviado correctamente', ['chat_id' => $instalador->telegram_chat_id]);
+            Log::info('✅ Notificación enviada', ['chat_id' => $instalador->telegram_chat_id]);
         } catch (\Exception $e) {
-            Log::error('❌ Error al enviar mensaje de Telegram', [
+            Log::error('❌ Error notificando asignación', [
                 'chat_id' => $instalador->telegram_chat_id,
                 'error' => $e->getMessage(),
             ]);
         }
     }
 
+    /* ============================================================
+     *  CALLBACK QUERY (botones inline)
+     * ============================================================ */
     public function handleCallbackQuery($callbackQuery): void
     {
-        $chatId = $callbackQuery['message']['chat']['id'] ?? null;
+        $chatId       = $callbackQuery['message']['chat']['id'] ?? null;
         $callbackData = $callbackQuery['data'] ?? null;
-        $messageId = $callbackQuery['message']['message_id'] ?? null;
+        $messageId    = $callbackQuery['message']['message_id'] ?? null;
 
-        if (empty($chatId) || empty($callbackData)) {
-            return;
-        }
+        if (empty($chatId) || empty($callbackData)) return;
 
         [$tipo, $instalacionId] = array_pad(explode('|', $callbackData, 2), 2, null);
 
@@ -127,43 +121,48 @@ class TelegramService
             $inicioSinFin = UbicacionUsuario::where('usuario_id', $usuario->id)
                 ->where('instalacion_id', $instalacionId)
                 ->where('tipo', 'inicio')
-                ->whereNotExists(function ($query) use ($usuario, $instalacionId) {
-                    $query->from('ubicaciones_usuarios')
-                        ->where('ubicaciones_usuarios.usuario_id', $usuario->id)
-                        ->where('instalacion_id', $instalacionId)
-                        ->where('tipo', 'fin');
+                ->whereNotExists(function ($q) use ($usuario, $instalacionId) {
+                    $q->from('ubicaciones_usuarios')
+                      ->where('ubicaciones_usuarios.usuario_id', $usuario->id)
+                      ->where('instalacion_id', $instalacionId)
+                      ->where('tipo', 'fin');
                 })
                 ->exists();
 
             if ($inicioSinFin) {
-                $this->sendMessage($chatId, '⚠️ Ya tienes una jornada iniciada. Finaliza primero antes de iniciar nuevamente.');
+                $this->sendMessage($chatId, '⚠️ Ya tienes una jornada iniciada. Finaliza primero.');
                 return;
             }
         }
 
+        // Limpiar solicitudes viejas del usuario
+        SolicitudUbicacion::where('usuario_id', $usuario->id)->delete();
+
         SolicitudUbicacion::create([
-            'usuario_id' => $usuario->id,
-            'chat_id' => $chatId,
-            'tipo' => $tipo,
+            'usuario_id'     => $usuario->id,
+            'chat_id'        => $chatId,
+            'tipo'           => $tipo,
             'instalacion_id' => $instalacionId,
         ]);
 
         if ($tipo === 'inicio' && $messageId) {
             try {
                 $this->telegram->deleteMessage([
-                    'chat_id' => $chatId,
+                    'chat_id'    => $chatId,
                     'message_id' => $messageId,
                 ]);
-                Log::info('🗑️ Mensaje de inicio eliminado', ['chat_id' => $chatId, 'message_id' => $messageId]);
             } catch (\Exception $e) {
-                Log::warning('No se pudo eliminar el mensaje de inicio', ['chat_id' => $chatId, 'message_id' => $messageId]);
+                Log::warning('No se pudo eliminar mensaje', ['chat_id' => $chatId]);
             }
         }
 
         $this->sendLocationRequest($chatId, $tipo);
     }
 
-    private function sendLocationRequest(string $chatId, string $tipo): void
+    /* ============================================================
+     *  SOLICITAR UBICACIÓN
+     * ============================================================ */
+    public function sendLocationRequest(string $chatId, string $tipo): void
     {
         $texto = $tipo === 'inicio'
             ? "🟢 Para *iniciar* la jornada, comparte tu ubicación actual presionando el botón de abajo."
@@ -179,21 +178,28 @@ class TelegramService
                 ])
             ]);
 
-        $this->telegram->sendMessage([
-            'chat_id' => $chatId,
-            'text' => $texto,
-            'reply_markup' => $keyboard,
-            'parse_mode' => 'Markdown',
-        ]);
+        try {
+            $this->telegram->sendMessage([
+                'chat_id'      => $chatId,
+                'text'         => $texto,
+                'reply_markup' => $keyboard,
+                'parse_mode'   => 'Markdown',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error enviando solicitud de ubicación', ['error' => $e->getMessage()]);
+        }
     }
 
+    /* ============================================================
+     *  HANDLE LOCATION (compartir ubicación)
+     * ============================================================ */
     public function handleLocation(array $message): void
     {
-        $chatId = $message['chat']['id'] ?? null;
+        $chatId   = $message['chat']['id'] ?? null;
         $location = $message['location'] ?? null;
 
         if (empty($chatId) || empty($location)) {
-            Log::warning('⚠️ Ubicación incompleta', ['chatId' => $chatId, 'location' => $location]);
+            Log::warning('⚠️ Ubicación incompleta', ['chatId' => $chatId]);
             return;
         }
 
@@ -201,14 +207,13 @@ class TelegramService
         $lng = $location['longitude'] ?? null;
 
         if ($lat === null || $lng === null) {
-            Log::warning('⚠️ Coordenadas inválidas', ['lat' => $lat, 'lng' => $lng]);
+            Log::warning('⚠️ Coordenadas inválidas');
             return;
         }
 
         $usuario = Usuario::where('telegram_chat_id', $chatId)->first();
         if (!$usuario) {
             $this->sendMessage($chatId, '❌ No estás registrado.');
-            Log::warning('⚠️ Usuario no encontrado', ['chatId' => $chatId]);
             return;
         }
 
@@ -218,25 +223,25 @@ class TelegramService
             ->first();
 
         if (!$solicitud) {
-            Log::warning('⚠️ No hay solicitud activa', [
-                'usuario_id' => $usuario->id,
-                'chat_id' => $chatId,
-            ]);
-            $this->sendMessage($chatId, '⏳ No hay una solicitud activa. Por favor, presiona nuevamente el botón "Iniciar Jornada".');
+            Log::warning('⚠️ No hay solicitud activa', ['usuario_id' => $usuario->id]);
+
+            // Anti-spam: solo enviar 1 vez cada 5 minutos
+            $cacheKey = "tg:no-solicitud:{$usuario->id}";
+            if (!Cache::has($cacheKey)) {
+                $this->sendMessage(
+                    $chatId,
+                    '⏳ No hay una solicitud activa. Presiona nuevamente el botón "Iniciar Jornada".'
+                );
+                Cache::put($cacheKey, true, now()->addMinutes(5));
+            }
             return;
         }
 
         $instalacionId = $solicitud->instalacion_id;
-        $usuarioId = $usuario->id;
-        $tipo = $solicitud->tipo;
+        $usuarioId     = $usuario->id;
+        $tipo          = $solicitud->tipo;
 
-        Log::info('✅ Solicitud activa encontrada', [
-            'solicitud_id' => $solicitud->id,
-            'tipo' => $tipo,
-            'instalacion_id' => $instalacionId,
-            'usuario_id' => $usuarioId,
-        ]);
-
+        // Validaciones de jornada
         if ($tipo === 'fin') {
             $tieneInicio = UbicacionUsuario::where('usuario_id', $usuarioId)
                 ->where('instalacion_id', $instalacionId)
@@ -244,7 +249,7 @@ class TelegramService
                 ->exists();
 
             if (!$tieneInicio) {
-                $this->sendMessage($chatId, '⚠️ No has iniciado la jornada. Debes iniciar antes de finalizar.');
+                $this->sendMessage($chatId, '⚠️ No has iniciado la jornada.');
                 $solicitud->delete();
                 return;
             }
@@ -254,16 +259,16 @@ class TelegramService
             $tieneInicioSinFin = UbicacionUsuario::where('usuario_id', $usuarioId)
                 ->where('instalacion_id', $instalacionId)
                 ->where('tipo', 'inicio')
-                ->whereNotExists(function ($query) use ($usuarioId, $instalacionId) {
-                    $query->from('ubicaciones_usuarios')
-                        ->where('ubicaciones_usuarios.usuario_id', $usuarioId)
-                        ->where('instalacion_id', $instalacionId)
-                        ->where('tipo', 'fin');
+                ->whereNotExists(function ($q) use ($usuarioId, $instalacionId) {
+                    $q->from('ubicaciones_usuarios')
+                      ->where('ubicaciones_usuarios.usuario_id', $usuarioId)
+                      ->where('instalacion_id', $instalacionId)
+                      ->where('tipo', 'fin');
                 })
                 ->exists();
 
             if ($tieneInicioSinFin) {
-                $this->sendMessage($chatId, '⚠️ Ya tienes una jornada iniciada. Finaliza primero antes de iniciar nuevamente.');
+                $this->sendMessage($chatId, '⚠️ Ya tienes una jornada iniciada.');
                 $solicitud->delete();
                 return;
             }
@@ -271,88 +276,75 @@ class TelegramService
 
         try {
             $ubicacion = UbicacionUsuario::create([
-                'usuario_id' => $usuarioId,
+                'usuario_id'     => $usuarioId,
                 'instalacion_id' => $instalacionId,
-                'latitud' => $lat,
-                'longitud' => $lng,
-                'fecha_hora' => now(),
-                'fuente' => 'telegram',
-                'tipo' => $tipo,
-                'detalles' => json_encode($message ?? []),
+                'latitud'        => $lat,
+                'longitud'       => $lng,
+                'fecha_hora'     => now(),
+                'fuente'         => 'telegram',
+                'tipo'           => $tipo,
+                'detalles'       => json_encode($message ?? []),
             ]);
 
             Log::info('✅ Ubicación guardada', [
                 'ubicacion_id' => $ubicacion->id,
-                'usuario' => $usuario->nombre,
-                'lat' => $lat,
-                'lng' => $lng,
-                'tipo' => $tipo,
+                'tipo'         => $tipo,
             ]);
 
-            // NUEVO: sincronizar lat/lng en la instalación si es tipo inicio
+            // Sincronizar coordenadas en instalación (solo inicio)
             if ($tipo === 'inicio') {
                 try {
                     $instalacion = Instalacion::find($instalacionId);
                     if ($instalacion) {
                         $instalacion->update([
-                            'latitud' => $lat,
-                            'longitud' => $lng,
+                            'latitud'                  => $lat,
+                            'longitud'                 => $lng,
                             'ubicacion_actualizada_en' => now(),
                         ]);
                     }
                 } catch (\Exception $e) {
-                    Log::warning('No se pudo sincronizar coordenadas en instalación: ' . $e->getMessage());
+                    Log::warning('No se pudo sincronizar coords: ' . $e->getMessage());
                 }
             }
 
+            // Geocercas
             try {
-                $geocercaService = app(\App\Services\GeocercaService::class);
-                $geocercaService->procesarUbicacion($ubicacion);
+                app(\App\Services\GeocercaService::class)->procesarUbicacion($ubicacion);
             } catch (\Exception $e) {
-                Log::error('❌ Error al procesar geocercas: ' . $e->getMessage());
+                Log::error('Error geocercas: ' . $e->getMessage());
             }
 
+            // Evento tiempo real
             try {
                 broadcast(new UbicacionActualizada($ubicacion))->toOthers();
-                Log::info('📡 Evento UbicacionActualizada emitido desde Telegram', [
-                    'ubicacion_id' => $ubicacion->id,
-                    'usuario_id' => $usuario->id,
-                    'lat' => $lat,
-                    'lng' => $lng,
-                    'tipo' => $tipo,
-                ]);
             } catch (\Exception $e) {
-                Log::error('❌ Error al emitir evento UbicacionActualizada', [
-                    'error' => $e->getMessage(),
-                    'ubicacion_id' => $ubicacion->id,
-                ]);
+                Log::error('Error broadcast: ' . $e->getMessage());
             }
+
+            // Borrar solicitud ANTES de enviar mensajes finales
+            $solicitud->delete();
 
             if ($tipo === 'inicio') {
                 $this->sendMessage($chatId, '✅ Ubicación de inicio guardada. ¡Buen trabajo!');
                 $this->sendFinButton($chatId, $instalacionId);
             } else {
                 $this->sendMessage($chatId, '✅ Ubicación de fin guardada. ¡Hasta luego!');
-
-                // NUEVO: si al finalizar, sugerir subir fotos de fin
                 $this->sendFotoRequest($chatId, $instalacionId, 'fin');
             }
 
-            $solicitud->delete();
-            Log::info('🗑️ Solicitud de ubicación eliminada', ['solicitud_id' => $solicitud->id]);
-
         } catch (\Exception $e) {
             Log::error('❌ Error al guardar ubicación', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'error'      => $e->getMessage(),
                 'usuario_id' => $usuarioId,
-                'chat_id' => $chatId,
             ]);
-            $this->sendMessage($chatId, '❌ Error al guardar la ubicación. Intenta de nuevo.');
+            $this->sendMessage($chatId, '❌ Error al guardar la ubicación.');
         }
     }
 
-    private function sendFinButton(string $chatId, int $instalacionId): void
+    /* ============================================================
+     *  BOTÓN FINALIZAR
+     * ============================================================ */
+    public function sendFinButton(string $chatId, int $instalacionId): void
     {
         $texto = "✅ Has iniciado la jornada.\n\n" .
             "📋 Instalación #{$instalacionId}\n\n" .
@@ -374,35 +366,43 @@ class TelegramService
                 'reply_markup' => $inlineKeyboard,
                 'parse_mode' => 'Markdown',
             ]);
-            Log::info('📤 Botón de FIN enviado', ['chat_id' => $chatId, 'instalacion_id' => $instalacionId]);
         } catch (\Exception $e) {
-            Log::error('❌ Error enviando botón de FIN', ['chat_id' => $chatId, 'error' => $e->getMessage()]);
-        }
-    }
-
-    public function sendMessage(string $chatId, string $text): void
-    {
-        try {
-            $this->telegram->sendMessage([
-                'chat_id' => $chatId,
-                'text' => $text,
-            ]);
-            Log::info('📤 Mensaje enviado', ['chat_id' => $chatId, 'text' => $text]);
-        } catch (\Exception $e) {
-            Log::error('❌ Error enviando mensaje', ['chat_id' => $chatId, 'error' => $e->getMessage()]);
+            Log::error('Error enviando botón FIN', ['error' => $e->getMessage()]);
         }
     }
 
     /* ============================================================
-     *  NUEVOS MÉTODOS (agregados sin romper lo existente)
+     *  SEND MESSAGE (con anti-spam)
      * ============================================================ */
+    public function sendMessage(string $chatId, string $text): void
+    {
+        // Anti-spam global
+        $hash     = md5($chatId . '|' . $text);
+        $cacheKey = "tg:msg:{$hash}";
 
-    /**
-     * Notifica un cambio de estatus de instalación (Opción C).
-     * - Notifica a instaladores asignados
-     * - Notifica al admin
-     * - Envía botones contextuales según el nuevo estatus
-     */
+        if (Cache::has($cacheKey)) {
+            Log::info('🔇 Mensaje duplicado silenciado', ['chat_id' => $chatId]);
+            return;
+        }
+        Cache::put($cacheKey, true, now()->addSeconds(30));
+
+        try {
+            $this->telegram->sendMessage([
+                'chat_id' => $chatId,
+                'text'    => $text,
+            ]);
+            Log::info('📤 Mensaje enviado', ['chat_id' => $chatId]);
+        } catch (\Exception $e) {
+            Log::error('❌ Error enviando mensaje', [
+                'chat_id' => $chatId,
+                'error'   => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /* ============================================================
+     *  CAMBIO DE ESTATUS
+     * ============================================================ */
     public function notifyCambioEstatus(Instalacion $instalacion, string $anterior, string $nuevo): void
     {
         $emoji = match ($nuevo) {
@@ -425,10 +425,8 @@ class TelegramService
             "De: `{$anterior}`\n" .
             "A: `{$nuevo}`";
 
-        // Keyboard contextual según nuevo estatus
         $keyboard = $this->buildEstatusKeyboard($instalacion, $nuevo);
 
-        // Notificar a instaladores asignados
         foreach ($instalacion->instaladores as $inst) {
             if (empty($inst->telegram_chat_id)) continue;
 
@@ -443,32 +441,27 @@ class TelegramService
                 }
                 $this->telegram->sendMessage($payload);
             } catch (\Exception $e) {
-                Log::error('❌ Error notificando cambio estatus a instalador', [
-                    'instalador' => $inst->usuario,
-                    'error' => $e->getMessage(),
-                ]);
+                Log::error('Error notificando a instalador', ['error' => $e->getMessage()]);
             }
         }
 
-        // Notificar al admin
         $adminChat = config('telegram.admin_chat_id');
         if (!empty($adminChat)) {
             try {
                 $this->telegram->sendMessage([
-                    'chat_id' => $adminChat,
-                    'text' => $texto,
+                    'chat_id'    => $adminChat,
+                    'text'       => $texto,
                     'parse_mode' => 'Markdown',
                 ]);
             } catch (\Exception $e) {
-                Log::error('❌ Error notificando cambio estatus a admin', ['error' => $e->getMessage()]);
+                Log::error('Error notificando a admin', ['error' => $e->getMessage()]);
             }
         }
     }
 
-    /**
-     * Notifica que se subió una foto a una instalación.
-     * Envía la foto real al admin si es posible.
-     */
+    /* ============================================================
+     *  NOTIFICAR FOTO SUBIDA
+     * ============================================================ */
     public function notifyFotoSubida(Instalacion $instalacion, string $tipo, ?InstalacionFoto $foto = null): void
     {
         $emojiTipo = match ($tipo) {
@@ -488,10 +481,8 @@ class TelegramService
         if (empty($adminChat)) return;
 
         try {
-            // Si tenemos el archivo físico, enviar como foto
             if ($foto && $foto->ruta) {
                 $rutaCompleta = storage_path('app/public/' . $foto->ruta);
-
                 if (file_exists($rutaCompleta)) {
                     $this->telegram->sendPhoto([
                         'chat_id' => $adminChat,
@@ -499,15 +490,10 @@ class TelegramService
                         'caption' => $texto,
                         'parse_mode' => 'Markdown',
                     ]);
-                    Log::info('📸 Foto enviada al admin', [
-                        'instalacion_id' => $instalacion->id,
-                        'ruta' => $foto->ruta,
-                    ]);
                     return;
                 }
             }
 
-            // Fallback: solo texto
             $this->telegram->sendMessage([
                 'chat_id' => $adminChat,
                 'text' => $texto,
@@ -515,25 +501,21 @@ class TelegramService
             ]);
 
         } catch (\Exception $e) {
-            Log::error('❌ Error notificando foto al admin', [
-                'error' => $e->getMessage(),
-                'instalacion_id' => $instalacion->id,
-            ]);
+            Log::error('Error notificando foto', ['error' => $e->getMessage()]);
         }
     }
 
-    /**
-     * Notifica alerta de geocerca (entrada/salida).
-     * Se llama desde GeocercaService.
-     */
+    /* ============================================================
+     *  GEOCERCAS (SOLO ADMIN)
+     * ============================================================ */
     public function notifyGeocercaAlerta(
         Usuario $usuario,
         string $nombreGeocerca,
-        string $tipo,       // 'entrada' | 'salida'
+        string $tipo,
         ?float $lat = null,
         ?float $lng = null
     ): void {
-        $emoji = $tipo === 'entrada' ? '🟢' : '🔴';
+        $emoji  = $tipo === 'entrada' ? '🟢' : '🔴';
         $accion = $tipo === 'entrada' ? 'entró a' : 'salió de';
 
         $texto = "{$emoji} *Alerta de geocerca*\n\n" .
@@ -545,43 +527,29 @@ class TelegramService
             $texto .= "\n📍 {$lat}, {$lng}";
         }
 
-        // Notificar al admin
+        // SOLO admin
         $adminChat = config('telegram.admin_chat_id');
-        if (!empty($adminChat)) {
-            try {
-                $this->telegram->sendMessage([
-                    'chat_id' => $adminChat,
-                    'text' => $texto,
-                    'parse_mode' => 'Markdown',
-                ]);
-            } catch (\Exception $e) {
-                Log::error('❌ Error notificando geocerca al admin', ['error' => $e->getMessage()]);
-            }
-        }
+        if (empty($adminChat)) return;
 
-        // Notificar al instalador mismo (opcional, útil)
-        if (!empty($usuario->telegram_chat_id)) {
-            try {
-                $this->telegram->sendMessage([
-                    'chat_id' => $usuario->telegram_chat_id,
-                    'text' => $texto,
-                    'parse_mode' => 'Markdown',
-                ]);
-            } catch (\Exception $e) {
-                Log::error('❌ Error notificando geocerca al instalador', ['error' => $e->getMessage()]);
-            }
+        try {
+            $this->telegram->sendMessage([
+                'chat_id'    => $adminChat,
+                'text'       => $texto,
+                'parse_mode' => 'Markdown',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error notificando geocerca', ['error' => $e->getMessage()]);
         }
     }
 
-    /**
-     * Envía un mensaje al instalador pidiéndole fotos de evidencia.
-     * Se llama automáticamente al finalizar jornada, o manualmente desde el panel.
-     */
+    /* ============================================================
+     *  SOLICITAR FOTOS
+     * ============================================================ */
     public function sendFotoRequest(string $chatId, int $instalacionId, string $tipo = 'fin'): void
     {
         $texto = match ($tipo) {
-            'fin'        => "📷 *Sube tus fotos de cierre*\n\nEnvía las fotos del trabajo terminado como respuesta a este mensaje.",
-            'incidencia' => "⚠️ *Reporta una incidencia*\n\nEnvía fotos de la incidencia que encontraste.",
+            'fin'        => "📷 *Sube tus fotos de cierre*\n\nEnvía las fotos del trabajo terminado.",
+            'incidencia' => "⚠️ *Reporta una incidencia*\n\nEnvía fotos de la incidencia.",
             default      => "📷 *Sube tus fotos*\n\nEnvía las fotos de la instalación.",
         };
 
@@ -589,22 +557,18 @@ class TelegramService
 
         try {
             $this->telegram->sendMessage([
-                'chat_id' => $chatId,
-                'text' => $texto,
+                'chat_id'    => $chatId,
+                'text'       => $texto,
                 'parse_mode' => 'Markdown',
             ]);
         } catch (\Exception $e) {
-            Log::error('❌ Error enviando solicitud de fotos', [
-                'chat_id' => $chatId,
-                'error' => $e->getMessage(),
-            ]);
+            Log::error('Error enviando solicitud de fotos', ['error' => $e->getMessage()]);
         }
     }
 
-    /**
-     * Envía un mensaje al admin con resumen de instalaciones activas.
-     * Útil para reportes diarios.
-     */
+    /* ============================================================
+     *  RESUMEN DIARIO
+     * ============================================================ */
     public function notifyResumenDiario(array $stats): void
     {
         $adminChat = config('telegram.admin_chat_id');
@@ -619,24 +583,23 @@ class TelegramService
 
         try {
             $this->telegram->sendMessage([
-                'chat_id' => $adminChat,
-                'text' => $texto,
+                'chat_id'    => $adminChat,
+                'text'       => $texto,
                 'parse_mode' => 'Markdown',
             ]);
         } catch (\Exception $e) {
-            Log::error('❌ Error enviando resumen diario', ['error' => $e->getMessage()]);
+            Log::error('Error enviando resumen diario', ['error' => $e->getMessage()]);
         }
     }
 
-    /**
-     * Construye el teclado inline contextual según el nuevo estatus.
-     */
+    /* ============================================================
+     *  KEYBOARD CONTEXTUAL SEGÚN ESTATUS
+     * ============================================================ */
     private function buildEstatusKeyboard(Instalacion $instalacion, string $nuevo): ?Keyboard
     {
         $keyboard = Keyboard::make()->inline();
         $agregado = false;
 
-        // Si pasa a "completada" → pedir fotos de fin
         if ($nuevo === 'completada') {
             $keyboard->row([
                 Keyboard::inlineButton([
@@ -647,7 +610,6 @@ class TelegramService
             $agregado = true;
         }
 
-        // Si pasa a "pruebas" → pedir fotos de proceso
         if ($nuevo === 'pruebas') {
             $keyboard->row([
                 Keyboard::inlineButton([
@@ -658,7 +620,6 @@ class TelegramService
             $agregado = true;
         }
 
-        // Si pasa a "asignada" o "pendiente" → botón de iniciar jornada
         if (in_array($nuevo, ['asignada', 'pendiente', 'programacion', 'preparacion'])) {
             $keyboard->row([
                 Keyboard::inlineButton([

@@ -18,9 +18,6 @@ class GeocercaService
         $this->telegram = $telegram;
     }
 
-    /**
-     * Procesa una ubicación y verifica todas las geocercas activas
-     */
     public function procesarUbicacion(UbicacionUsuario $ubicacion): void
     {
         $usuario = $ubicacion->usuario;
@@ -30,29 +27,23 @@ class GeocercaService
         }
 
         $geocercas = Geocerca::where('activa', true)->get();
-        if ($geocercas->isEmpty()) {
-            return;
-        }
+        if ($geocercas->isEmpty()) return;
 
         foreach ($geocercas as $geocerca) {
             $distancia = $this->calcularDistancia(
-                $ubicacion->latitud,
-                $ubicacion->longitud,
-                $geocerca->latitud,
-                $geocerca->longitud
+                $ubicacion->latitud, $ubicacion->longitud,
+                $geocerca->latitud, $geocerca->longitud
             );
 
             $estaDentro = $distancia <= $geocerca->radio;
 
-            // Buscar o crear estado actual
             $estado = GeocercaEstado::firstOrNew([
                 'geocerca_id' => $geocerca->id,
-                'usuario_id' => $usuario->id,
+                'usuario_id'  => $usuario->id,
             ]);
 
             $estadoAnterior = $estado->estado ?? 'fuera';
 
-            // Si cambió el estado
             if ($estaDentro && $estadoAnterior === 'fuera') {
                 $this->crearAlerta($geocerca, $usuario, $ubicacion, 'entrada');
                 $estado->estado = 'dentro';
@@ -63,87 +54,76 @@ class GeocercaService
                 Log::info("📍 {$usuario->nombre} Salió de {$geocerca->nombre}");
             }
 
-            // Actualizar última ubicación conocida
-            $estado->ultima_latitud = $ubicacion->latitud;
-            $estado->ultima_longitud = $ubicacion->longitud;
+            $estado->ultima_latitud       = $ubicacion->latitud;
+            $estado->ultima_longitud      = $ubicacion->longitud;
             $estado->ultima_actualizacion = now();
             $estado->save();
         }
     }
 
-    /**
-     * Calcula la distancia entre dos coordenadas (fórmula de Haversine)
-     */
     public function calcularDistancia($lat1, $lng1, $lat2, $lng2): float
     {
-        $tierraRadio = 6371000; // metros
+        $tierraRadio = 6371000;
         $dLat = deg2rad($lat2 - $lat1);
         $dLng = deg2rad($lng2 - $lng1);
 
-        $a = sin($dLat/2) * sin($dLat/2) +
-             cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
-             sin($dLng/2) * sin($dLng/2);
+        $a = sin($dLat/2) ** 2
+           + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng/2) ** 2;
 
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-        return $tierraRadio * $c;
+        return $tierraRadio * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
-    /**
-     * Crea una alerta de geocerca y notifica
-     */
-    protected function crearAlerta($geocerca, $usuario, $ubicacion, $tipo)
+    protected function crearAlerta($geocerca, $usuario, $ubicacion, $tipo): void
     {
-        // 1. Guardar alerta
         $alerta = GeocercaAlerta::create([
             'geocerca_id' => $geocerca->id,
-            'usuario_id' => $usuario->id,
-            'tipo' => $tipo,
-            'latitud' => $ubicacion->latitud,
-            'longitud' => $ubicacion->longitud,
-            'fecha_hora' => now(),
-            'notificado' => false,
+            'usuario_id'  => $usuario->id,
+            'tipo'        => $tipo,
+            'latitud'     => $ubicacion->latitud,
+            'longitud'    => $ubicacion->longitud,
+            'fecha_hora'  => now(),
+            'notificado'  => false, // = "no leído por el admin"
         ]);
 
-        // 2. Notificar por Telegram
-        $this->notificarAlerta($alerta);
+        // Notificar SOLO al admin por Telegram
+        $this->notificarAdmin($alerta);
 
-        // 3. Emitir evento WebSocket
+        // Broadcast en tiempo real para el dashboard
         try {
-            broadcast(new GeocercaAlertaEvent($alerta))->toOthers();
-            Log::info('📡 Evento GeocercaAlerta emitido', ['alerta_id' => $alerta->id]);
-        } catch (\Exception $e) {
-            Log::error('❌ Error al emitir evento GeocercaAlerta: ' . $e->getMessage());
+            broadcast(new GeocercaAlertaEvent($alerta->load('usuario', 'geocerca')))->toOthers();
+        } catch (\Throwable $e) {
+            Log::error('❌ Error broadcast GeocercaAlerta: ' . $e->getMessage());
         }
-
-        // 4. Marcar como notificado
-        $alerta->notificado = true;
-        $alerta->save();
     }
 
     /**
-     * Envía notificaciones por Telegram
+     * Notifica únicamente al admin. NO al instalador.
      */
-    protected function notificarAlerta($alerta)
+    protected function notificarAdmin(GeocercaAlerta $alerta): void
     {
-        $geocerca = $alerta->geocerca;
-        $usuario = $alerta->usuario;
-        $tipo = $alerta->tipo === 'entrada' ? '🟢 ENTRÓ a' : '🔴 Salió de';
+        $adminChatId = config('telegram.admin_chat_id')
+            ?? env('TELEGRAM_ADMIN_CHAT_ID')
+            ?? env('TELEGRAM_GROUP_CHAT_ID');
 
-        $mensaje = "📍 Alerta de Geocerca\n\n" .
-                   "{$tipo} la zona: *{$geocerca->nombre}*\n" .
-                   "👤 Instalador: {$usuario->nombre}\n" .
-                   "📅 Fecha: {$alerta->fecha_hora->format('d/m/Y H:i')}\n" .
-                   "📍 Ubicación: {$alerta->latitud}, {$alerta->longitud}";
-
-        // Enviar al instalador
-        if ($usuario->telegram_chat_id) {
-            $this->telegram->sendMessage($usuario->telegram_chat_id, $mensaje);
+        if (!$adminChatId) {
+            Log::warning('⚠️ No hay admin_chat_id configurado para notificar geocerca');
+            return;
         }
 
-        // Enviar al grupo de administradores (si está configurado)
-        $adminGroup = env('TELEGRAM_GROUP_CHAT_ID');
-        if ($adminGroup) {
-            $this->telegram->sendMessage($adminGroup, $mensaje);
+        $emoji = $alerta->tipo === 'entrada' ? '🟢 ENTRÓ a' : '🔴 Salió de';
+        $usuario = $alerta->usuario;
+        $geocerca = $alerta->geocerca;
+
+        $mensaje = "📍 *Alerta de Geocerca*\n\n"
+                 . "{$emoji}: *{$geocerca->nombre}*\n"
+                 . "👤 Instalador: {$usuario->nombre}\n"
+                 . "📅 {$alerta->fecha_hora->format('d/m/Y H:i')}\n"
+                 . "🗺️ [Ver en mapa](https://www.google.com/maps?q={$alerta->latitud},{$alerta->longitud})";
+
+        try {
+            $this->telegram->sendMessage($adminChatId, $mensaje);
+        } catch (\Throwable $e) {
+            Log::error('❌ Error enviando Telegram geocerca: ' . $e->getMessage());
         }
     }
 }

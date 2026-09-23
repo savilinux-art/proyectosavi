@@ -40,19 +40,19 @@ public function show($id)
         return view('usuarios.create', compact('roles'));
     }
 
-    public function store(Request $request)
-    {
-        if ($redir = $this->verificarAdmin()) return $redir;
+   public function store(Request $request)
+{
+    if ($redir = $this->verificarAdmin()) return $redir;
 
-       $request->validate([
-    'usuario' => 'required|unique:usuarios,usuario,' . $usuario->id,
-    'nombre' => 'required',
-    'correo' => 'required|email|unique:usuarios,correo,' . $usuario->id,
-    'telegram_chat_id' => 'nullable|unique:usuarios,telegram_chat_id,' . $usuario->id,
-    'traccar_device_id' => 'nullable|unique:usuarios,traccar_device_id,' . $usuario->id,
-    'rol' => 'required|exists:roles,rol',
-    'contraseña' => 'required|min:6',
-]);
+    $request->validate([
+        'usuario'            => 'required|unique:usuarios,usuario',
+        'nombre'             => 'required',
+        'correo'             => 'required|email|unique:usuarios,correo',
+        'telegram_chat_id'   => 'nullable|unique:usuarios,telegram_chat_id',
+        'traccar_device_id'  => 'nullable|unique:usuarios,traccar_device_id',
+        'rol'                => 'required|exists:roles,rol',
+        'contraseña'         => 'required|min:6',
+    ]);
 
         DB::beginTransaction();
         try {
@@ -62,6 +62,7 @@ public function show($id)
                 'correo' => $request->correo,
                 'contraseña' => Hash::make($request->contraseña),
                 'telegram_chat_id' => $request->telegram_chat_id,
+                'traccar_device_id' => $request->traccar_device_id,
                 'rol' => $request->rol
             ]);
             DB::commit();
