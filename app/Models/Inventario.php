@@ -18,7 +18,7 @@ class Inventario extends Model
         'marca',
         'categoria',
         'almacen_url',
-        'apea',
+        'apea'               => 'nullable|string|max:255',   // ← aquí
         'imagen_url',
         'fecha_modificacion',
         'comentarios',
