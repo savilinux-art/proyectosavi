@@ -26,35 +26,38 @@ class InventarioController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'modelo' => 'required|string',
+            'modelo'      => 'required|string',
             'descripcion' => 'required|string',
-            'marca' => 'required|string',
-            'categoria' => 'required|exists:categorias,nombre_categoria',
-            'existencia' => 'required|integer|min:0',
-            'almacen_url' => 'required|string',
-            'apea' => 'required|string',
+            'marca'       => 'required|string',
+            'categoria'   => 'required|exists:categorias,nombre_categoria',
+            'existencia'  => 'required|integer|min:0',
+            'almacen'     => 'required|string',
+            'apea'        => 'nullable|string',        // ← ya no obligatorio
             'comentarios' => 'nullable|string',
-            'imagen_url' => 'nullable|string'
+            'imagen_url'  => 'nullable|string',
         ]);
 
         DB::beginTransaction();
-        
+
         try {
-            $data = $request->all();
+            $data = $request->only([
+                'modelo', 'descripcion', 'marca', 'categoria',
+                'existencia', 'almacen', 'apea', 'comentarios', 'imagen_url',
+            ]);
+
             $data['fecha_modificacion'] = now();
-            $data['modificado_por'] = Session::get('user_usuario');
+            $data['modificado_por']     = Session::get('user_usuario');
 
             if ($request->hasFile('imagen')) {
-                $data['imagen_url'] = file_get_contents($request->file('imagen')->getRealPath());
+                $data['imagen'] = file_get_contents($request->file('imagen')->getRealPath());
             }
 
             $inventario = Inventario::create($data);
 
-            // Registrar movimiento
             MovimientoInventario::create([
-                'inventario_id' => $inventario->id,
-                'entrada' => $request->existencia,
-                'modificado_por' => Session::get('user_usuario')
+                'inventario_id'  => $inventario->id,
+                'entrada'        => $request->existencia,
+                'modificado_por' => Session::get('user_usuario'),
             ]);
 
             DB::commit();
@@ -65,28 +68,27 @@ class InventarioController extends Controller
         }
     }
 
-   public function show($id)
-{
-    $inventario = Inventario::with(['categoriaRelacion', 'modificadoPor'])->findOrFail($id);
-    $movimientos = MovimientoInventario::where('inventario_id', $id)->with('modificadoPor')->get();
+    public function show($id)
+    {
+        $inventario = Inventario::with(['categoriaRelacion', 'modificadoPor'])->findOrFail($id);
+        $movimientos = MovimientoInventario::where('inventario_id', $id)->with('modificadoPor')->get();
 
-    // Calcular totales de movimientos
-    $totalEntradas = $movimientos->sum('entrada');
-    $totalSalidas = $movimientos->sum('salida');
-    $totalAjustes = $movimientos->sum('ajuste');
-    $totalApartados = $movimientos->sum('apartado');
-    $totalDevoluciones = $movimientos->sum('devolucion');
+        $totalEntradas    = $movimientos->sum('entrada');
+        $totalSalidas     = $movimientos->sum('salida');
+        $totalAjustes     = $movimientos->sum('ajuste');
+        $totalApartados   = $movimientos->sum('apartado');
+        $totalDevoluciones = $movimientos->sum('devolucion');
 
-    return view('inventario.show', compact(
-        'inventario',
-        'movimientos',
-        'totalEntradas',
-        'totalSalidas',
-        'totalAjustes',
-        'totalApartados',
-        'totalDevoluciones'
-    ));
-}
+        return view('inventario.show', compact(
+            'inventario',
+            'movimientos',
+            'totalEntradas',
+            'totalSalidas',
+            'totalAjustes',
+            'totalApartados',
+            'totalDevoluciones'
+        ));
+    }
 
     public function edit($id)
     {
@@ -97,8 +99,54 @@ class InventarioController extends Controller
 
     public function update(Request $request, $id)
     {
-        // Similar a store pero actualizando y registrando ajustes si cambia existencia
-        // ... (puedes copiar la lógica de versiones anteriores)
+        $request->validate([
+            'modelo'      => 'required|string',
+            'descripcion' => 'required|string',
+            'marca'       => 'required|string',
+            'categoria'   => 'required|exists:categorias,nombre_categoria',
+            'existencia'  => 'required|integer|min:0',
+            'almacen'     => 'required|string',
+            'apea'        => 'nullable|string',        // ← ya no obligatorio
+            'comentarios' => 'nullable|string',
+            'imagen_url'  => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $inventario         = Inventario::findOrFail($id);
+            $existenciaAnterior = $inventario->existencia;
+
+            $data = $request->only([
+                'modelo', 'descripcion', 'marca', 'categoria',
+                'existencia', 'almacen', 'apea', 'comentarios', 'imagen_url',
+            ]);
+
+            $data['fecha_modificacion'] = now();
+            $data['modificado_por']     = Session::get('user_usuario');
+
+            if ($request->hasFile('imagen')) {
+                $data['imagen']     = file_get_contents($request->file('imagen')->getRealPath());
+                $data['imagen_url'] = null;
+            }
+
+            $inventario->update($data);
+
+            $diferencia = $inventario->existencia - $existenciaAnterior;
+            if ($diferencia !== 0) {
+                MovimientoInventario::create([
+                    'inventario_id'  => $inventario->id,
+                    'ajuste'         => $diferencia,
+                    'modificado_por' => Session::get('user_usuario'),
+                ]);
+            }
+
+            DB::commit();
+            return redirect()->route('inventario.index')->with('success', 'Producto actualizado');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Error: ' . $e->getMessage());
+        }
     }
 
     public function destroy($id)

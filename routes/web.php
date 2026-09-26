@@ -100,7 +100,7 @@ Route::middleware(['auth.session', 'administrador'])->group(function () {
 
 // Roles y Permisos (solo admin)
 Route::middleware(['auth.session', 'administrador'])->group(function () {
-    Route::resource('roles', RolController::class);
+    Route::resource('roles', RolController::class)->except(['show']);
     Route::resource('permisos', PermisoController::class);
 });
 
