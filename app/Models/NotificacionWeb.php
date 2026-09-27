@@ -16,7 +16,7 @@ class NotificacionWeb extends Model
 
     public function usuario(): BelongsTo
     {
-        return $this->belongsTo(Usuario::class, 'usuario_id', 'usuario');
+        return $this->belongsTo(Usuario::class, 'usuario_id');
     }
 
     public function recordatorio(): BelongsTo
