@@ -18,30 +18,41 @@ class TelegramNotificador implements NotificadorInterface
     }
 
     public function enviar(Recordatorio $recordatorio): bool
-    {
-        $chatId = $recordatorio->usuario?->telegram_chat_id;
+{
+    $chatId = $recordatorio->usuario?->telegram_chat_id;
 
-        if (!$chatId) {
-            Log::warning('TelegramNotificador: usuario sin telegram_chat_id', [
-                'recordatorio_id' => $recordatorio->id,
-                'usuario_id'      => $recordatorio->usuario_id,
-            ]);
-            return false;
-        }
-
-        $texto = $this->formatearMensaje($recordatorio);
-
-        try {
-            $this->telegram->sendMessage($chatId, $texto);
-            return true;
-        } catch (\Throwable $e) {
-            Log::error('TelegramNotificador: error enviando', [
-                'recordatorio_id' => $recordatorio->id,
-                'error'           => $e->getMessage(),
-            ]);
-            return false;
-        }
+    if (!$chatId) {
+        Log::warning('TelegramNotificador: usuario sin telegram_chat_id', [
+            'recordatorio_id' => $recordatorio->id,
+            'usuario_id'      => $recordatorio->usuario_id,
+        ]);
+        return false;
     }
+
+    $texto = $this->formatearMensaje($recordatorio);
+
+    try {
+        // Certificados llevan botón inline "Renovar"
+        if ($recordatorio->esCertificado()) {
+            return $this->telegram->sendMessageWithInlineButton(
+                $chatId,
+                $texto,
+                '🔄 Marcar como renovado',
+                "renovar_cert|{$recordatorio->id}"
+            );
+        }
+
+        // Resto: mensaje plano
+        $this->telegram->sendMessage($chatId, $texto);
+        return true;
+    } catch (\Throwable $e) {
+        Log::error('TelegramNotificador: error enviando', [
+            'recordatorio_id' => $recordatorio->id,
+            'error'           => $e->getMessage(),
+        ]);
+        return false;
+    }
+}
 
     protected function formatearMensaje(Recordatorio $recordatorio): string
     {

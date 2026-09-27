@@ -86,7 +86,13 @@ class TelegramService
 
         if (empty($chatId) || empty($callbackData)) return;
 
-        [$tipo, $instalacionId] = array_pad(explode('|', $callbackData, 2), 2, null);
+        [$tipo, $arg1] = array_pad(explode('|', $callbackData, 2), 2, null);
+        $instalacionId = $arg1;
+         // ===== NUEVO: renovar certificado =====
+        if ($tipo === 'renovar_cert') {
+            $this->handleRenovarCert($chatId, (int) $arg1, $messageId);
+            return;
+        }
 
         if (!in_array($tipo, ['inicio', 'fin']) || !is_numeric($instalacionId)) {
             $this->sendMessage($chatId, '❌ Acción no válida.');
@@ -632,4 +638,139 @@ class TelegramService
 
         return $agregado ? $keyboard : null;
     }
+
+    /* ============================================================
+ *  RENOVAR CERTIFICADO (callback)
+ * ============================================================ */
+public function handleRenovarCert(string $chatId, int $recordatorioId, ?int $messageId = null): void
+{
+    $usuario = Usuario::where('telegram_chat_id', $chatId)->first();
+    if (!$usuario) {
+        $this->sendMessage($chatId, '❌ No estás registrado.');
+        return;
+    }
+
+    $recordatorio = \App\Models\Recordatorio::where('id', $recordatorioId)
+        ->where('usuario_id', $usuario->id)
+        ->first();
+
+    if (!$recordatorio) {
+        $this->sendMessage($chatId, "❌ No encontré el certificado #{$recordatorioId}.");
+        return;
+    }
+
+    if (!$recordatorio->esCertificado()) {
+        $this->sendMessage($chatId, '❌ Ese recordatorio no es un certificado.');
+        return;
+    }
+
+    if (!$recordatorio->cert_fecha_vencimiento) {
+        $this->sendMessage($chatId, '❌ El certificado no tiene fecha de vencimiento.');
+        return;
+    }
+
+    // Renueva +1 año por defecto
+    $vencAnterior = $recordatorio->cert_fecha_vencimiento->copy();
+    $vencNueva    = $vencAnterior->copy()->addYear();
+
+    // Registrar en historial
+    \App\Models\CertificadoHistorial::create([
+        'recordatorio_id'            => $recordatorio->id,
+        'usuario_id'                 => $usuario->id,
+        'fecha_vencimiento_anterior' => $vencAnterior,
+        'fecha_vencimiento_nueva'    => $vencNueva,
+        'notas'                      => 'Renovado vía botón Telegram',
+    ]);
+
+    // Cerrar el ciclo actual
+    $recordatorio->update([
+        'estatus'          => 'completado',
+        'cert_renovado_at' => now(),
+    ]);
+
+    // Crear siguiente ciclo
+    $avisos = $recordatorio->cert_avisos_dias ?: [15, 7, 3, 1, 0];
+    $nuevo  = $recordatorio->replicate([
+        'enviado_at', 'intentos', 'ultimo_error', 'cert_renovado_at',
+    ]);
+    $nuevo->cert_fecha_vencimiento = $vencNueva;
+    $nuevo->estatus                = 'pendiente';
+    $nuevo->intentos               = 0;
+    $nuevo->enviado_at             = null;
+    $nuevo->ultimo_error           = null;
+    $nuevo->cert_renovado_at       = null;
+    $nuevo->fecha_hora_programada  = $vencNueva->copy()->subDays(max($avisos))->setTime(9, 0, 0);
+    $nuevo->save();
+
+    // Editar el mensaje original (quitar botón) y avisar
+    if ($messageId) {
+        try {
+            $this->telegram->editMessageText([
+                'chat_id'    => $chatId,
+                'message_id' => $messageId,
+                'text'       => "✅ Certificado *{$recordatorio->cert_nombre}* renovado.\n\n" .
+                                "📅 Anterior: {$vencAnterior->format('d/m/Y')}\n" .
+                                "📅 Nuevo: {$vencNueva->format('d/m/Y')}",
+                'parse_mode' => 'Markdown',
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo editar mensaje original', ['error' => $e->getMessage()]);
+            $this->sendMessage(
+                $chatId,
+                "✅ Certificado renovado hasta {$vencNueva->format('d/m/Y')}"
+            );
+        }
+    }
+}
+
+/* ============================================================
+ *  MENSAJE CON BOTÓN INLINE GENÉRICO
+ * ============================================================ */
+public function sendMessageWithInlineButton(
+    string $chatId,
+    string $text,
+    string $buttonText,
+    string $callbackData,
+    bool $markdown = true
+): bool {
+    // Anti-spam global (mismo criterio que sendMessage)
+    $hash     = md5($chatId . '|' . $text . '|' . $callbackData);
+    $cacheKey = "tg:msg:{$hash}";
+
+    if (Cache::has($cacheKey)) {
+        Log::info('🔇 Mensaje con botón duplicado silenciado', ['chat_id' => $chatId]);
+        return false;
+    }
+    Cache::put($cacheKey, true, now()->addSeconds(30));
+
+    $keyboard = Keyboard::make()
+        ->inline()
+        ->row([
+            Keyboard::inlineButton([
+                'text'          => $buttonText,
+                'callback_data' => $callbackData,
+            ]),
+        ]);
+
+    try {
+        $payload = [
+            'chat_id'      => $chatId,
+            'text'         => $text,
+            'reply_markup' => $keyboard,
+        ];
+        if ($markdown) {
+            $payload['parse_mode'] = 'Markdown';
+        }
+        $this->telegram->sendMessage($payload);
+        Log::info('📤 Mensaje con botón enviado', ['chat_id' => $chatId]);
+        return true;
+    } catch (\Exception $e) {
+        Log::error('❌ Error enviando mensaje con botón', [
+            'chat_id' => $chatId,
+            'error'   => $e->getMessage(),
+        ]);
+        return false;
+    }
+}
+
 }

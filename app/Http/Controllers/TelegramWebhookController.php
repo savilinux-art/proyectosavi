@@ -42,6 +42,13 @@ class TelegramWebhookController extends Controller
                 return response('OK', 200);
             }
 
+            // Comandos de texto (/recordar, /certificados, etc.)
+            if (isset($payload['message']['text'])) {
+                app(\App\Services\Telegram\CommandRouter::class)
+                ->handle($payload['message']);
+                return response('OK', 200);
+            }
+
             // Location (compartir ubicación)
             if (isset($payload['message']['location'])) {
                 // handleLocation ya hace todo: guarda + geocercas + broadcast
