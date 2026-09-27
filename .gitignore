@@ -27,3 +27,8 @@ Homestead.yaml
 Thumbs.db
 /storage/debugbar
 /resumen.txt
+
+# Notas de trabajo locales
+resumen*.txt
+pendientes-*.txt
+*teccnico*.txt
