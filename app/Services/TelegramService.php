@@ -316,7 +316,7 @@ class TelegramService
 
             // Evento tiempo real
             try {
-                broadcast(new UbicacionActualizada($ubicacion))->toOthers();
+                broadcast(new UbicacionActualizada($ubicacion));
             } catch (\Exception $e) {
                 Log::error('Error broadcast: ' . $e->getMessage());
             }
