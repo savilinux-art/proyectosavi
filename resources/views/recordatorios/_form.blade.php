@@ -2,6 +2,7 @@
     $esAdmin = session('user_rol') === 'Administrador';
     $r = $recordatorio ?? null;
     $old = fn($k, $def = null) => old($k, $r->{$k} ?? $def);
+    $canalesActuales = (array) old('canal', $r->canal ?? ['telegram']);
 @endphp
 
 @if($errors->any())
@@ -20,8 +21,8 @@
     <div class="col-md-4">
         <label class="form-label">Tipo <span class="text-danger">*</span></label>
         <select name="tipo" id="tipoSelect" class="form-select" required>
-            @foreach(['unico' => 'Único', 'recurrente' => 'Recurrente', 'certificado' => 'Certificado', 'sistema' => 'Sistema'] as $k => $v)
-                <option value="{{ $k }}" @selected($old('tipo', 'unico') === $k)>{{ $v }}</option>
+            @foreach(['general' => 'General', 'certificado' => 'Certificado', 'sistema' => 'Sistema'] as $k => $v)
+                <option value="{{ $k }}" @selected($old('tipo', 'general') === $k)>{{ $v }}</option>
             @endforeach
         </select>
     </div>
@@ -37,8 +38,8 @@
         <select name="usuario_id" class="form-select" required>
             <option value="">— Selecciona —</option>
             @foreach($usuarios as $u)
-                <option value="{{ $u->usuario }}" @selected($old('usuario_id') === $u->usuario)>
-                    {{ $u->nombre ?? $u->usuario }} ({{ $u->usuario }})
+                <option value="{{ $u->id }}" @selected((string) $old('usuario_id') === (string) $u->id)>
+                    {{ $u->nombre }} ({{ $u->usuario }})
                 </option>
             @endforeach
         </select>
@@ -54,7 +55,7 @@
     <div class="col-md-4">
         <label class="form-label">Recurrencia</label>
         <select name="recurrencia" class="form-select">
-            @foreach(['una_vez' => 'Una vez', 'diaria' => 'Diaria', 'semanal' => 'Semanal', 'mensual' => 'Mensual', 'anual' => 'Anual'] as $k => $v)
+            @foreach(['una_vez' => 'Una vez', 'diario' => 'Diario', 'semanal' => 'Semanal', 'mensual' => 'Mensual', 'personalizado' => 'Personalizado'] as $k => $v)
                 <option value="{{ $k }}" @selected($old('recurrencia', 'una_vez') === $k)>{{ $v }}</option>
             @endforeach
         </select>
@@ -62,12 +63,11 @@
 
     <div class="col-12">
         <label class="form-label">Canales <span class="text-danger">*</span></label>
-        @php $canales = (array) $old('canal', ['telegram']); @endphp
         <div class="d-flex gap-4">
             @foreach(['telegram' => 'Telegram', 'email' => 'Email', 'web' => 'Web', 'whatsapp' => 'WhatsApp (fase 2)'] as $k => $v)
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="canal[]"
-                           id="canal_{{ $k }}" value="{{ $k }}" @checked(in_array($k, $canales))>
+                           id="canal_{{ $k }}" value="{{ $k }}" @checked(in_array($k, $canalesActuales))>
                     <label class="form-check-label" for="canal_{{ $k }}">{{ $v }}</label>
                 </div>
             @endforeach
@@ -85,7 +85,12 @@
         </div>
         <div class="col-md-3">
             <label class="form-label">Tipo</label>
-            <input type="text" name="cert_tipo" class="form-control" placeholder="SSL, CSD, Dominio..." value="{{ $old('cert_tipo') }}">
+            <select name="cert_tipo" class="form-select">
+                <option value="">—</option>
+                @foreach(['ssl' => 'SSL', 'csd' => 'CSD', 'dominio' => 'Dominio', 'otro' => 'Otro'] as $k => $v)
+                    <option value="{{ $k }}" @selected($old('cert_tipo') === $k)>{{ $v }}</option>
+                @endforeach
+            </select>
         </div>
         <div class="col-md-3">
             <label class="form-label">Emisor</label>
@@ -120,7 +125,7 @@
 @push('scripts')
 <script>
 (function () {
-    const tipo = document.getElementById('tipoSelect');
+    const tipo   = document.getElementById('tipoSelect');
     const bloque = document.getElementById('bloqueCertificado');
     const toggle = () => { bloque.style.display = (tipo.value === 'certificado') ? '' : 'none'; };
     tipo.addEventListener('change', toggle);

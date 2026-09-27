@@ -128,6 +128,7 @@ Route::middleware(['auth.session'])->prefix('recordatorios')->name('recordatorio
     Route::put('/{id}',           [RecordatorioController::class, 'update'])->name('update');
     Route::delete('/{id}',        [RecordatorioController::class, 'destroy'])->name('destroy');
     Route::post('/{id}/cancelar', [RecordatorioController::class, 'cancelar'])->name('cancelar');
+    Route::post('/{id}/renovar', [RecordatorioController::class, 'renovar'])->name('renovar');
 });
 
 

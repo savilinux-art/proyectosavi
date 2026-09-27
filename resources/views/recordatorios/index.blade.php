@@ -19,14 +19,23 @@
 <div class="card mb-4"><div class="card-body">
     <form method="GET" class="row g-2 align-items-end">
         <div class="col-md-2">
-            <label class="form-label small">Estatus</label>
-            <select name="estatus" class="form-select form-select-sm">
-                <option value="">Todos</option>
-                @foreach(['pendientes' => 'Pendientes', 'enviados' => 'Enviados', 'cancelados' => 'Cancelados'] as $k => $v)
-                    <option value="{{ $k }}" @selected(request('estatus') === $k)>{{ $v }}</option>
-                @endforeach
-            </select>
-        </div>
+    <label class="form-label small">Estatus</label>
+    <select name="estatus" class="form-select form-select-sm">
+        <option value="">Todos</option>
+        @foreach(['pendiente' => 'Pendiente', 'enviado' => 'Enviado', 'cancelado' => 'Cancelado', 'completado' => 'Completado', 'error' => 'Error'] as $k => $v)
+            <option value="{{ $k }}" @selected(request('estatus') === $k)>{{ $v }}</option>
+        @endforeach
+    </select>
+</div>
+<div class="col-md-2">
+    <label class="form-label small">Tipo</label>
+    <select name="tipo" class="form-select form-select-sm">
+        <option value="">Todos</option>
+        @foreach(['general' => 'General', 'certificado' => 'Certificado', 'sistema' => 'Sistema'] as $k => $v)
+            <option value="{{ $k }}" @selected(request('tipo') === $k)>{{ $v }}</option>
+        @endforeach
+    </select>
+</div>
         <div class="col-md-2">
             <label class="form-label small">Tipo</label>
             <select name="tipo" class="form-select form-select-sm">
@@ -82,13 +91,20 @@
                     <td>{{ $r->id }}</td>
                     <td>
                         {{ $r->titulo }}
-                        @if($r->tipo === 'certificado' && $r->cert_fecha_vencimiento)
-                            @php $d = $r->diasRestantesCertificado(); @endphp
-                            <br><small class="text-{{ $d <= 3 ? 'danger' : ($d <= 7 ? 'warning' : 'muted') }}">
-                                <i class="bi bi-patch-check"></i>
-                                {{ $d }} días {{ $d < 0 ? '(VENCIDO)' : '' }}
-                            </small>
+                         @if($r->tipo === 'certificado' && $r->cert_fecha_vencimiento)
+                         @php
+                         $d = $r->diasRestantesCertificado();
+                         $emoji = $d < 0 ? '🔴' : ($d <= 1 ? '🔴' : ($d <= 3 ? '🟠' : ($d <= 7 ? '🟡' : ($d <= 15 ? '🟢' : '⚪'))));
+                         $color = $d < 0 ? 'danger' : ($d <= 3 ? 'danger' : ($d <= 7 ? 'warning' : 'muted'));
+                         @endphp
+                         <br><small class="text-{{ $color }}">
+                        {{ $emoji }}
+                        @if($d < 0) VENCIDO hace {{ abs($d) }} días
+                        @elseif($d === 0) VENCE HOY
+                        @else {{ $d }} días restantes
                         @endif
+                        </small>
+                         @endif
                     </td>
                     <td><span class="badge bg-info">{{ ucfirst($r->tipo) }}</span></td>
                     <td>{{ $r->fecha_hora_programada?->format('d/m/Y H:i') }}</td>
@@ -112,6 +128,47 @@
                     </td>
                     <td>
                         <div class="btn-group">
+                            @if($r->tipo === 'certificado')
+<button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalRenovar{{ $r->id }}" title="Marcar como renovado">
+    <i class="bi bi-arrow-repeat"></i>
+</button>
+
+{{-- Modal renovar --}}
+<div class="modal fade" id="modalRenovar{{ $r->id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ route('recordatorios.renovar', $r->id) }}" method="POST">
+            @csrf
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Renovar certificado: {{ $r->cert_nombre }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Vencimiento anterior: <strong>{{ $r->cert_fecha_vencimiento?->format('d/m/Y') }}</strong></p>
+                    <div class="mb-3">
+                        <label class="form-label">Nueva fecha de vencimiento <span class="text-danger">*</span></label>
+                        <input type="date" name="fecha_vencimiento_nueva" class="form-control" required
+                               min="{{ now()->addDay()->toDateString() }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Link de renovación</label>
+                        <input type="url" name="cert_link_renovacion" class="form-control"
+                               value="{{ $r->cert_link_renovacion }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea name="notas" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Marcar como renovado</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+@endif
                             <a href="{{ route('recordatorios.edit', $r->id) }}" class="btn btn-sm btn-warning" title="Editar"><i class="bi bi-pencil"></i></a>
                             @if($r->estatus === 'pendiente')
                             <form action="{{ route('recordatorios.cancelar', $r->id) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Cancelar este recordatorio?')">

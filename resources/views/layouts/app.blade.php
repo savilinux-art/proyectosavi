@@ -139,12 +139,20 @@
             <a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
                 <i class="bi bi-speedometer2"></i> Dashboard
             </a>
+  
+            <a href="{{ route('recordatorios.index') }}" class="nav-link {{ request()->routeIs('recordatorios.*') ? 'active' : '' }}">
+                <i class="bi bi-alarm"></i> Recordatorios
+                <span class="badge bg-warning ms-auto">{{ \App\Models\Recordatorio::where('usuario_id', session('user_id'))->where('estatus','pendiente')->count() }}</span>
+            </a>
 
-<li class="nav-item">
-    <a class="nav-link" href="{{ route('geocercas.index') }}">
-        <i class="bi bi-pin-map"></i> Geocercas
-    </a>
-</li>
+
+            <li class="nav-item">
+                <a class="nav-link" href="{{ route('geocercas.index') }}">
+                <i class="bi bi-pin-map"></i> Geocercas
+                </a>
+            </li>
+
+
 
             <!-- ==================== INVENTARIO ==================== -->
             @if(in_array(session('user_rol'), ['Administrador', 'Ventas', 'Inventarios']) || (session('user_usuario') && \App\Models\Usuario::find(session('user_usuario'))?->hasPermiso('ver-inventario')))
@@ -300,11 +308,7 @@
             </a>
             @endif
 
-            
-            <a href="{{ route('recordatorios.index') }}" class="nav-link {{ request()->routeIs('recordatorios.*') ? 'active' : '' }}">
-                <i class="bi bi-alarm"></i> Recordatorios
-                <span class="badge bg-warning ms-auto">{{ \App\Models\Recordatorio::where('usuario_id', session('user_usuario'))->where('estatus','pendiente')->count() }}</span>
-            </a>
+          
 
 
             <!-- ==================== NOTIFICACIONES ==================== -->

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Recordatorio;
+use App\Models\CertificadoHistorial;
 use App\Models\Usuario;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
@@ -15,11 +17,16 @@ class RecordatorioController extends Controller
         return Session::get('user_rol') === 'Administrador';
     }
 
+    private function userId(): int
+    {
+        return (int) Session::get('user_id');
+    }
+
     private function queryBase()
     {
         $q = Recordatorio::with(['usuario', 'creador']);
         if (!$this->esAdmin()) {
-            $q->where('usuario_id', Session::get('user_usuario'));
+            $q->where('usuario_id', $this->userId());
         }
         return $q;
     }
@@ -29,17 +36,19 @@ class RecordatorioController extends Controller
         $query = $this->queryBase();
 
         if ($estatus = $request->input('estatus')) {
-            if ($estatus === 'pendientes')      $query->where('estatus', 'pendiente');
-            elseif ($estatus === 'enviados')    $query->where('estatus', 'enviado');
-            elseif ($estatus === 'cancelados')  $query->where('estatus', 'cancelado');
+            if (in_array($estatus, ['pendiente', 'enviado', 'cancelado', 'completado', 'error'])) {
+                $query->where('estatus', $estatus);
+            }
         }
 
         if ($tipo = $request->input('tipo')) {
-            $query->where('tipo', $tipo);
+            if (in_array($tipo, ['general', 'certificado', 'sistema'])) {
+                $query->where('tipo', $tipo);
+            }
         }
 
-        if ($this->esAdmin() && ($usuarioId = $request->input('usuario_id'))) {
-            $query->where('usuario_id', $usuarioId);
+        if ($this->esAdmin() && ($uid = $request->input('usuario_id'))) {
+            $query->where('usuario_id', $uid);
         }
 
         if ($desde = $request->input('desde')) {
@@ -51,7 +60,11 @@ class RecordatorioController extends Controller
 
         $recordatorios = $query->orderBy('fecha_hora_programada', 'desc')->get();
 
-        $kpiBase = $this->queryBase();
+        $kpiBase = Recordatorio::query();
+        if (!$this->esAdmin()) {
+            $kpiBase->where('usuario_id', $this->userId());
+        }
+
         $pendientesHoy = (clone $kpiBase)->where('estatus', 'pendiente')
             ->whereDate('fecha_hora_programada', today())->count();
         $proximos7Dias = (clone $kpiBase)->where('estatus', 'pendiente')
@@ -63,7 +76,7 @@ class RecordatorioController extends Controller
         $total = (clone $kpiBase)->count();
 
         $usuarios = $this->esAdmin()
-            ? Usuario::orderBy('usuario')->get()
+            ? Usuario::orderBy('nombre')->get()
             : collect();
 
         return view('recordatorios.index', compact(
@@ -81,12 +94,18 @@ class RecordatorioController extends Controller
     public function store(Request $request)
     {
         $data = $this->validar($request);
-        $data['created_by'] = Session::get('user_usuario');
+
+        $data['created_by'] = $this->userId();
         if (!$this->esAdmin()) {
-            $data['usuario_id'] = Session::get('user_usuario');
+            $data['usuario_id'] = $this->userId();
         }
         $data['estatus']  = 'pendiente';
         $data['intentos'] = 0;
+
+        // Si es certificado y no hay avisos definidos, usar default
+        if (($data['tipo'] ?? null) === 'certificado' && empty($data['cert_avisos_dias'])) {
+            $data['cert_avisos_dias'] = [15, 7, 3, 1, 0];
+        }
 
         Recordatorio::create($data);
 
@@ -133,11 +152,65 @@ class RecordatorioController extends Controller
             ->with('success', 'Recordatorio cancelado');
     }
 
+    public function renovar(Request $request, $id)
+    {
+        $recordatorio = $this->queryBase()->findOrFail($id);
+
+        if (!$recordatorio->esCertificado()) {
+            return back()->with('error', 'Este recordatorio no es un certificado.');
+        }
+
+        $data = $request->validate([
+            'fecha_vencimiento_nueva' => 'required|date',
+            'cert_link_renovacion'    => 'nullable|url|max:500',
+            'notas'                   => 'nullable|string|max:1000',
+        ]);
+
+        $vencAnterior = $recordatorio->cert_fecha_vencimiento;
+        $vencNueva    = Carbon::parse($data['fecha_vencimiento_nueva']);
+
+        // 1. Registrar historial
+        CertificadoHistorial::create([
+            'recordatorio_id'            => $recordatorio->id,
+            'usuario_id'                 => $this->userId(),
+            'fecha_vencimiento_anterior' => $vencAnterior,
+            'fecha_vencimiento_nueva'    => $vencNueva,
+            'notas'                      => $data['notas'] ?? null,
+        ]);
+
+        // 2. Actualizar el recordatorio actual: certificado renovado
+        $recordatorio->update([
+            'cert_fecha_vencimiento' => $vencNueva,
+            'cert_renovado_at'       => now(),
+            'estatus'                => 'completado',
+            'cert_link_renovacion'   => $data['cert_link_renovacion'] ?? $recordatorio->cert_link_renovacion,
+        ]);
+
+        // 3. Crear nuevo recordatorio clonado para el próximo ciclo
+        //    El nuevo vencimiento es 1 año después (o según su periodicidad)
+        $proxVencimiento = $vencNueva->copy()->addYear();
+        $nuevo = $recordatorio->replicate([
+            'cert_renovado_at', 'enviado_at', 'intentos', 'ultimo_error',
+        ]);
+        $nuevo->estatus                = 'pendiente';
+        $nuevo->intentos               = 0;
+        $nuevo->enviado_at             = null;
+        $nuevo->ultimo_error           = null;
+        $nuevo->cert_fecha_vencimiento = $proxVencimiento;
+        $nuevo->cert_renovado_at       = null;
+        $nuevo->fecha_hora_programada  = $proxVencimiento->copy()->subDays(15)->setTime(9, 0, 0);
+        $nuevo->created_by             = $this->userId();
+        $nuevo->save();
+
+        return redirect()->route('recordatorios.index')
+            ->with('success', "Certificado renovado. Nuevo ciclo programado para {$proxVencimiento->format('d/m/Y')}.");
+    }
+
     private function usuariosDisponibles()
     {
         return $this->esAdmin()
-            ? Usuario::orderBy('usuario')->get()
-            : Usuario::where('usuario', Session::get('user_usuario'))->get();
+            ? Usuario::orderBy('nombre')->get()
+            : Usuario::where('id', $this->userId())->get();
     }
 
     private function validar(Request $request): array
@@ -145,20 +218,20 @@ class RecordatorioController extends Controller
         $rules = [
             'titulo'                => 'required|string|max:200',
             'descripcion'           => 'nullable|string|max:2000',
-            'tipo'                  => ['required', Rule::in(['unico', 'recurrente', 'certificado', 'sistema'])],
+            'tipo'                  => ['required', Rule::in(['general', 'certificado', 'sistema'])],
             'canal'                 => 'required|array|min:1',
             'canal.*'               => ['string', Rule::in(['telegram', 'email', 'web', 'whatsapp'])],
             'fecha_hora_programada' => 'required|date',
-            'recurrencia'           => ['nullable', Rule::in(['una_vez', 'diaria', 'semanal', 'mensual', 'anual'])],
+            'recurrencia'           => ['nullable', Rule::in(['una_vez', 'diario', 'semanal', 'mensual', 'personalizado'])],
         ];
 
         if ($this->esAdmin()) {
-            $rules['usuario_id'] = 'required|exists:usuarios,usuario';
+            $rules['usuario_id'] = 'required|exists:usuarios,id';
         }
 
         if ($request->input('tipo') === 'certificado') {
             $rules['cert_nombre']             = 'required|string|max:200';
-            $rules['cert_tipo']               = 'nullable|string|max:50';
+            $rules['cert_tipo']               = ['nullable', Rule::in(['ssl', 'csd', 'dominio', 'otro'])];
             $rules['cert_emisor']             = 'nullable|string|max:200';
             $rules['cert_serie']              = 'nullable|string|max:200';
             $rules['cert_fecha_emision']      = 'nullable|date';
@@ -168,14 +241,11 @@ class RecordatorioController extends Controller
 
         $data = $request->validate($rules);
 
-        if (($data['tipo'] ?? null) === 'recurrente' && empty($data['recurrencia'])) {
-            $data['recurrencia'] = 'mensual';
-        }
-        if (($data['tipo'] ?? null) === 'unico') {
+        if (($data['tipo'] ?? null) === 'general' && empty($data['recurrencia'])) {
             $data['recurrencia'] = 'una_vez';
         }
         if (($data['tipo'] ?? null) === 'certificado' && empty($data['recurrencia'])) {
-            $data['recurrencia'] = 'anual';
+            $data['recurrencia'] = 'personalizado';
         }
 
         return $data;
