@@ -300,6 +300,13 @@
             </a>
             @endif
 
+            
+            <a href="{{ route('recordatorios.index') }}" class="nav-link {{ request()->routeIs('recordatorios.*') ? 'active' : '' }}">
+                <i class="bi bi-alarm"></i> Recordatorios
+                <span class="badge bg-warning ms-auto">{{ \App\Models\Recordatorio::where('usuario_id', session('user_usuario'))->where('estatus','pendiente')->count() }}</span>
+            </a>
+
+
             <!-- ==================== NOTIFICACIONES ==================== -->
             <div class="menu-label mt-3">Sistema</div>
             <a href="{{ route('notificaciones.index') }}" class="nav-link {{ request()->routeIs('notificaciones.*') ? 'active' : '' }}">

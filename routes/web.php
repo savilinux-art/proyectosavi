@@ -26,6 +26,7 @@ use App\Http\Controllers\UbicacionController;
 use App\Http\Controllers\GeocercaController;
 use App\Http\Controllers\CotizacionController;
 use App\Http\Controllers\GeocercaAlertaController;
+use App\Http\Controllers\RecordatorioController;
 
 // Auth
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
@@ -117,6 +118,18 @@ Route::middleware(['auth.session'])->group(function () {
     Route::delete('notificaciones/{id}', [NotificacionController::class, 'destroy'])->name('notificaciones.destroy');
     Route::get('notificaciones/count', [NotificacionController::class, 'count'])->name('notificaciones.count');
 });
+
+// ==================== RECORDATORIOS ====================
+Route::middleware(['auth.session'])->prefix('recordatorios')->name('recordatorios.')->group(function () {
+    Route::get('/',               [RecordatorioController::class, 'index'])->name('index');
+    Route::get('/create',         [RecordatorioController::class, 'create'])->name('create');
+    Route::post('/',              [RecordatorioController::class, 'store'])->name('store');
+    Route::get('/{id}/edit',      [RecordatorioController::class, 'edit'])->name('edit');
+    Route::put('/{id}',           [RecordatorioController::class, 'update'])->name('update');
+    Route::delete('/{id}',        [RecordatorioController::class, 'destroy'])->name('destroy');
+    Route::post('/{id}/cancelar', [RecordatorioController::class, 'cancelar'])->name('cancelar');
+});
+
 
 // Telegram Location
 Route::post('/telegram/send-location/start/{id}', [TelegramLocationController::class, 'sendStartLocation'])
@@ -235,3 +248,4 @@ Route::get('/test-notify/{id}', function ($id, TelegramService $telegram) {
         return '❌ Error: ' . $e->getMessage();
     }
 });
+
