@@ -18,6 +18,7 @@ class TelegramWebhookController extends Controller
         // 🔒 SIEMPRE devolver 200 OK. Nunca relanzar excepciones.
         try {
             $payload  = $request->all();
+            Log::info('🔍 PAYLOAD COMPLETO', $payload);
             $updateId = $payload['update_id'] ?? null;
 
             // 🔒 IDEMPOTENCIA: si el mismo update ya se procesó, ignorar
@@ -32,8 +33,9 @@ class TelegramWebhookController extends Controller
 
             Log::info('📨 Webhook recibido', [
                 'update_id' => $updateId,
-                'tipo'      => isset($payload['callback_query']) ? 'callback' :
-                              (isset($payload['message']['location']) ? 'location' : 'otro'),
+               'tipo' => isset($payload['callback_query']) ? 'callback' :
+                    (isset($payload['message']['location']) ? 'location' :
+                    (isset($payload['message']['text']) ? 'command' : 'otro')),
             ]);
 
             // Callback (botones inline)
