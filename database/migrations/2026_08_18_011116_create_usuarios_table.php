@@ -12,6 +12,7 @@ return new class extends Migration
             $table->string('usuario')->unique();
             $table->string('nombre');
             $table->string('correo')->unique();
+            $table->string('telegram_chat_id')->nullable()->unique();
             $table->string('contraseña');
             $table->string('rol');
             $table->foreign('rol')->references('rol')->on('roles');
