@@ -32,3 +32,9 @@ Thumbs.db
 resumen*.txt
 pendientes-*.txt
 *teccnico*.txt
+
+# Backups locales (nunca versionar)
+*.bak-*
+
+# PDFs de reportes (se regeneran desde .md)
+docs/reportes/*.pdf
