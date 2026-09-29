@@ -133,10 +133,12 @@ Route::middleware(['auth.session'])->prefix('recordatorios')->name('recordatorio
 
 
 // Telegram Location
-Route::post('/telegram/send-location/start/{id}', [TelegramLocationController::class, 'sendStartLocation'])
-    ->name('telegram.send-start');
-Route::post('/telegram/send-location/end/{id}', [TelegramLocationController::class, 'sendEndLocation'])
-    ->name('telegram.send-end');
+Route::middleware(['auth.session'])->group(function () {
+    Route::post('/telegram/send-location/start/{id}', [TelegramLocationController::class, 'sendStartLocation'])
+        ->name('telegram.send-start');
+    Route::post('/telegram/send-location/end/{id}', [TelegramLocationController::class, 'sendEndLocation'])
+        ->name('telegram.send-end');
+});
 
 // Salidas y Devoluciones
 Route::get('salidas/buscar-productos', [SalidaInventarioController::class, 'buscarProductos'])->name('salidas.buscarProductos');
@@ -144,8 +146,8 @@ Route::get('salidas/buscar-productos', [SalidaInventarioController::class, 'busc
 Route::middleware(['auth.session', 'permiso:ver-salidas'])->group(function () {
     Route::resource('salidas', SalidaInventarioController::class);
     Route::get('salidas/{id}/download/{copia?}', [SalidaInventarioController::class, 'downloadPDF'])->name('salidas.download');
+    Route::get('salidas/{id}/imprimir', [SalidaInventarioController::class, 'imprimir'])->name('salidas.imprimir');
 });
-Route::get('salidas/{id}/imprimir', [SalidaInventarioController::class, 'imprimir'])->name('salidas.imprimir');
 
 Route::middleware(['auth.session', 'permiso:ver-devoluciones'])->group(function () {
     Route::resource('devoluciones', DevolucionInventarioController::class);
@@ -220,33 +222,4 @@ Route::middleware(['auth.session', 'permiso:ver-ventas'])->group(function () {
         ->name('cotizaciones.enviar');
 });
 
-// ============================================================
-// 🧪 RUTAS DE PRUEBA
-// ============================================================
-Route::get('/test-telegram-system', function (TelegramService $telegram) {
-    $chatId = '8884130238';
-    try {
-        $telegram->sendMessage($chatId, '✅ Mensaje de prueba desde Laravel');
-        return '✅ Mensaje enviado correctamente desde Laravel';
-    } catch (\Exception $e) {
-        return '❌ Error: ' . $e->getMessage();
-    }
-});
-
-Route::get('/test-notify/{id}', function ($id, TelegramService $telegram) {
-    $usuario = \App\Models\Usuario::find($id);
-    if (!$usuario) {
-        return '❌ Usuario no encontrado';
-    }
-    $instalacion = \App\Models\Instalacion::first();
-    if (!$instalacion) {
-        return '❌ No hay instalaciones disponibles';
-    }
-    try {
-        $telegram->notifyInstalacionAsignada($usuario, $instalacion);
-        return '✅ Notificación enviada al instalador ' . $usuario->nombre;
-    } catch (\Exception $e) {
-        return '❌ Error: ' . $e->getMessage();
-    }
-});
 
