@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Estatus;
 use App\Models\Instalacion;
+use App\Models\Usuario;
 use App\Models\Venta;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -20,7 +21,12 @@ class InstalacionFactory extends Factory
             ['tipo'    => 'instalacion']
         );
 
+        // TODO(legacy): columna zombie, solo existe en testing.
+        // El dominio usa el pivote `instalacion_instalador`.
+        $instaladorLegacy = Usuario::factory()->instalador()->create();
+
         return [
+            'id_usuario_asignado'      => $instaladorLegacy->usuario,
             'nombre_proyecto'          => $venta->nombre_proyecto,
             'nombre_instalacion'       => 'Instalación ' . $this->faker->unique()->numerify('###'),
             'ubicacion_actual'         => null,

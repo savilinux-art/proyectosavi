@@ -20,7 +20,8 @@ class InventarioFactory extends Factory
             'marca'              => $this->faker->randomElement(['Hikvision', 'Dahua', 'TP-Link', 'Ezviz', 'Genérico']),
             'categoria'          => Categoria::factory()->create()->nombre_categoria,
             'almacen'            => $this->faker->randomElement(['Bodega Central', 'Bodega Norte', 'Camioneta 1']),
-            'apea'               => null,
+            // TODO(legacy): testing tiene apea NOT NULL por drift (prod es nullable).
+            'apea'               => '',
             'imagen'             => null,
             'imagen_url'         => null,
             'fecha_modificacion' => now(),
