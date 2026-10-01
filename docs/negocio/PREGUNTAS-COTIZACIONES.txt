@@ -1,0 +1,551 @@
+================================================================================
+        CUESTIONARIO — COTIZACIONES
+        ProyectoSAVI — Proyecto docs/negocio (fase 2)
+        Fecha creación: 30 de septiembre de 2026
+        Estado: ABIERTO — pendiente de responder
+        Módulos cubiertos:
+          - Cotizaciones (estructura, ciclo de vida, envío)
+          - Relación Venta ↔ Cotización ↔ Proyecto
+          - Líneas de cotización (artículo, mano de obra, libre)
+          - Reserva de inventario desde cotización
+        Dependencias externas (NO se documentan aquí):
+          - Venta (Q-B: pendiente, es el paraguas)
+          - Facturación / CFDI (más adelante)
+          - Clientes (fase 2)
+        Pendientes Q-XX que este cuestionario busca cerrar:
+          - Q-42 (estados cotización — ya cerrado, se confirma)
+          - Q-44 (seguimiento de pedidos — se profundiza)
+          - Subpreguntas del flujo de reserva
+        Instrucciones:
+          - Contestar SOLO lo que sepas con certeza.
+          - Si no estás seguro → dejar en blanco (se marca [—]).
+          - Si no aplica → escribir "N/A" + razón.
+          - Al terminar, avisar al asistente para procesar.
+================================================================================
+
+
+================================================================================
+INSTRUCCIONES RÁPIDAS
+================================================================================
+
+  Cómo responder:
+
+    A1. ¿Pregunta?
+        → Respuesta: _______________________________________________
+
+    Opción múltiple:
+
+    A1. ¿Pregunta?
+        ( ) Opción 1
+        ( ) Opción 2
+        (+) Opción 3    ← marcar con + o X
+        → Respuesta: ___
+
+    No sé / no aplica:
+        → Respuesta: [—]
+        → Respuesta: N/A — <razón>
+
+
+================================================================================
+BLOQUE A — JERARQUÍA: VENTA, COTIZACIÓN, PROYECTO
+================================================================================
+
+A1. ¿Cuál es la jerarquía real de estas 3 entidades?
+
+    ( ) Venta > Cotización > Proyecto
+    ( ) Venta > Proyecto > Cotización
+    ( ) Proyecto > Venta > Cotización
+    ( ) Son 3 entidades independientes relacionadas N:M
+    ( ) Otro: _______________________________________________
+
+    Aclaración: en el flujo escrito pusiste
+    "Venta → Cotización → Reserva → ... → Proyecto"
+    pero Q-48 dijo "la primera venta crea el proyecto".
+    → Respuesta: ___
+
+
+A2. ¿Una venta puede tener varias cotizaciones?
+
+    ( ) No, 1 venta = 1 cotización
+    ( ) Sí, versiones (v1, v2, v3 de la misma)
+    ( ) Sí, alternativas distintas (opción A, B para el cliente)
+    ( ) Sí, ambas cosas
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+A3. ¿Una cotización puede servir a varias ventas?
+
+    ( ) No, pertenece a una sola venta
+    ( ) Sí, se puede reutilizar
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+A4. El proyecto, ¿cuándo se crea?
+
+    ( ) Al crear la venta (primera acción)
+    ( ) Al aceptar la primera cotización
+    ( ) Al cerrar la venta (estado "cierre de venta")
+    ( ) Manual por un admin
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+A5. Q-48 dijo "N ventas = 1 proyecto". ¿Cómo se refleja eso?
+
+    ( ) Todas las ventas del mismo cliente se agrupan en 1 proyecto
+    ( ) Un proyecto grande tiene varias ventas (parcialidades)
+    ( ) Un cliente con varias compras = 1 proyecto común
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+A6. Si una venta se cae ANTES de generar cotización,
+    ¿qué pasa con el proyecto?
+
+    ( ) Nunca existió (no se había creado)
+    ( ) Queda como proyecto abandonado
+    ( ) Se elimina
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+================================================================================
+BLOQUE B — ESTRUCTURA DE LA COTIZACIÓN
+================================================================================
+
+B1. ¿Qué campos obligatorios lleva una cotización?
+
+    ( ) Número de cotización
+    ( ) Fecha
+    ( ) Cliente
+    ( ) Venta/proyecto asociado
+    ( ) Vigencia (válida hasta X fecha)
+    ( ) Forma de pago
+    ( ) Condiciones (anticipo, plazos)
+    ( ) Observaciones
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+B2. ¿Se versiona la cotización?
+
+    ( ) No, se edita y ya
+    ( ) Sí, cada envío genera versión nueva
+    ( ) Sí, cada modificación guarda versión
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+B3. ¿Se puede modificar una cotización ya enviada al cliente?
+
+    ( ) No, hay que crear nueva versión
+    ( ) Sí, cualquiera con permiso
+    ( ) Sí, solo Administrador
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+B4. ¿Hay plantillas predefinidas de cotización?
+
+    ( ) No, se arma libre
+    ( ) Sí, por tipo de proyecto (CCTV, redes, etc.)
+    ( ) Sí, por cliente recurrente
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+B5. ¿El número de cotización es correlativo?
+
+    ( ) Sí, por año (ej: 2026-001, 2026-002)
+    ( ) Sí, global (001, 002, ...)
+    ( ) Sí, por cliente
+    ( ) No, se ingresa manual
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+================================================================================
+BLOQUE C — LÍNEAS DE COTIZACIÓN
+================================================================================
+
+C1. Tipos de línea confirmados: `articulo`, `mano_obra`, `libre`.
+    ¿Hay algún tipo más?
+
+    ( ) Servicio (ej: consultoría, capacitación)
+    ( ) Flete / traslado
+    ( ) Garantía extendida
+    ( ) Otro: _______________________________________________
+    ( ) Ninguno más
+
+    → Respuesta: ___
+
+
+C2. Una línea de tipo `articulo` — ¿se puede editar la descripción
+    o queda igual que en el catálogo de inventario?
+
+    ( ) Descripción autocompletada, NO editable
+    ( ) Autocompletada pero editable
+    ( ) Totalmente libre (solo el precio viene del catálogo si existe)
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+C3. ¿Se permiten cantidades decimales?
+
+    ( ) No, solo enteros (piezas)
+    ( ) Sí, decimales (metros, fracciones de rollo)
+    ( ) Depende de la unidad del artículo
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+C4. ¿Cada línea lleva descuento propio?
+
+    ( ) No, no hay descuentos por línea
+    ( ) Sí, % por línea
+    ( ) Sí, monto fijo por línea
+    ( ) Sí, ambos
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+C5. ¿Se pueden agrupar líneas por sección / capítulo?
+    (Ej: "Sección 1: Cámaras", "Sección 2: Cableado")
+
+    ( ) No, todas las líneas van juntas
+    ( ) Sí, con subtotales por sección
+    ( ) Sí, solo visual (sin subtotales)
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+C6. La línea `mano_obra`, ¿lleva cantidad?
+
+    ( ) No, es un monto global (1 x $X)
+    ( ) Sí, cantidad × precio unitario (ej: horas × $X)
+    ( ) Depende del caso
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+================================================================================
+BLOQUE D — PRECIOS, MONEDAS, IMPUESTOS
+================================================================================
+
+D1. ¿En qué moneda se cotiza?
+
+    ( ) Solo MXN
+    ( ) Solo USD
+    ( ) Mixta (algunas líneas MXN, otras USD)
+    ( ) Se elige moneda a nivel cotización
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+D2. Si es mixta o se elige moneda, ¿cómo se maneja el tipo de cambio?
+
+    ( ) Se congela al momento de cotizar
+    ( ) Se actualiza al momento de facturar
+    ( ) Se ingresa manual por cotización
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+D3. ¿Se calcula IVA en la cotización?
+
+    ( ) No, la cotización es sin IVA
+    ( ) Sí, se muestra subtotal + IVA + total
+    ( ) Depende del cliente
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+D4. Descuentos globales (no por línea):
+
+    ( ) No hay descuentos globales
+    ( ) Sí, % sobre subtotal
+    ( ) Sí, monto fijo sobre subtotal
+    ( ) Sí, ambos
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+D5. ¿Se manejan anticipos / enganches en la cotización?
+
+    ( ) No
+    ( ) Sí, se indica % de anticipo
+    ( ) Sí, monto fijo de anticipo
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+D6. Redondeo de totales:
+
+    ( ) No se redondea
+    ( ) Al peso (entero)
+    ( ) A 2 decimales
+    ( ) A 50 centavos / peso
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+================================================================================
+BLOQUE E — CICLO DE VIDA DE LA COTIZACIÓN
+================================================================================
+
+E1. Confirmar estados: `borrador`, `enviada`, `aceptada`, `rechazada`.
+    ¿Falta alguno?
+
+    ( ) `cancelada` (cliente cancela post-aceptación)
+    ( ) `vencida` (pasó vigencia sin respuesta)
+    ( ) `en_revision` (cliente pidió cambios)
+    ( ) Otro: _______________________________________________
+    ( ) Ninguno más
+
+    → Respuesta: ___
+
+
+E2. ¿Se puede duplicar una cotización?
+
+    ( ) No
+    ( ) Sí, clonar y editar
+    ( ) Sí, clonar para el mismo cliente
+    ( ) Sí, clonar para otro cliente
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+E3. Vigencia de la cotización:
+
+    ( ) No tiene vigencia
+    ( ) 15 días
+    ( ) 30 días
+    ( ) 60 días
+    ( ) Configurable por cotización
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+E4. Cancelación post-aceptación (ya definido: botón "liberar apartado").
+    ¿La cotización pasa a estado `cancelada` o queda `aceptada` con flag?
+
+    ( ) Pasa a `cancelada`
+    ( ) Queda `aceptada` con flag `apartado_liberado = true`
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+E5. ¿Se archiva o se borra una cotización rechazada?
+
+    ( ) Se archiva (histórico)
+    ( ) Se puede borrar solo por admin
+    ( ) Se borra automáticamente
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+E6. ¿Quién puede crear cotizaciones? ¿Quién marcar aceptada/rechazada?
+
+    Crea:
+    ( ) Solo Administrador
+    ( ) Administrador + Ventas
+    ( ) Cualquiera con permiso
+    ( ) Otro: _______________________________________________
+
+    Marca aceptada/rechazada:
+    ( ) Solo Administrador
+    ( ) Administrador + Ventas
+    ( ) Cualquiera con permiso
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+================================================================================
+BLOQUE F — RESERVA DE INVENTARIO (PROFUNDIZAR)
+================================================================================
+
+F1. Confirmar: la reserva se dispara cuando la cotización pasa a `aceptada`.
+
+    ( ) Sí, confirmado
+    ( ) No, al `enviada`
+    ( ) No, en otro momento: _______________________________
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+F2. ¿Se reserva TODO el material de la cotización de una vez,
+    o se puede reservar parcial?
+
+    ( ) Todo de una vez
+    ( ) Parcial (solo lo que hay en stock)
+    ( ) Parcial por decisión del usuario
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+F3. Si un proyecto tiene VARIAS cotizaciones aceptadas,
+    ¿los apartados se ACUMULAN por producto?
+
+    ( ) Sí, se acumula
+    ( ) No, se reemplaza el apartado anterior
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+F4. El apartado, ¿se ve en algún lado fuera de `inventario`?
+    (Ej: dashboard, alertas, vista de cotización)
+
+    ( ) Sí, en la vista de cotización aceptada
+    ( ) Sí, en dashboard de inventario
+    ( ) Sí, en vista de proyecto
+    ( ) No, solo en la tabla de inventario
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+================================================================================
+BLOQUE G — ENVÍO Y ACEPTACIÓN DEL CLIENTE
+================================================================================
+
+G1. ¿Cómo se envía la cotización al cliente?
+
+    ( ) PDF por email
+    ( ) PDF por WhatsApp
+    ( ) PDF impreso en mano
+    ( ) Link público
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+G2. ¿La cotización lleva firma digital del cliente?
+
+    ( ) No, aceptación verbal o por WhatsApp
+    ( ) Sí, firma electrónica en el PDF
+    ( ) Sí, firma física sobre el PDF impreso
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+G3. ¿Quién marca la cotización como `aceptada` en el sistema?
+
+    ( ) El cliente desde un link
+    ( ) El vendedor tras confirmación del cliente
+    ( ) Administrador
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+G4. ¿Se guarda evidencia de aceptación?
+
+    ( ) Sí, PDF firmado
+    ( ) Sí, captura de WhatsApp/email
+    ( ) No, solo el cambio de estado en sistema
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+G5. ¿Hay seguimiento de cotizaciones "enviadas pero sin respuesta"?
+
+    ( ) No, se quedan así
+    ( ) Sí, recordatorio automático al vendedor
+    ( ) Sí, recordatorio al cliente
+    ( ) Sí, cambio automático a `vencida` al pasar vigencia
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+================================================================================
+BLOQUE H — PREGUNTAS ABIERTAS
+================================================================================
+
+H1. ¿Qué te frustra HOY del manejo de cotizaciones?
+
+    → Respuesta: _______________________________________________
+    ___________________________________________________________
+    ___________________________________________________________
+
+
+H2. Si pudieras pedir UNA sola cosa del nuevo sistema de cotizaciones,
+    ¿cuál sería?
+
+    → Respuesta: _______________________________________________
+    ___________________________________________________________
+
+
+H3. ¿Hay algún proceso manual de cotización (Excel, papel, WhatsApp)
+    que debería estar en el sistema?
+
+    → Respuesta: _______________________________________________
+    ___________________________________________________________
+    ___________________________________________________________
+
+
+H4. ¿Algo más que deba saber sobre cotizaciones que no haya preguntado?
+
+    → Respuesta: _______________________________________________
+    ___________________________________________________________
+    ___________________________________________________________
+
+
+================================================================================
+FIN DEL CUESTIONARIO
+================================================================================
+
+  Cobertura:
+    - 6 preguntas → Bloque A (Jerarquía Venta/Cotización/Proyecto)
+    - 5 preguntas → Bloque B (Estructura de cotización)
+    - 6 preguntas → Bloque C (Líneas)
+    - 6 preguntas → Bloque D (Precios, monedas, impuestos)
+    - 6 preguntas → Bloque E (Ciclo de vida)
+    - 4 preguntas → Bloque F (Reserva de inventario)
+    - 5 preguntas → Bloque G (Envío y aceptación)
+    - 4 preguntas → Bloque H (Abiertas)
+
+    TOTAL: 42 preguntas
+
+  Al terminar:
+    "Cuestionario cotizaciones respondido. Adjunto el archivo."
+    El asistente va a:
+      1. Generar COTIZACIONES.md v1
+      2. Actualizar MODELO-DATOS.md, FLUJOS.md, GLOSARIO.md
+      3. Cerrar subpreguntas pendientes de inventario
+      4. Identificar nuevos Q-XX
+      5. Dejar listo para commit (post 5 oct)
+================================================================================

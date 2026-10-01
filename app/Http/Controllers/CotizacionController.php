@@ -188,6 +188,15 @@ public function edit(Cotizacion $cotizacion)
     return view('cotizaciones.edit', compact('cotizacion', 'clientes', 'proyectos', 'productos'));
 }
 
+    /**
+     * Vista de la lista de materiales para el almacenista.
+     * Sin precios — se filtran server-side.
+     */
+    public function vistaAlmacen(Cotizacion $cotizacion)
+    {
+        $cotizacion->load(['detalles.inventario', 'proyecto', 'cliente']);
+        return view('cotizaciones.almacen', compact('cotizacion'));
+    }
 
 // =========================== Eliminar cotización ======================================
     public function destroy(Cotizacion $cotizacion)
