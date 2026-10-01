@@ -88,6 +88,12 @@ Route::middleware(['auth.session', 'permiso:ver-proyectos'])->group(function () 
     Route::resource('proyectos', ProyectoController::class);
 });
 
+// Rutas para generar PDFs de salida y devolución de inventario
+    Route::get('proyectos/{proyecto}/salida-pdf', [ProyectoController::class, 'salidaPdf'])
+        ->name('proyectos.salida-pdf');
+    Route::get('proyectos/{proyecto}/devolucion-pdf', [ProyectoController::class, 'devolucionPdf'])
+        ->name('proyectos.devolucion-pdf');
+
 // Categorías y Estatus
 Route::middleware(['auth.session', 'permiso:ver-inventario'])->group(function () {
     Route::resource('categorias', CategoriaController::class);
@@ -147,10 +153,18 @@ Route::middleware(['auth.session', 'permiso:ver-salidas'])->group(function () {
     Route::resource('salidas', SalidaInventarioController::class);
     Route::get('salidas/{id}/download/{copia?}', [SalidaInventarioController::class, 'downloadPDF'])->name('salidas.download');
     Route::get('salidas/{id}/imprimir', [SalidaInventarioController::class, 'imprimir'])->name('salidas.imprimir');
+        // ↓ NUEVA
+    Route::get('cotizaciones/{cotizacion}/almacen', [CotizacionController::class, 'vistaAlmacen'])
+        ->name('cotizaciones.almacen');
+    Route::get('proyectos/{proyecto}/propuesta-pdf', [ProyectoController::class, 'propuestaPdf'])
+        ->name('proyectos.propuesta-pdf');
+    Route::get('proyectos/{proyecto}/as-built', [ProyectoController::class, 'asBuilt'])
+        ->name('proyectos.as-built');
 });
 
 Route::middleware(['auth.session', 'permiso:ver-devoluciones'])->group(function () {
     Route::resource('devoluciones', DevolucionInventarioController::class);
+
 });
 
 

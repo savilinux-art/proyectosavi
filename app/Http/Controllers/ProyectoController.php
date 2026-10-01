@@ -7,6 +7,9 @@ use App\Models\Venta;
 use App\Models\Usuario;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
+use App\Services\TrazabilidadService;
+use App\Models\SalidaInventario;
+use App\Models\DevolucionInventario;
 
 class ProyectoController extends Controller
 {
@@ -96,12 +99,79 @@ class ProyectoController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show($id)
+        public function show($id)
     {
         $proyecto = Proyecto::with(['venta', 'modificadoPor'])->findOrFail($id);
-        return view('proyectos.show', compact('proyecto'));
+
+        $materiales = app(TrazabilidadService::class)->paraProyecto($proyecto);
+
+        $salidas = SalidaInventario::with('detalles.inventario')
+            ->where('nombre_proyecto', $proyecto->nombre_proyecto)
+            ->orderByDesc('fecha_hora_salida')
+            ->get();
+
+        $devoluciones = DevolucionInventario::with('detalles.inventario')
+            ->where('nombre_proyecto', $proyecto->nombre_proyecto)
+            ->orderByDesc('fecha_hora_devolucion')
+            ->get();
+
+        return view('proyectos.show', compact(
+            'proyecto', 'materiales', 'salidas', 'devoluciones'
+        ));
     }
 
+    public function salidaPdf($id)
+    {
+        $proyecto = Proyecto::findOrFail($id);
+
+        if (!$proyecto->salida_inventario) {
+            abort(404);
+        }
+
+        return response($proyecto->salida_inventario)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="salida-inventario-' . $proyecto->id . '.pdf"');
+    }
+
+    public function devolucionPdf($id)
+    {
+        $proyecto = Proyecto::findOrFail($id);
+
+        if (!$proyecto->devolucion_inventario) {
+            abort(404);
+        }
+
+        return response($proyecto->devolucion_inventario)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="devolucion-inventario-' . $proyecto->id . '.pdf"');
+    }
+
+        public function propuestaPdf($id)
+    {
+        $proyecto = Proyecto::findOrFail($id);
+
+        if (!$proyecto->propuesta_economica) {
+            abort(404);
+        }
+
+        return response($proyecto->propuesta_economica)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="propuesta-' . $proyecto->id . '.pdf"');
+    }
+
+    public function asBuilt($id)
+    {
+        $proyecto = Proyecto::findOrFail($id);
+
+        if (!$proyecto->archivo_as_built) {
+            abort(404);
+        }
+
+        // As-Built puede ser PDF o DWG (validación: mimes:pdf,dwg)
+        return response($proyecto->archivo_as_built)
+            ->header('Content-Type', 'application/octet-stream')
+            ->header('Content-Disposition', 'attachment; filename="as-built-' . $proyecto->id . '"');
+    }
     /**
      * Show the form for editing the specified resource.
      */
