@@ -1,0 +1,643 @@
+================================================================================
+        CUESTIONARIO — INVENTARIO Y TRAZABILIDAD DE MATERIALES
+        ProyectoSAVI — Proyecto docs/negocio (fase 2)
+        Fecha creación: 30 de septiembre de 2026
+        Estado: ABIERTO — pendiente de responder
+        Módulos cubiertos:
+          - Inventario (salidas, devoluciones, apartados)
+          - Cotizaciones
+          - Ventas
+          - Proyectos
+          - Instalaciones
+          - Trazabilidad end-to-end
+        Pendientes Q-XX que este cuestionario busca resolver:
+          - Q-10 (rename movimientos_inventario.instalacion → proyecto)
+          - Q-15 (rediseño inventario.apartados / cantidad_apartados)
+          - Q-16 (relación Proyecto ↔ Venta, hoy 1:1)
+          - Q-40 (inventario.apea nullable en testing)
+        Instrucciones:
+          - Contestar SOLO lo que sepas con certeza.
+          - Si no estás seguro → dejar en blanco (se marca [—] honesto).
+          - Si la pregunta no aplica → escribir "N/A" + por qué.
+          - Si querés agregar contexto extra → usar el espacio "NOTAS:".
+          - Al terminar, avisar al asistente para procesar respuestas.
+================================================================================
+
+
+================================================================================
+INSTRUCCIONES RÁPIDAS
+================================================================================
+
+  Cómo responder cada pregunta:
+
+    A1. ¿Pregunta?
+        → Respuesta: _______________________________________________
+
+    Si es de opción múltiple:
+
+    A1. ¿Pregunta?
+        ( ) Opción 1
+        ( ) Opción 2
+        ( ) Opción 3
+        → Respuesta: ___
+
+    Si querés decir "no sé":
+        → Respuesta: [—]
+
+    Si querés decir "no aplica":
+        → Respuesta: N/A — <razón>
+
+
+================================================================================
+BLOQUE A — INVENTARIO BASE (¿qué inventariamos y cómo?)
+================================================================================
+
+A1. ¿Qué tipos de cosas entran al inventario?
+    ¿Solo material que se instala? ¿También herramientas?
+    ¿Son un solo inventario o dos separados?
+
+    ( ) Solo material de instalación
+    ( ) Solo herramientas (préstamo)
+    ( ) Ambos, pero en tablas separadas
+    (+) Ambos, mezclados en la misma tabla con una categoría
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: 
+    ambos se separan por medio de categorias
+
+
+A2. ¿Qué categorías de material existen realmente?
+    (No las que están en BD — las que usás día a día.)
+
+    → Respuesta: 
+    son cuatro familias
+    Material de instalaciones
+    Equipos electronicos 
+    Consumibles de instalaciones
+    Herramientas de trabajo
+
+A3. ¿Qué unidades de medida se manejan?
+
+    (+) Pieza
+    (+) Metro
+    ( ) Caja
+    (+) Rollo
+    ( ) Kilogramo
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+    algunos materciales se manejan por metro como ejemplo  los patchcord
+
+A4. APEA — código de ubicación (ejemplo: A1S2L4).
+    ¿Qué significa cada parte?
+    
+     → Respuesta:
+    A1  = Anaquel 1
+    S2 = Seccion  2
+    L4 = nivel de charola
+    
+
+A5. ¿Hay múltiples almacenes o solo uno?
+
+    ( ) Uno solo
+    (+) Varios — ¿cómo se identifican? ______________
+    ( ) Uno físico + uno virtual (ej. camioneta)
+
+    → Respuesta: 
+    por nombre ejemplos reales lutron, cctcv, sonos, bocinas, racks, vivero
+
+A6. ¿Se maneja stock mínimo?
+    ¿Se alerta cuando baja? ¿A quién?
+
+    (+) No se maneja
+    ( ) Sí — se alerta por email
+    (+) Sí — se alerta en dashboard
+    ( ) Sí — se alerta por Telegram
+    ( ) Sí — otro medio: _______________________________
+    
+    → Respuesta:
+    en el dashboard ya existen tarjetas con esas alertas articuios con 10, menos de 10, articulos en 0
+
+A7. ¿Un artículo del inventario tiene costo?
+    ¿El costo se actualiza con cada compra o es fijo?
+
+    (+) No tiene costo
+    ( ) Costo fijo (se carga una vez)
+    ( ) Costo promedio (se recalcula con cada compra)
+    ( ) Costo último (se actualiza a la última compra)
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: 
+    como los costos varian  por tipo de caambio de dolar se asignan en las cotizaciones
+
+
+A8. ¿Se maneja número de serie por artículo?
+
+    (+) No, todo por cantidad agregada
+    ( ) Sí, solo para equipos caros (¿cuáles?): ____________
+    ( ) Sí, para todo
+    (+) Otro: modelo y marca
+
+    → Respuesta: ___
+    no pero lo importante en esta empresa el la marca y el modelo
+
+A9. `inventario.existencia` — ¿qué representa exactamente?
+    ¿Es "cantidad disponible" o "cantidad total física"?
+    ¿Qué la descuenta exactamente?
+
+    (+) Disponible = Total físico − Apartados
+    ( ) Total físico (los apartados van en campo aparte)
+    ( ) Otra interpretación: _______________________________
+
+    → Respuesta: ___
+    NOTAS: 
+
+================================================================================
+BLOQUE B — SALIDAS DE INVENTARIO (el flujo de sacar material)
+================================================================================
+
+B1. ¿Quién puede autorizar una salida de material?
+
+    ( ) Solo Administrador
+    (+) Administrador + algún otro rol: inventario
+    ( ) Cualquiera con permiso `ver-salidas`
+    ( ) Cualquier usuario logueado
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+    el usuario con rol inventario con cotejaamiento de cotizaciones aceptadas
+
+B2. ¿Una salida SIEMPRE está ligada a un proyecto?
+
+    ( ) Sí, siempre
+    (+) No, puede haber salidas sueltas (ej. consumo interno)
+    ( ) Depende: _______________________________________________
+
+    → Respuesta:
+    solo con proyecto o para uso interno de la empresa muchas veces 
+    se lesda salida a equipos para pruebas en el area de sistemas
+
+B3. Una salida típica, ¿es de una vez todo el material del proyecto,
+    o se va sacando por etapas conforme se instala?
+
+    ( ) De una vez (todo el material al inicio)
+    ( ) Por etapas (varias salidas conforme avanza)
+    (+) Mixto (algunos proyectos de una vez, otros por etapas)
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+B4. ¿Se registra quién físicamente retira el material?
+
+    (+) Sí — campo "quién retira"
+    ( ) Sí — solo el usuario que registra la salida en el sistema
+    ( ) No se registra
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+    se rejistra quien autoriza la salida "el usuario con rol inventario y quien recibe 
+    "el usuario con rol instalador o ventas"
+
+B5. ¿Se puede modificar una salida después de creada?
+    ¿Quién? ¿Queda auditoría?
+
+    ( ) No se puede modificar
+    ( ) Solo Administrador
+    (+) Administrador + creador
+    ( ) Sí, cualquiera con permiso
+    ( ) Otro: _______________________________________________
+
+    ¿Queda registro de cambios (auditoría)?
+    (+) Sí
+    ( ) No
+    ( ) No sé
+
+    → Respuesta: ___
+    debe haver un historial de cambios
+
+B6. ¿Una salida descuenta `existencia` inmediatamente o al confirmar?
+
+    (+) Inmediatamente al crear la salida
+    ( ) Al confirmar (estado borrador → confirmada)
+    ( ) Al marcar como "entregada"
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+B7. ¿Se firma algo al sacar material?
+    (documento, foto, remisión)
+
+    (+) Sí, remision impresa
+    ( ) Sí, foto del material
+    ( ) Sí, firma digital
+    ( ) No, solo el registro en sistema
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+    es un pdf generado con la salida a detalle , quien entrega , quien recibe y nombre del proyecto
+
+================================================================================
+BLOQUE C — DEVOLUCIONES DE INVENTARIO
+================================================================================
+
+C1. ¿Quién puede registrar y quién autorizar una devolución?
+
+    Registra:
+    ( ) Cualquier técnico
+    (+) Almacenista
+    (+) Administrador
+    ( ) Otro: _______________________________________________
+
+    Autoriza:
+    (+) Administrador
+    (+) Almacenista
+    ( ) Nadie (auto-aprobada)
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+C2. Un material devuelto, ¿regresa a la misma APEA de donde salió,
+    o se reubica?
+
+    (+) Misma APEA siempre
+    ( ) Se puede elegir nueva APEA al devolver
+    ( ) Se reubica por regla (ej. siempre a "cuarentena")
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+C3. ¿Se distingue entre material no usado / dañado / parcialmente usado?
+
+    (+) Sí, los 3 estados
+    ( ) Solo no usado vs dañado
+    ( ) Solo regresa "lo que regresa", sin estado
+    ( ) Otro: _______________________________________________
+
+    Si hay estado "dañado":
+      ¿Qué pasa con el material dañado?
+      ( ) Se da de baja
+      ( ) Se manda a reparar
+      ( ) Queda en inventario con estado "dañado"
+      (+) Otro: se registra para garantia cuando aplica
+
+    → Respuesta: ___
+    se envia a garantia si aplica de echo esta pendiente un modulo de trazavilidad de garantias
+
+C4. ¿Una devolución cierra el proyecto o puede haber múltiples?
+
+    ( ) Una sola devolución cierra
+    ( ) Múltiples devoluciones permitidas
+    (+) Otro: no
+
+    → Respuesta: ___
+    no puede aver vaarias pero lo que cierra un proyecto es el modulo de instalaciones cuando se entrega
+    al cliente el proyecto termindo, tambien epueden existir proyectos sin instalacion solo venta
+
+C5. ¿Qué pasa si el material se pierde en la obra?
+    ¿Se registra como "merma"? ¿Quién lo autoriza?
+
+    ( ) No se maneja (simplemente no regresa)
+    ( ) Se registra como merma — autoriza: ______________
+    ( ) Se registra como pérdida — autoriza: ______________
+    (+) Otro: es responsavilidad del cliente
+
+    → Respuesta: ___
+    cuando se le entrega una salida a un instalador tiene que entregarla al cliente incluso antes de instalar 
+    para validar la entrega el instalador tiene que regresar la salida (pdf generado) firmada por el cliente 
+
+================================================================================
+BLOQUE D — TRAZABILIDAD (el corazón del asunto)
+================================================================================
+
+D1. ¿Qué preguntas querés poder responder con el sistema?
+    Marcar TODAS las que apliquen.
+
+    ( ) ¿Cuánto material lleva gastado un proyecto hasta hoy?
+    ( ) ¿Cuánto material se cotizó vs. cuánto se sacó vs. cuánto se usó?
+    ( ) ¿Cuánto material se sacó este mes? ¿Por proyecto? ¿Por técnico?
+    ( ) ¿De dónde salió cada artículo (qué APEA) y a dónde fue?
+    ( ) ¿Cuál es el costo real de material de un proyecto?
+    ( ) ¿Qué proyectos están pendientes de devolución?
+    ( ) ¿Quién autorizó cada movimiento?
+    (+) Otras: cantidad de equipos entregados cotejados con la cotizacion aceptada
+    (+) Otras: cantidad de material entregado al cliente (rollos de cable, gabinetes, cajas raco)
+
+    → Respuesta: ___
+    es necesario saver cunto materi y equipo se entregoa en un proyecto cotejando con cotizacion aceptada
+
+D2. ¿A qué nivel de detalle querés trazabilidad?
+
+    ( ) Por movimiento (cada salida/devolución individual)
+    ( ) Por proyecto (agregado — total material del proyecto)
+    (+) Ambos
+
+    → Respuesta: ___
+    necesito una relacion de equipos y material entrega al proyecto
+
+D3. ¿Se necesita saber el costo del material en cada proyecto,
+    o solo la cantidad?
+
+    (+) Solo cantidad
+    ( ) Cantidad + costo
+    ( ) Cantidad + costo + precio de venta al cliente
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+D4. ¿La trazabilidad debe conectar con instalación?
+    (qué técnico instaló qué material)
+
+    (+) Sí, obligatorio
+    ( ) Sí, pero opcional
+    ( ) No hace falta
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+    saber quien entrego el material y enrelacion a equipos quien entrego y quien instalo
+    
+D5. ¿Los reportes de trazabilidad son para uso interno o se los
+    pedís a clientes?
+
+    (+) Solo interno
+    ( ) Interno + cliente final
+    ( ) Interno + SAT / auditoría
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+================================================================================
+BLOQUE E — COTIZACIÓN / VENTA → INVENTARIO
+================================================================================
+
+E1. Una cotización, ¿reserva material en el inventario?
+
+    ( ) Sí, reserva (aparta) al crear la cotización
+    (+) No, solo se aparta al cerrar la venta
+    ( ) No se aparta nunca hasta la salida física
+    (+) Otro: debe ser en automatico cuando la cotizacion es aceptada
+
+    → Respuesta: ___
+    aplica a los productos con existenci y los productos sin existencia se les 
+    genera un pedido (pendiente un modulo de seguimiento de pedidos) y cuando llegan y se les da entrada se deben apartar
+
+E2. Si reserva, ¿cuánto tiempo dura la reserva?
+    ¿Se libera si no se cierra la venta?
+
+    Duración: _______________________________________________
+
+    Se libera:
+    ( ) Automáticamente después de X días: ______
+    ( ) Manual al cancelar la cotización
+    ( ) Nunca se libera sola
+    (+) Otro: sol se elimina con la salida de inventario
+
+    → Respuesta: ___
+    permanece reservado hasta que se le da salida para su entrega o instalacion
+
+E3. Al cerrar la venta, ¿se descuenta automáticamente el inventario,
+    o solo hasta la salida física?
+
+    ( ) Descuenta al cerrar venta
+    (+) Descuenta al hacer la salida física
+    ( ) Descuenta al iniciar el proyecto
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+    debe permanecer en reserva hasta que se le de salida fisca
+
+E4. ¿Se puede cotizar material que no está en inventario?
+
+    (+) Sí, se cotiza sin validar stock
+    ( ) No, hay que tener stock para cotizar
+    (+) Sí, pero se marca como "pendiente de compra"
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+    se debe generar un pedido y notifiacion  permanete de pendiente de compra hasta que se genera su pedido y de pasa 
+    la etapa de seguimiento de pedido hasta su llegada a almecen
+
+E5. Si entre cotización y venta cambian las cantidades,
+    ¿se actualiza el compromiso de inventario?
+
+    (+) Se actualiza automáticamente
+    ( ) Manual
+    ( ) No se actualiza (queda la reserva original)
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+E6. (Q-16) Proyecto ↔ Venta: ¿cuál es la relación real?
+
+    (+) 1 venta = 1 proyecto (como hoy)
+    ( ) 1 venta = N proyectos
+    (+) N ventas = 1 proyecto
+    ( ) N ventas = N proyectos (independientes)
+    ( ) Otro: _______________________________________________
+
+    Ejemplo real que justifique:
+    cuando se genera una venta ahi se le da nombre al proyecto para poder darle seguimiento
+    → Respuesta: ___
+    cuando se crea la venta tambie se asigna nombre al proyecto
+
+================================================================================
+BLOQUE F — PROYECTO → INVENTARIO
+================================================================================
+
+F1. Un proyecto, ¿tiene una lista de materiales explícita (BOM)
+    o se deriva de la cotización/venta?
+
+    (+) Lista explícita por proyecto
+    ( ) Se deriva de la venta
+    (+) Se deriva de la cotización
+    ( ) Mixto
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+F2. ¿Se puede agregar material no contemplado en la venta original
+    a un proyecto?
+
+    ( ) Sí, libremente
+    ( ) Sí, pero requiere autorización
+    (+) No
+    (+) Otro: requiere cotizacion aceptada
+    
+    → Respuesta: ___
+    solo si se genera una nueva cotizacion y es aceptada
+
+F3. ¿Quién aprueba material extra? ¿Se factura al cliente después?
+
+    Autoriza: administrador
+
+    Se factura:
+    (+) Sí, se genera cargo adicional
+    ( ) No, se absorbe como costo interno
+    ( ) Depende del caso
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+    se factura en parcialidades algunas veces cotejado con las cotizaciones
+
+F4. Cuando un proyecto se cierra, ¿qué pasa con el material?
+
+    ( ) Devolución obligatoria
+    (+) Se queda como "consumido" (nada que devolver)
+    ( ) Conciliación manual
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+F5. ¿La instalación descuenta material por sí sola
+    (cada vez que se completa una), o se descuenta en la salida?
+
+    (+) Se descuenta en la salida (una sola vez)
+    ( ) Se descuenta por instalación
+    ( ) Se descuenta por ambas (doble control)
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+
+
+================================================================================
+BLOQUE G — REDISEÑOS PENDIENTES (Q-10, Q-15, Q-40)
+================================================================================
+
+G1. (Q-10) `movimientos_inventario.instalacion` → renombrar a `proyecto`.
+    ¿El FK conceptual es proyecto o instalación?
+
+    (+) Proyecto (un proyecto puede tener varias instalaciones)
+    ( ) Instalación (cada instalación tiene su propio material)
+    ( ) Ambos (dos columnas separadas)
+    ( ) Otro: _______________________________________________
+
+    ¿Qué gana el negocio con ese rename?
+    ___________________________________________________________
+    ___________________________________________________________
+
+    → Respuesta: ___
+    movimientos de inventarioi es para un historial de salidas y o devoluciones ligadas a proyecto
+
+G2. (Q-15) `inventario.apartados` / `cantidad_apartados`.
+    ¿Qué representan hoy?
+
+    solo lacantidas de productos apartado y se debe registrar por producto
+
+    Si rediseñamos, ¿reservas por qué entidad?
+
+    (+) Por cotización
+    ( ) Por venta
+    ( ) Por proyecto
+    ( ) Combinación
+    ( ) Otro: _______________________________________________
+
+    ¿Preferís tabla nueva `reservas_inventario` con FK al origen?
+    ( ) Sí
+    (+) No, mantener campos en `inventario`
+    ( ) Otro: _______________________________________________
+
+    → Respuesta: ___
+    cantidad apartados es el numero de piezas apartdas de un producto
+
+G3. (Q-40) `inventario.apea` — ¿debería ser nullable en producción?
+
+    (+) Sí, un artículo puede no tener APEA
+    ( ) No, siempre debe tener ubicación
+    ( ) Otro: _______________________________________________
+
+    Si es nullable, ¿en qué casos un artículo no tiene APEA?
+    cuando aun no se le asigna una apea
+    
+     → Respuesta: 
+    se asigna un apea cuando se le asigna un ligar en los anaqueles de los almacenes
+
+
+G4. ¿Hay otros rediseños que tengas en mente para este módulo?
+    (No importa si es vago — se documenta y se refina.)
+
+    ___________________________________________________________
+    ___________________________________________________________
+    ___________________________________________________________
+
+    → Respuesta: 
+    no 
+
+================================================================================
+BLOQUE H — PREGUNTAS ABIERTAS (lo que no entra en ningún bloque)
+================================================================================
+
+H1. ¿Qué te frustra HOY del manejo actual de inventario?
+    (Ejemplos: "no sé cuánto material hay", "las devoluciones son un
+     desastre", "no encuentro cosas", etc.)
+
+    → Respuesta: 
+    no conocer la cantidad exacta entragada en los proyectos 
+    ni la recaacion de quien dio salida 
+    quien recibio la salida y la entrego al cliente (proyecto)
+
+
+H2. Si pudieras pedir UNA sola cosa del nuevo sistema de inventario,
+    ¿cuál sería?
+
+    → Respuesta: 
+    que se veras, oprtuno y consistente
+
+
+H3. ¿Hay algún proceso manual que hagas hoy (papel, Excel, WhatsApp)
+    que debería estar en el sistema?
+
+    → Respuesta: 
+    si son varios
+    fotos de los tiquets de combustible
+    fotos de las evidencias de instalacion
+    fotos de las incidencias de instalacion
+    relacion de combustible surtidos a los direrentes carros de la empresa y 
+    que conductor lo recibio
+    herammientas prestadas a los intaladores  
+    heramientras fijas asignadas alos instaladores
+    relacion de credenciales de los proyectos
+    redes, cctv, domotoca, iluminacion, sonido 
+
+
+H4. ¿Algo más que deba saber sobre inventario y trazabilidad que no
+    haya preguntado?
+
+    → Respuesta: _______________________________________________
+    ___________________________________________________________
+    ___________________________________________________________
+    ___________________________________________________________
+
+
+================================================================================
+FIN DEL CUESTIONARIO
+================================================================================
+
+  Cobertura:
+    - 9 preguntas  → Bloque A (Inventario base)
+    - 7 preguntas  → Bloque B (Salidas)
+    - 5 preguntas  → Bloque C (Devoluciones)
+    - 5 preguntas  → Bloque D (Trazabilidad)
+    - 6 preguntas  → Bloque E (Cotización/Venta → Inventario)
+    - 5 preguntas  → Bloque F (Proyecto → Inventario)
+    - 4 preguntas  → Bloque G (Rediseños)
+    - 4 preguntas  → Bloque H (Abiertas)
+
+    TOTAL: 45 preguntas
+
+  Al terminar de responder, avisar al asistente:
+    "Cuestionario inventario respondido. Adjunto el archivo."
+    El asistente va a:
+      1. Leer las respuestas
+      2. Generar INVENTARIO-Y-TRAZABILIDAD.md v1
+      3. Actualizar MODELO-DATOS.md, FLUJOS.md, GLOSARIO.md
+      4. Identificar nuevos Q-XX si surgen
+      5. Dejar todo listo para commit (post 5 oct)
+================================================================================
