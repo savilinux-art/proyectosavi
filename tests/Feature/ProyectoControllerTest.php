@@ -91,12 +91,17 @@ class ProyectoControllerTest extends TestCase
      */
     private function crearSalida(string $proyecto, Inventario $inv, int $cantidad): SalidaInventario
     {
-        $salida = SalidaInventario::create([
+                    // ⚠️ forceCreate (no create): `productos` NO está en $fillable
+        // del modelo (evita "Unknown column" en dev, ver Q-45), pero SÍ
+        // existe en testing como NOT NULL sin default. forceCreate
+        // bypassea el filtro de $fillable para que el atributo llegue a BD.
+        // Valor '[]' = JSON válido por el CHECK json_valid() del schema.
+        $salida = SalidaInventario::forceCreate([
             'nombre_proyecto'   => $proyecto,
             'entregado_por'     => $this->admin->usuario,
             'entregado_a'       => $this->admin->usuario,
             'fecha_hora_salida' => now(),
-            'productos'         => '',   // legacy en testing — ver Q-45
+            'productos'         => '[]',
         ]);
 
         SalidaDetalle::create([
@@ -186,11 +191,15 @@ class ProyectoControllerTest extends TestCase
 
         $this->crearSalida('p-devol', $inv, 10);
 
-        $dev = DevolucionInventario::create([
+        // forceCreate: `productos` NO está en $fillable (Q-45), pero
+        // SÍ es NOT NULL sin default en testing. Mismo patrón que
+        // salidas_inventario.
+        $dev = DevolucionInventario::forceCreate([
             'nombre_proyecto'       => 'p-devol',
             'devuelto_por'          => $this->admin->usuario,
             'recibido_por'          => $this->admin->usuario,
             'fecha_hora_devolucion' => now(),
+            'productos'             => '[]',
         ]);
 
         DevolucionDetalle::create([
@@ -208,6 +217,9 @@ class ProyectoControllerTest extends TestCase
     public function test_salida_de_otro_proyecto_no_contamina(): void
     {
         $p   = $this->crearProyecto('p-aislado-a');
+        // p-aislado-b debe existir: salidas_inventario tiene FK a ventas
+        // por nombre_proyecto, y crearSalida no crea la venta.
+        $pB  = $this->crearProyecto('p-aislado-b');
         $inv = Inventario::factory()->create(['descripcion' => 'Material Ajeno B']);
 
         $this->crearSalida('p-aislado-b', $inv, 7);

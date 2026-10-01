@@ -20,6 +20,10 @@ class DevolucionInventario extends Model
         // 👈 ELIMINADO: 'productos'
     ];
 
+        protected $casts = [
+        'fecha_hora_devolucion' => 'datetime',
+    ];
+
     // 👈 ELIMINADO: protected $casts = [ 'productos' => 'array' ]
 
     // Relación con los detalles de la devolución

@@ -20,6 +20,10 @@ class SalidaInventario extends Model
         // 'productos' eliminado
     ];
 
+    protected $casts = [
+        'fecha_hora_salida' => 'datetime',
+    ];
+
     // Relación con los detalles
     public function detalles()
     {
