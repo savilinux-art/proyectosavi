@@ -6,9 +6,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
-
+use Illuminate\Database\Eloquent\SoftDeletes;
 class Usuario extends Authenticatable
 {
+    use SoftDeletes;   
     use HasFactory, Notifiable;
 
     protected $table      = 'usuarios';
@@ -96,4 +97,17 @@ class Usuario extends Authenticatable
         }
         return null;
     }
+    /**
+    * Blindaje: nunca borrar físicamente un usuario.
+     * Preserva histórico en movimientos_inventario.modificado_por,
+     * salidas_inventario.entregado_por, etc.
+     */
+    public function forceDelete()
+    {
+        throw new \RuntimeException(
+            'forceDelete() está deshabilitado en Usuario. ' .
+            'Usa soft-delete: $usuario->delete().'
+        );
+    }
+
 }
