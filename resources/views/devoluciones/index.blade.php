@@ -16,7 +16,7 @@
                 <td>{{ $d->devueltoPor->nombre ?? 'N/A' }}</td>
                 <td>{{ $d->recibidoPor->nombre ?? 'N/A' }}</td>
                 <td>{{ \Carbon\Carbon::parse($d->fecha_hora_devolucion)->format('d/m/Y H:i') }}</td>
-                <td><span class="badge bg-info">{{ count(json_decode($d->productos, true)) }}</span></td>
+                <td><span class="badge bg-info">{{ $d->detalles->count() }}</span></td>
                 <td><a href="{{ route('devoluciones.show', $d->id) }}" class="btn btn-sm btn-info"><i class="bi bi-eye"></i></a></td>
             </tr>
             @endforeach

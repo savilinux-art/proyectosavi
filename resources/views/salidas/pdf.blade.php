@@ -162,7 +162,7 @@
             @endforeach
             <tr style="font-weight: bold; background: #e9ecef;">
                 <td colspan="2" style="text-align: right;">TOTAL:</td>
-                <td style="text-align: center;">{{ collect($salida->productos)->sum('cantidad') }}</td>
+                <td style="text-align: center;">{{ $salida->detalles->sum('cantidad') }}</td>
             </tr>
         </tbody>
     </table>
@@ -220,16 +220,16 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($salida->productos as $producto)
+                @foreach($salida->detalles as $detalle)
                 <tr>
-                    <td>{{ $producto['modelo'] }}</td>
-                    <td>{{ $producto['descripcion'] }}</td>
-                    <td style="text-align: center;">{{ $producto['cantidad'] }}</td>
+                    <td>{{ $detalle->inventario->modelo ?? '—' }}</td>
+                    <td>{{ $detalle->inventario->descripcion ?? '—' }}</td>
+                    <td style="text-align: center;">{{ $detalle->cantidad }}</td>
                 </tr>
                 @endforeach
                 <tr style="font-weight: bold; background: #e9ecef;">
                     <td colspan="2" style="text-align: right;">TOTAL:</td>
-                    <td style="text-align: center;">{{ collect($salida->productos)->sum('cantidad') }}</td>
+                    <td style="text-align: center;">{{ $salida->detalles->sum('cantidad') }}</td>
                 </tr>
             </tbody>
         </table>
