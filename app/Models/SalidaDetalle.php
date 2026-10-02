@@ -4,7 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\SalidaDetalle; 
+use App\Observers\SalidaDetalleObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+
+#[ObservedBy(SalidaDetalleObserver::class)]
+
 
 class SalidaDetalle extends Model
 {

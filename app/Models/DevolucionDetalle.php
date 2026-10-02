@@ -3,6 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Observers\DevolucionDetalleObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+
+#[ObservedBy(DevolucionDetalleObserver::class)]
 
 class DevolucionDetalle extends Model
 {
