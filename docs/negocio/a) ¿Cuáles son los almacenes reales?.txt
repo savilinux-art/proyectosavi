@@ -1,0 +1,80 @@
+a) ¿Cuáles son los almacenes reales?
+text
+
+[+] Los 6 del cuestionario son el total
+[ ] Son más — listado completo:
+    _______________________________________________
+    _______________________________________________
+[ ] Existe "Bodega General" además de esos
+[+] "Bodega General" no existe (fue error del v1.1/v1.2)
+
+b) ¿Qué es un "almacén" físicamente?
+text
+
+[ ] Espacio físico separado (bodega distinta, dirección distinta)
+[+] Área/sección dentro del mismo espacio (mismo techo, distinta zona)
+[ ] Mixto — algunos son espacios separados, otros áreas
+[ ] Otro: _______________________________________________
+
+c) ¿Cada almacén tiene su propio APEA, o el APEA es global?
+text
+
+[ ] APEA es global (A1S2L4 existe una sola vez en toda la empresa)
+[+] Cada almacén tiene su propio espacio APEA (A1S2L4 puede repetirse por almacén)
+[ ] Otro: _______________________________________________
+
+Pregunta 2 — Proyecto ↔ Venta (Q-16 / Q-77)
+
+En el cuestionario (E6) marcaste dos opciones que se contradicen. El schema actual fuerza 1 venta = 1 proyecto.
+
+a) ¿Cuál es la relación real?
+text
+
+[] 1 venta = 1 proyecto (como está hoy en la BD)
+[ ] 1 venta = N proyectos (una venta grande que se divide)
+[+] N cotizacines = 1 proyecto (varias cotizaciones alimentan un mismo proyecto)
+[ ] Otro: _______________________________________________
+respuesta ampliada:
+puede ser una o varias derivadas de la misma venta
+
+b) Si es N ventas = 1 proyecto, ¿cómo se llamaría el proyecto?
+text
+
+[ ] Un nombre manual que se elige aparte
+[ ] El nombre de la primera venta
+[+] ya no aplica esta pregunta la anula la pregunta aterior
+
+c) Ayuda memoria: pensá en un caso real. ¿Alguna vez dos ventas terminaron siendo el mismo proyecto? ¿O siempre una venta = un proyecto?
+text
+
+creo que tambien qu
+
+Pregunta 3 — Estado de cotización (Q-50 / Q-78)
+
+En la BD dice aprobada. Vos escribís aceptada en todas las respuestas del cuestionario.
+
+a) ¿Cuál queda como palabra canónica en el sistema?
+text
+
+[ ] "aprobada" (la BD tiene razón)
+[ ] "aceptada" (el negocio tiene razón — hay que migrar la BD)
+[ ] Da igual, son sinónimos
+[ ] Otro: _______________________________________________
+
+b) Estados completos de una cotización, en orden:
+text
+
+1. _______________________________________________
+2. _______________________________________________
+3. _______________________________________________
+4. _______________________________________________
+(marcá cuáles existen hoy y cuáles querés)
+
+c) ¿facturada es un estado de cotización, o vive aparte?
+text
+
+[ ] Estado de cotización
+[ ] Vive aparte (bandera, tabla de facturación, etc.)
+[ ] No aplica
+[ ] Otro: _______________________________________________
+

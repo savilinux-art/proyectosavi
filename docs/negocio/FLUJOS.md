@@ -26,6 +26,27 @@ Actualizar en el mismo commit que cualquier cambio de lógica.
 7. Telegram: captura de ubicación y webhook
 8. Geocercas: alertas de entrada/salida
 
+## Infraestructura de acceso (sesión 01-oct-2026)
+
+### Entornos
+
+| Entorno | Ubicación | MariaDB | PHP | Estado |
+|---|---|---|---|---|
+| **Dev** | Laptop local | 11.8.9 | 8.3.33 | Schema sí, datos **no** |
+| **Prod** | `savilinux-server` (Tailscale) | 11.8.6 | 8.4.25 | Schema + datos poblados (~3 MB total) |
+
+### Accesos configurados
+
+- **SSH a prod:** `savilinux@savilinux-server` (clave SSH cargada, sin password).
+- **phpMyAdmin prod:** `http://savilinux-server.tail50a173.ts.net:8081`.
+- **Credenciales MySQL:** `~/.my.cnf` en **ambas máquinas** (laptop y server), con `chmod 600`. Permite correr `mysql` y `mysqldump` sin `-u`/`-p`.
+
+```ini
+# ~/.my.cnf (ambas máquinas)
+[client]
+user=root
+password=<password_base32>
+
 ---
 
 # 1. Autenticación y sesión
@@ -50,3 +71,39 @@ Actualizar en el mismo commit que cualquier cambio de lógica.
    Session::put('user_id',      $usuario->id);
    Session::put('user_usuario', $usuario->usuario);
    Session::put('user_rol',     $usuario->rol);
+
+   2.1 Añadir al índice (o al final del documento)
+markdown
+
+## Flujos de inventario y trazabilidad
+→ Ver detalle completo en docs/negocio/INVENTARIO-Y-TRAZABILIDAD.md §3
+
+### Resumen ejecutivo
+
+**Flujo end-to-end:**
+
+Venta → Cotización → Reserva → Salida → Entrega → Instalación → Cierre
+text
+
+
+**Sub-flujos:**
+
+| # | Flujo | Doc fuente |
+|---|---|---|
+| 3.0 | End-to-end general | §3.0 |
+| 3.1 | Estados de cotización | §3.1 |
+| 3.2 | Cotización → Reserva | §3.2 |
+| 3.3 | Salida de inventario (remisión PDF) | §3.3 |
+| 3.4 | Devolución (misma APEA, 3 estados) | §3.4 |
+| 3.5 | Entrega al cliente (firma) | §3.5 |
+| 3.6 | Cierre de proyecto (mano_obra) | §3.6 |
+| 3.7 | Venta → Cotización → Proyecto | §3.7 |
+| 3.8 | Liberación de apartado | §3.8 |
+
+**Reglas clave (resumen):**
+
+- Reserva se dispara al **aceptar** cotización (manual).
+- Salida descuenta `existencia` **inmediatamente**.
+- Cierre de proyecto es **automático** si no hay línea `mano_obra`.
+- Entrega al cliente transfiere responsabilidad (firma PDF).
+- Liberación de apartado es **acción manual** (botón).

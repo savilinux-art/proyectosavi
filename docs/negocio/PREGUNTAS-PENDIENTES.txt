@@ -1,0 +1,40 @@
+================================================================================
+  Q-XX — CUESTIONARIO INVENTARIO 30 SEP (estado final v1.1)
+================================================================================
+
+  Derivados del cuestionario de 45 preguntas + 7 rondas de cierre.
+
+  ┌──────┬──────────────────────────────────────────────────────────────┐
+  │ ID   │ Pendiente                                          │ Estado   │
+  ├──────┼────────────────────────────────────────────────────┼──────────┤
+  │ Q-41 │ Stock mínimo: umbrales fijos hardcoded.            │ ✅ CERRADO│
+  │ Q-42 │ Cotización: 4 estados (borrador/enviada/aceptada/  │ ✅ CERRADO│
+  │      │ rechazada). Aceptada/rechazada manuales.           │          │
+  │ Q-43 │ Módulo nuevo: trazabilidad de garantías.           │ 🔴 ABIERTO│
+  │ Q-44 │ Módulo nuevo: seguimiento de pedidos (sin stock).  │ 🔴 ABIERTO│
+  │ Q-45 │ Marca/modelo: strings libres, no catálogo.         │ ✅ CERRADO│
+  │ Q-46 │ Cierre sin instalación: automático si cotización   │ ✅ CERRADO│
+  │      │ no tiene línea tipo 'mano_obra'.                    │          │
+  │ Q-47 │ Liberación de apartado: acción manual (botón).     │ ✅ CERRADO│
+  │ Q-48 │ Proyecto↔Venta: N ventas = 1 proyecto. 1ª venta    │ ✅ CERRADO│
+  │      │ crea el proyecto.                                   │          │
+  └──────┴────────────────────────────────────────────────────┴──────────┘
+
+  Decisiones cerradas 30 sep (v1.1):
+    - Q-41: umbrales <10 y =0 fijos. No hay stock_minimo por producto.
+    - Q-42: 4 estados cotización. Reserva se dispara al pasar a 'aceptada'.
+    - Q-45: marca/modelo string libre por artículo.
+    - Q-46: cierre automático si no hay línea 'mano_obra'.
+            Mano de obra es ARTÍCULO de cotización con precio variable.
+    - Q-47: botón manual "Liberar apartado" en cotización aceptada.
+            Queda en auditoría. No hay liberación automática.
+    - Q-48: N ventas = 1 proyecto. Primera venta asigna nombre al proyecto.
+
+  Módulos nuevos (pendientes de diseño):
+    - Q-43: trazabilidad de garantías
+    - Q-44: seguimiento de pedidos (prerequisito para reserva automática)
+
+  Estado del módulo INVENTARIO Y TRAZABILIDAD:
+    → v1.1 COMPLETO. Sin subpreguntas.
+    → Ver docs/negocio/INVENTARIO-Y-TRAZABILIDAD.md
+================================================================================
