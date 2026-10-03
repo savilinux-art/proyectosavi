@@ -279,13 +279,13 @@
             return [
                 'id' => $d->inventario_id,
                 'descripcion' => $d->descripcion,
-                'cantidad' => $d->cantidad,
-                'precio' => $d->precio_unitario,
-                'importe' => $d->importe
+                'cantidad' => (float) $d->cantidad,
+                'precio' => (float) $d->precio_unitario,
+                'importe' => (float) $d->importe
             ];
         })->toJson(JSON_HEX_QUOT | JSON_HEX_APOS);
     @endphp
-
+    
     @if($cotizacion->detalles && $cotizacion->detalles->count() > 0)
         productosSeleccionados = JSON.parse('{!! $productosJson !!}');
         renderizarLista();
