@@ -16,10 +16,22 @@ use Illuminate\Support\Facades\Log;
 class CotizacionController extends Controller
 {
     // funciones para manejar las cotizaciones
-    public function index()
+       public function index(Request $request)
     {
-        $cotizaciones = Cotizacion::with(['cliente', 'creador'])->orderBy('id', 'desc')->get();
-        return view('cotizaciones.index', compact('cotizaciones'));
+        $query = Cotizacion::with(['cliente', 'creador', 'proyecto'])
+            ->orderBy('id', 'desc');
+
+        $proyectoFiltro = $request->input('proyecto');
+
+        if ($proyectoFiltro) {
+            $query->whereHas('proyecto', function ($q) use ($proyectoFiltro) {
+                $q->where('nombre_proyecto', $proyectoFiltro);
+            });
+        }
+
+        $cotizaciones = $query->get();
+
+        return view('cotizaciones.index', compact('cotizaciones', 'proyectoFiltro'));
     }
 
     // ============== Mostrar formulario para crear una nueva cotización ========================
@@ -184,7 +196,7 @@ public function edit(Cotizacion $cotizacion)
     $clientes = Cliente::all();
     $proyectos = Proyecto::all();
     $productos = Inventario::all();
-    $cotizacion->load('detalles');
+    $cotizacion->load(['detalles.inventario']);
     return view('cotizaciones.edit', compact('cotizacion', 'clientes', 'proyectos', 'productos'));
 }
 

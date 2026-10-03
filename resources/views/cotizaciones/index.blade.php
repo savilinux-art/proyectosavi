@@ -9,7 +9,18 @@
         <i class="bi bi-plus-circle"></i> Nueva Cotización
     </a>
 </div>
-
+@if(!empty($proyectoFiltro))
+<div class="alert alert-info d-flex justify-content-between align-items-center">
+    <div>
+        <i class="bi bi-funnel-fill"></i>
+        Mostrando cotizaciones del proyecto: <strong>{{ $proyectoFiltro }}</strong>
+        <span class="badge bg-secondary ms-1">{{ $cotizaciones->count() }}</span>
+    </div>
+    <a href="{{ route('cotizaciones.index') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-x-circle"></i> Quitar filtro
+    </a>
+</div>
+@endif
 <div class="card">
     <div class="card-body">
         <table class="table table-striped" id="cotizacionesTable">
@@ -30,7 +41,7 @@
                     <td><strong>{{ $c->folio }}</strong></td>
                     <td>{{ $c->cliente->razon_social ?? 'N/A' }}</td>
                     <td>{{ $c->proyecto->nombre_proyecto ?? 'N/A' }}</td>
-                    <td>{{ $c->fecha_emision->format('d/m/Y') }}</td>
+                    <td>{{ $c->fecha_emision?->format('d/m/Y') ?? '—' }}</td>
                     <td>{{ $c->moneda }} {{ number_format($c->total, 2) }}</td>
                     <td>
                         @php
