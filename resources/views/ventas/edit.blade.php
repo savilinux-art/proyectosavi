@@ -4,7 +4,7 @@
 <div class="card">
     <div class="card-header"><h4><i class="bi bi-pencil"></i> Editar Venta</h4></div>
     <div class="card-body">
-        <form action="{{ route('ventas.update', $venta->id) }}" method="POST" enctype="multipart/form-data">
+        <form action="{{ route('ventas.update', $venta) }}" method="POST" enctype="multipart/form-data">
             @csrf @method('PUT')
             <div class="row">
                 <div class="col-md-6 mb-3"><label for="titulo_venta" class="form-label">Título *</label><input type="text" class="form-control @error('titulo_venta') is-invalid @enderror" id="titulo_venta" name="titulo_venta" value="{{ old('titulo_venta', $venta->titulo_venta) }}" required>@error('titulo_venta')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
@@ -28,7 +28,17 @@
                 <div class="col-md-6 mb-3"><label for="cotizacion" class="form-label">Cotización</label>@if($venta->cotizacion)<div class="alert alert-info"><i class="bi bi-file-pdf"></i> Documento actual cargado</div>@endif<input type="file" class="form-control @error('cotizacion') is-invalid @enderror" id="cotizacion" name="cotizacion" accept=".pdf,.doc,.docx">@error('cotizacion')<div class="invalid-feedback">{{ $message }}</div>@enderror<small class="text-muted">Dejar vacío para mantener</small></div>
                 <div class="col-md-6 mb-3"><label for="levantamiento" class="form-label">Levantamiento</label>@if($venta->levantamiento)<div class="alert alert-info"><i class="bi bi-file-earmark"></i> Documento actual cargado</div>@endif<input type="file" class="form-control @error('levantamiento') is-invalid @enderror" id="levantamiento" name="levantamiento" accept=".pdf,.doc,.docx">@error('levantamiento')<div class="invalid-feedback">{{ $message }}</div>@enderror<small class="text-muted">Dejar vacío para mantener</small></div>
             </div>
-            <div class="d-flex justify-content-end"><a href="{{ route('ventas.index') }}" class="btn btn-secondary me-2"><i class="bi bi-x-circle"></i> Cancelar</a><button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Actualizar</button></div>
+            <div class="d-flex justify-content-between">
+            <a href="{{ route('cotizaciones.index', ['proyecto' => $venta->nombre_proyecto]) }}"
+            class="btn btn-outline-info"
+            target="_blank">
+            <i class="bi bi-file-earmark-text"></i> Ver cotizaciones de este proyecto
+            </a>
+            <div>
+        <a href="{{ route('ventas.index') }}" class="btn btn-secondary me-2"><i class="bi bi-x-circle"></i> Cancelar</a>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Actualizar</button>
+    </div>
+</div>
         </form>
     </div>
 </div>

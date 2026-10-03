@@ -74,7 +74,7 @@ public function update(Request $request, $id)
 {
     $request->validate([
         'titulo_venta' => 'required|string',
-        'nombre_proyecto' => 'required|string|unique:ventas,nombre_proyecto,' . $id,
+        'nombre_proyecto' => 'required|string|unique:ventas,nombre_proyecto,' . $id . ',id',
         'moneda' => 'required|string',
         'monto_venta' => 'required|numeric',
         'requerimiento_venta' => 'required|string',

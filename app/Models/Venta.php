@@ -10,9 +10,7 @@ class Venta extends Model
     use HasFactory;
 
     protected $table = 'ventas';
-    protected $primaryKey = 'nombre_proyecto';
-    public $incrementing = false;
-    protected $keyType = 'string';
+   
 
     protected $fillable = [
         'titulo_venta',
@@ -53,11 +51,7 @@ class Venta extends Model
         return $this->hasMany(Instalacion::class, 'nombre_proyecto', 'nombre_proyecto');
     }
 
-    // Relación con movimientos de inventario
-    public function movimientosInventario()
-    {
-        return $this->hasMany(MovimientoInventario::class, 'instalacion', 'nombre_proyecto');
-    }
+    
 
     // Relación con cliente
     public function cliente()

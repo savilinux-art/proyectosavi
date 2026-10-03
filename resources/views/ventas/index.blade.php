@@ -44,9 +44,15 @@
                 <td>@if($venta->venta_ganada)<span class="badge bg-success"><i class="bi bi-check-circle"></i> Sí</span>@else<span class="badge bg-danger"><i class="bi bi-x-circle"></i> No</span>@endif</td>
                 <td>
                     <div class="btn-group">
-                        <a href="{{ route('ventas.show', $venta->nombre_proyecto) }}" class="btn btn-sm btn-info"><i class="bi bi-eye"></i></a>
-                        <a href="{{ route('ventas.edit', $venta->nombre_proyecto) }}" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i></a>
-                        <form action="{{ route('ventas.destroy', $venta->nombre_proyecto) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Eliminar esta venta?')">
+                        <a href="{{ route('ventas.show', $venta) }}" class="btn btn-sm btn-info"><i class="bi bi-eye"></i></a>
+                        <a href="{{ route('ventas.edit', $venta) }}" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i></a>
+                        <a href="{{ route('cotizaciones.index', ['proyecto' => $venta->nombre_proyecto]) }}"
+                                class="btn btn-sm btn-outline-info"
+                                title="Ver cotizaciones de este proyecto"
+                                target="_blank">
+                            <i class="bi bi-file-earmark-text"></i>
+                        </a>
+                        <form action="{{ route('ventas.destroy', $venta) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Eliminar esta venta?')">
                             @csrf @method('DELETE')
                             <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
                         </form>
