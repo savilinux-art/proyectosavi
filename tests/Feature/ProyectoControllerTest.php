@@ -101,7 +101,7 @@ class ProyectoControllerTest extends TestCase
             'entregado_por'     => $this->admin->usuario,
             'entregado_a'       => $this->admin->usuario,
             'fecha_hora_salida' => now(),
-            'productos'         => '[]',
+            
         ]);
 
         SalidaDetalle::create([
@@ -199,7 +199,6 @@ class ProyectoControllerTest extends TestCase
             'devuelto_por'          => $this->admin->usuario,
             'recibido_por'          => $this->admin->usuario,
             'fecha_hora_devolucion' => now(),
-            'productos'             => '[]',
         ]);
 
         DevolucionDetalle::create([
