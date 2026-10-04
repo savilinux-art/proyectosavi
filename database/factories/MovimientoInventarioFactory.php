@@ -20,7 +20,6 @@ class MovimientoInventarioFactory extends Factory
             'ajuste'               => null,
             'devolucion'           => null,
             'apartado'             => null,
-            'instalacion'          => null,
             'devolucion_proveedor' => null,
             'modificado_por'       => Usuario::factory()->create()->usuario,
             'comentarios'          => $this->faker->sentence(),

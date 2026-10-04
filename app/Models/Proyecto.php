@@ -13,6 +13,7 @@ class Proyecto extends Model
 
     protected $fillable = [
         'nombre_proyecto',
+        'cliente_id',
         'correo_electronico',
         'ubicacion',
         'propuesta_economica',
@@ -32,4 +33,14 @@ class Proyecto extends Model
     {
         return $this->belongsTo(Usuario::class, 'modificado_por', 'usuario');
     }
+    public function cliente()
+    {
+        return $this->belongsTo(Cliente::class);
+    }
+
+    public function movimientosInventario()
+    {
+        return $this->hasMany(MovimientoInventario::class);
+    }
+
 }

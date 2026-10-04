@@ -25,4 +25,10 @@ class Cliente extends Model
     {
         return $this->belongsTo(Venta::class, 'nombre_proyecto', 'nombre_proyecto');
     }
+
+    public function proyectos()
+    {
+        return $this->hasMany(Proyecto::class);
+    }
+
 }
