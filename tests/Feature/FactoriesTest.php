@@ -67,3 +67,23 @@ test('MovimientoInventarioFactory crea un movimiento', function () {
     $m = MovimientoInventario::factory()->create();
     expect($m->inventario_id)->not->toBeNull();
 });
+
+test('VentaMostradorFactory crea una venta de mostrador', function () {
+    $venta = \App\Models\VentaMostrador::factory()->create();
+
+    expect($venta)->toBeInstanceOf(\App\Models\VentaMostrador::class)
+        ->and($venta->estado)->toBe('pendiente')
+        ->and($venta->proyecto)->toBeInstanceOf(\App\Models\Proyecto::class);
+});
+
+test('VentaMostradorDetalleFactory crea un detalle con subtotal correcto', function () {
+    $detalle = \App\Models\VentaMostradorDetalle::factory()->create();
+
+    $esperado = $detalle->cantidad * ($detalle->precio_unitario - $detalle->descuento);
+    expect((float) $detalle->subtotal)->toBe((float) $esperado);
+});
+
+test('VentaMostrador puede tener N salidas (pivote vacía al crear)', function () {
+    $venta = \App\Models\VentaMostrador::factory()->create();
+    expect($venta->salidas)->toHaveCount(0);
+});
