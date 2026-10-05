@@ -241,4 +241,26 @@ class VentaMostradorController extends Controller
     return $pdf->download("venta_mostrador_{$folio}.pdf");
 }
 
+public function buscarInventario(Request $request)
+{
+    $q = trim((string) $request->get('q', ''));
+
+    if (mb_strlen($q) < 2) {
+        return response()->json([]);
+    }
+
+    $items = \App\Models\Inventario::where('existencia', '>', 0)
+        ->where(function ($sub) use ($q) {
+            $sub->where('modelo',      'LIKE', "%{$q}%")
+                ->orWhere('descripcion','LIKE', "%{$q}%")
+                ->orWhere('marca',      'LIKE', "%{$q}%")
+                ->orWhere('categoria',  'LIKE', "%{$q}%");
+        })
+        ->orderBy('modelo')
+        ->limit(20)
+        ->get(['id', 'modelo', 'descripcion', 'marca', 'categoria', 'existencia', 'precio']);
+
+    return response()->json($items);
+}
+
 }

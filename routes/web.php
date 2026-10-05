@@ -61,15 +61,17 @@ Route::middleware(['auth.session', 'permiso:ver-ventas'])->group(function () {
     
 });
 Route::middleware(['auth.session','permiso:ventas-mostrador'])->group(function () {
+    Route::get('ventas_mostrador/buscar-inventario', [VentaMostradorController::class, 'buscarInventario'])
+        ->name('ventas_mostrador.buscarInventario');
+
     Route::resource('ventas_mostrador', VentaMostradorController::class)->except(['destroy']);
     Route::patch('ventas_mostrador/{ventas_mostrador}/cancelar', [VentaMostradorController::class, 'cancelar'])
         ->name('ventas_mostrador.cancelar');
     Route::get('ventas_mostrador/{ventas_mostrador}/pdf', [VentaMostradorController::class, 'pdf'])
-    ->name('ventas_mostrador.pdf');
+        ->name('ventas_mostrador.pdf');
     Route::patch('ventas_mostrador/{ventas_mostrador}/estado', [VentaMostradorController::class, 'cambiarEstado'])
-    ->name('ventas_mostrador.cambiarEstado');
+        ->name('ventas_mostrador.cambiarEstado');
 });
-
 // Instalaciones
 Route::middleware(['auth.session', 'permiso:ver-instalaciones'])->group(function () {
 

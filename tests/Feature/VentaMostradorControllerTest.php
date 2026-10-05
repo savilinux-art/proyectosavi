@@ -225,6 +225,51 @@ public function test_edit_muestra_formulario(): void
     $response->assertViewIs('ventas_mostrador.edit');
     $response->assertViewHas('ventaMostrador');
 }
+public function test_buscar_inventario_devuelve_json(): void
+{
+    Inventario::factory()->create([
+        'modelo'      => 'CABLE-HDMI-001',
+        'descripcion' => 'Cable HDMI 2.0 5m',
+        'marca'       => 'Genérico',
+        'existencia'  => 10,
+        'precio'      => 12.50,
+    ]);
 
+    $response = $this->withSession($this->sesion())
+        ->getJson(route('ventas_mostrador.buscarInventario', ['q' => 'HDMI']));
+
+    $response->assertOk();
+    $response->assertJsonCount(1);
+    $response->assertJsonFragment(['modelo' => 'CABLE-HDMI-001']);
+}
+
+public function test_buscar_inventario_con_menos_de_2_caracteres_devuelve_vacio(): void
+{
+    Inventario::factory()->create([
+        'modelo'     => 'CABLE-HDMI-001',
+        'existencia' => 10,
+    ]);
+
+    $response = $this->withSession($this->sesion())
+        ->getJson(route('ventas_mostrador.buscarInventario', ['q' => 'H']));
+
+    $response->assertOk();
+    $response->assertJsonCount(0);
+}
+
+public function test_buscar_inventario_excluye_productos_sin_existencia(): void
+{
+    Inventario::factory()->create([
+        'modelo'      => 'CABLE-HDMI-001',
+        'descripcion' => 'Cable HDMI sin stock',
+        'existencia'  => 0,
+    ]);
+
+    $response = $this->withSession($this->sesion())
+        ->getJson(route('ventas_mostrador.buscarInventario', ['q' => 'HDMI']));
+
+    $response->assertOk();
+    $response->assertJsonCount(0);
+}
 
 }

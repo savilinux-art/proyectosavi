@@ -51,8 +51,24 @@
             </div>
 
             <hr>
-
             <div class="mb-3">
+    <label class="form-label">Buscar producto (búsqueda rápida)</label>
+    <div class="input-group mb-2">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" id="buscadorInventario"
+               placeholder="Mínimo 2 caracteres (modelo, descripción, marca, categoría)..."
+               autocomplete="off">
+        <button type="button" class="btn btn-outline-secondary" id="btnLimpiarBusquedaInventario">
+            <i class="bi bi-x"></i>
+        </button>
+    </div>
+    <div id="resultadosBusquedaInventario" class="list-group mb-3"
+         style="max-height:300px; overflow-y:auto; display:none;"></div>
+</div>
+
+<!-- ↓↓↓ el <div class="mb-3"> original con el <select id="selectorInventario"> sigue acá ↓↓↓ -->
+            <div class="mb-3">
+
                 <label class="form-label">Agregar producto del inventario *</label>
                 <div class="row g-2">
                     <div class="col-md-9">
@@ -215,5 +231,79 @@
         }
         return true;
     });
+// ========== BUSCADOR DE INVENTARIO (Etapa 2) ==========
+let timeoutBuscadorInv = null;
+
+$('#buscadorInventario').on('input', function () {
+    const q = $(this).val().trim();
+    const $cont = $('#resultadosBusquedaInventario');
+    if (q.length < 2) { $cont.hide().empty(); return; }
+
+    clearTimeout(timeoutBuscadorInv);
+    timeoutBuscadorInv = setTimeout(function () {
+        $.ajax({
+            url: "{{ route('ventas_mostrador.buscarInventario') }}",
+            method: 'GET',
+            data: { q: q },
+            dataType: 'json',
+            success: function (data) {
+                $cont.empty().show();
+                if (!data.length) {
+                    $cont.append('<div class="list-group-item text-muted">Sin resultados</div>');
+                    return;
+                }
+                data.forEach(function (p) {
+                    if (items.some(x => x.inventario_id == p.id)) return;
+
+                    const $btn = $('<button type="button">')
+                        .addClass('list-group-item list-group-item-action d-flex justify-content-between align-items-center agregar-desde-busqueda-inv')
+                        .data('id', p.id)
+                        .data('modelo', p.modelo || '')
+                        .data('descripcion', p.descripcion || '')
+                        .data('precio', p.precio || 0);
+
+                    const $left = $('<div class="text-start">')
+                        .append($('<strong>').text(p.modelo || 'Sin modelo'))
+                        .append('<br>')
+                        .append($('<small class="text-muted">').text(p.descripcion || ''));
+
+                    $btn.append($left)
+                        .append($('<span class="badge bg-primary">').html('<i class="bi bi-plus-circle"></i> Agregar'));
+
+                    $cont.append($btn);
+                });
+            },
+            error: function () {
+                $cont.empty().show()
+                     .append('<div class="list-group-item text-danger">Error al buscar</div>');
+            }
+        });
+    }, 300);
+});
+
+$('#btnLimpiarBusquedaInventario').on('click', function () {
+    $('#buscadorInventario').val('');
+    $('#resultadosBusquedaInventario').hide().empty();
+});
+
+$(document).on('click', '.agregar-desde-busqueda-inv', function () {
+    const id = $(this).data('id');
+    if (items.some(x => x.inventario_id == id)) {
+        alert('Ese producto ya está en la lista.');
+        return;
+    }
+    items.push({
+        inventario_id:   id,
+        modelo:          $(this).data('modelo'),
+        descripcion:     $(this).data('descripcion'),
+        cantidad:        1,
+        precio_unitario: parseFloat($(this).data('precio')) || 0,
+        descuento:       0,
+    });
+    renderItems();
+    $('#buscadorInventario').val('');
+    $('#resultadosBusquedaInventario').hide().empty();
+});
+
 </script>
 @endpush
