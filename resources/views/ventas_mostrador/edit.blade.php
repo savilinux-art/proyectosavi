@@ -91,6 +91,19 @@
                 <textarea class="form-control" name="observaciones" id="observaciones" rows="3">{{ old('observaciones', $ventaMostrador->observaciones) }}</textarea>
             </div>
 
+            @if(!empty($ventaMostrador->estadosPermitidos()))
+<div class="mb-3">
+    <label for="estado" class="form-label">Cambiar estado</label>
+    <select class="form-select" name="estado" id="estado">
+        <option value="{{ $ventaMostrador->estado }}">{{ ucfirst($ventaMostrador->estado) }} (actual)</option>
+        @foreach($ventaMostrador->estadosPermitidos() as $est)
+            <option value="{{ $est }}">{{ ucfirst($est) }}</option>
+        @endforeach
+    </select>
+    <small class="text-muted">Solo se permite avanzar de pendiente → completada/cancelada.</small>
+</div>
+@endif
+
             <div id="itemsHidden"></div>
 
             <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Guardar Cambios</button>
@@ -102,14 +115,17 @@
 
 @push('scripts')
 <script>
-    let items = @json($ventaMostrador->detalles->map(fn($d) => [
+   @php
+    $itemsArray = $ventaMostrador->detalles->map(fn($d) => [
         'inventario_id'    => $d->inventario_id,
         'modelo'           => $d->inventario?->modelo ?? '',
         'descripcion'      => $d->inventario?->descripcion ?? '',
         'cantidad'         => $d->cantidad,
         'precio_unitario'  => (float) $d->precio_unitario,
         'descuento'        => (float) $d->descuento,
-    ]));
+    ])->values()->all();
+@endphp
+let items = {!! json_encode($itemsArray, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 
     $('#btnAgregar').on('click', function() {
         const $opt = $('#selectorInventario option:selected');

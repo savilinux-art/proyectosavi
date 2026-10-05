@@ -83,13 +83,18 @@
                     <td>{{ $v->creado_por }}</td>
                     <td>{{ $v->created_at?->format('d/m/Y H:i') ?? '—' }}</td>
                     <td>
-                        <div class="btn-group">
-                            <a href="{{ route('ventas_mostrador.show', $v) }}" class="btn btn-sm btn-info" title="Ver"><i class="bi bi-eye"></i></a>
-                            @if($v->puedeEditarse())
-                                <a href="{{ route('ventas_mostrador.edit', $v) }}" class="btn btn-sm btn-warning" title="Editar"><i class="bi bi-pencil"></i></a>
-                            @endif
-                        </div>
-                    </td>
+                        
+    <div class="btn-group">
+        <a href="{{ route('ventas_mostrador.show', $v) }}" class="btn btn-sm btn-info" title="Ver"><i class="bi bi-eye"></i></a>
+        @if($v->puedeEditarse())
+            <a href="{{ route('ventas_mostrador.edit', $v) }}" class="btn btn-sm btn-warning" title="Editar"><i class="bi bi-pencil"></i></a>
+        @endif
+        <a href="{{ route('ventas_mostrador.pdf', $v) }}" class="btn btn-sm btn-outline-danger" title="PDF" target="_blank">
+            <i class="bi bi-file-earmark-pdf"></i>
+        </a>
+    </div>
+</td>
+                      
                 </tr>
                 @endforeach
             </tbody>

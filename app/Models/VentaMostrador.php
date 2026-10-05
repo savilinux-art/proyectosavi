@@ -24,7 +24,33 @@ class VentaMostrador extends Model
         'total' => 'decimal:2',
     ];
 
-    public const ESTADOS = ['pendiente', 'completada', 'cancelada'];
+    public const ESTADO_PENDIENTE  = 'pendiente';
+public const ESTADO_COMPLETADA = 'completada';
+public const ESTADO_CANCELADA  = 'cancelada';
+
+public const ESTADOS = [
+    self::ESTADO_PENDIENTE,
+    self::ESTADO_COMPLETADA,
+    self::ESTADO_CANCELADA,
+];
+
+    /**
+     * Estados a los que se puede transicionar desde el estado actual.
+     * Regla (v22): pendiente → completada | cancelada.
+     *              completada y cancelada son terminales.
+     */
+    public function estadosPermitidos(): array
+    {
+        if ($this->estado !== self::ESTADO_PENDIENTE) {
+            return [];
+        }
+        return [self::ESTADO_COMPLETADA, self::ESTADO_CANCELADA];
+    }
+
+    public function puedeCambiarEstadoA(string $nuevo): bool
+    {
+        return in_array($nuevo, $this->estadosPermitidos(), true);
+    }
 
     public function proyecto()
     {

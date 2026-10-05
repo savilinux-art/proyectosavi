@@ -139,4 +139,92 @@ class VentaMostradorControllerTest extends TestCase
         $response->assertRedirect(route('ventas_mostrador.show', $venta));
         $this->assertSame('cancelada', $venta->fresh()->estado);
     }
+
+    public function test_cambiar_estado_a_completada_desde_pendiente(): void
+{
+    $venta = VentaMostrador::factory()->create(['estado' => 'pendiente']);
+
+    $this->withSession($this->sesion())
+        ->patch(route('ventas_mostrador.cambiarEstado', $venta), ['estado' => 'completada'])
+        ->assertRedirect(route('ventas_mostrador.show', $venta));
+
+    $this->assertDatabaseHas('ventas_mostrador', [
+        'id' => $venta->id, 'estado' => 'completada',
+    ]);
+}
+
+public function test_cambiar_estado_a_cancelada_desde_pendiente(): void
+{
+    $venta = VentaMostrador::factory()->create(['estado' => 'pendiente']);
+
+    $this->withSession($this->sesion())
+        ->patch(route('ventas_mostrador.cambiarEstado', $venta), ['estado' => 'cancelada'])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('ventas_mostrador', [
+        'id' => $venta->id, 'estado' => 'cancelada',
+    ]);
+}
+
+public function test_no_puede_revertir_completada_a_pendiente(): void
+{
+    $venta = VentaMostrador::factory()->create(['estado' => 'completada']);
+
+    $this->withSession($this->sesion())
+        ->patch(route('ventas_mostrador.cambiarEstado', $venta), ['estado' => 'pendiente'])
+        ->assertSessionHas('error');
+
+    $this->assertDatabaseHas('ventas_mostrador', [
+        'id' => $venta->id, 'estado' => 'completada',
+    ]);
+}
+
+public function test_no_puede_cambiar_estado_de_cancelada(): void
+{
+    $venta = VentaMostrador::factory()->create(['estado' => 'cancelada']);
+
+    $this->withSession($this->sesion())
+        ->patch(route('ventas_mostrador.cambiarEstado', $venta), ['estado' => 'completada'])
+        ->assertSessionHas('error');
+
+    $this->assertDatabaseHas('ventas_mostrador', [
+        'id' => $venta->id, 'estado' => 'cancelada',
+    ]);
+}
+
+public function test_pdf_venta_mostrador_genera_archivo(): void
+{
+    $venta = VentaMostrador::factory()->create();
+
+    $response = $this->withSession($this->sesion())
+        ->get(route('ventas_mostrador.pdf', $venta));
+
+    $response->assertOk();
+    $response->assertHeader('content-type', 'application/pdf');
+}
+public function test_show_muestra_venta(): void
+{
+    $venta = VentaMostrador::factory()->create();
+
+    $response = $this->withSession($this->sesion())
+        ->get(route('ventas_mostrador.show', $venta));
+
+    $response->assertOk();
+    $response->assertViewIs('ventas_mostrador.show');
+    $response->assertViewHas('ventaMostrador');
+}
+
+public function test_edit_muestra_formulario(): void
+{
+    $venta = VentaMostrador::factory()->create(['estado' => 'pendiente']);
+
+    $response = $this->withSession($this->sesion())
+        ->get(route('ventas_mostrador.edit', $venta));
+
+    $response->assertOk();
+    $response->assertViewIs('ventas_mostrador.edit');
+    $response->assertViewHas('ventaMostrador');
+}
+
+
 }

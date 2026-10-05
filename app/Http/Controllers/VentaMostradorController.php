@@ -9,6 +9,7 @@ use App\Models\VentaMostradorDetalle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class VentaMostradorController extends Controller
 {
@@ -105,27 +106,33 @@ class VentaMostradorController extends Controller
         }
     }
 
-    public function show(VentaMostrador $ventasMostrador)
-    {
-        $ventasMostrador->load(['proyecto', 'detalles.inventario', 'creadoPor', 'salidas']);
-        return view('ventas_mostrador.show', compact('ventaMostrador'));
-    }
+   public function show(VentaMostrador $ventasMostrador)
+{
+    $ventasMostrador->load(['proyecto', 'detalles.inventario', 'creadoPor', 'salidas']);
+    return view('ventas_mostrador.show', [
+        'ventaMostrador' => $ventasMostrador,
+    ]);
+}
 
     public function edit(VentaMostrador $ventasMostrador)
-    {
-        if (!$ventasMostrador->puedeEditarse()) {
-            return redirect()->route('ventas_mostrador.show', $ventasMostrador)
-                ->with('error', 'Esta venta no puede editarse en su estado actual.');
-        }
-
-        $ventasMostrador->load('detalles');
-        $proyectos = Proyecto::orderBy('nombre_proyecto')->get();
-        $inventario = Inventario::where('existencia', '>', 0)
-            ->orderBy('modelo')
-            ->get();
-
-        return view('ventas_mostrador.edit', compact('ventaMostrador', 'proyectos', 'inventario'));
+{
+    if (!$ventasMostrador->puedeEditarse()) {
+        return redirect()->route('ventas_mostrador.show', $ventasMostrador)
+            ->with('error', 'Esta venta no puede editarse en su estado actual.');
     }
+
+    $ventasMostrador->load('detalles');
+    $proyectos = Proyecto::orderBy('nombre_proyecto')->get();
+    $inventario = Inventario::where('existencia', '>', 0)
+        ->orderBy('modelo')
+        ->get();
+
+    return view('ventas_mostrador.edit', [
+        'ventaMostrador' => $ventasMostrador,
+        'proyectos'      => $proyectos,
+        'inventario'     => $inventario,
+    ]);
+}
 
     public function update(Request $request, VentaMostrador $ventasMostrador)
     {
@@ -192,4 +199,46 @@ class VentaMostradorController extends Controller
         return redirect()->route('ventas_mostrador.show', $ventasMostrador)
             ->with('success', 'Venta cancelada.');
     }
+
+    public function cambiarEstado(Request $request, VentaMostrador $ventasMostrador)
+    {
+    $request->validate([
+        'estado' => 'required|in:' . implode(',', VentaMostrador::ESTADOS),
+    ]);
+
+    $nuevo = $request->estado;
+
+    if (!$ventasMostrador->puedeCambiarEstadoA($nuevo)) {
+        return back()->with('error',
+            "No se puede cambiar el estado de '{$ventasMostrador->estado}' a '{$nuevo}'.");
+    }
+
+    $ventasMostrador->update([
+        'estado'         => $nuevo,
+        'modificado_por' => Session::get('user_usuario'),
+    ]);
+
+    return redirect()->route('ventas_mostrador.show', $ventasMostrador)
+        ->with('success', 'Estado cambiado a ' . ucfirst($nuevo) . '.');
+    }
+
+    public function pdf(VentaMostrador $ventasMostrador)
+{
+    $ventasMostrador->load(['proyecto', 'detalles.inventario', 'creadoPor']);
+
+    $logoPath = public_path('images/logo.png');
+    $logoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+
+    $pdf = Pdf::loadView('pdf.venta_mostrador', compact('ventasMostrador', 'logoBase64'));
+    $pdf->setPaper('letter', 'portrait');
+    $pdf->setOptions([
+        'defaultFont'         => 'DejaVu Sans',
+        'isHtml5ParserEnabled' => true,
+        'isRemoteEnabled'      => true,
+    ]);
+
+    $folio = 'VM-' . str_pad($ventasMostrador->id, 4, '0', STR_PAD_LEFT);
+    return $pdf->download("venta_mostrador_{$folio}.pdf");
+}
+
 }

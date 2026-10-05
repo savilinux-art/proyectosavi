@@ -11,15 +11,21 @@
                 <i class="bi bi-pencil"></i> Editar
             </a>
         @endif
-        @if($ventaMostrador->estado === 'pendiente')
-            <form action="{{ route('ventas_mostrador.cancelar', $ventaMostrador) }}" method="POST" class="d-inline">
-                @csrf
-                @method('PATCH')
-                <button class="btn btn-danger" onclick="return confirm('¿Cancelar esta venta?')">
-                    <i class="bi bi-x-circle"></i> Cancelar
-                </button>
-            </form>
-        @endif
+        @if(!empty($ventaMostrador->estadosPermitidos()))
+    <form action="{{ route('ventas_mostrador.cambiarEstado', $ventaMostrador) }}" method="POST" class="d-inline-flex align-items-center gap-2">
+        @csrf
+        @method('PATCH')
+        <select name="estado" class="form-select form-select-sm" style="width:auto;">
+            <option value="">Cambiar estado a...</option>
+            @foreach($ventaMostrador->estadosPermitidos() as $est)
+                <option value="{{ $est }}">{{ ucfirst($est) }}</option>
+            @endforeach
+        </select>
+        <button class="btn btn-sm btn-primary" onclick="return confirm('¿Cambiar el estado de esta venta?')">
+            <i class="bi bi-arrow-repeat"></i> Aplicar
+        </button>
+    </form>
+@endif
         <a href="{{ route('ventas_mostrador.index') }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Volver
         </a>
