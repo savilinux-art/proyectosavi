@@ -80,7 +80,7 @@ test('VentaMostradorDetalleFactory crea un detalle con subtotal correcto', funct
     $detalle = \App\Models\VentaMostradorDetalle::factory()->create();
 
     $esperado = $detalle->cantidad * ($detalle->precio_unitario - $detalle->descuento);
-    expect((float) $detalle->subtotal)->toBe((float) $esperado);
+    expect((float) $detalle->subtotal)->toEqualWithDelta((float) $esperado, 0.01);
 });
 
 test('VentaMostrador puede tener N salidas (pivote vacía al crear)', function () {

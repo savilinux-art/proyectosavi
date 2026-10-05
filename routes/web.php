@@ -27,7 +27,7 @@ use App\Http\Controllers\GeocercaController;
 use App\Http\Controllers\CotizacionController;
 use App\Http\Controllers\GeocercaAlertaController;
 use App\Http\Controllers\RecordatorioController;
-
+use App\Http\Controllers\VentaMostradorController;
 // Auth
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
@@ -58,6 +58,12 @@ Route::middleware(['auth.session'])->group(function () {
 Route::middleware(['auth.session', 'permiso:ver-ventas'])->group(function () {
     Route::resource('ventas', VentaController::class);
     Route::get('ventas/export', [VentaController::class, 'export'])->name('ventas.export');
+    
+});
+Route::middleware(['auth.session','permiso:ventas-mostrador'])->group(function () {
+    Route::resource('ventas_mostrador', VentaMostradorController::class)->except(['destroy']);
+    Route::patch('ventas_mostrador/{ventas_mostrador}/cancelar', [VentaMostradorController::class, 'cancelar'])
+        ->name('ventas_mostrador.cancelar');
 });
 
 // Instalaciones
