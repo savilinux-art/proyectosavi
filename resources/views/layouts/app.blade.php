@@ -197,19 +197,27 @@
             @endif
             @endif
 
-            <!-- ==================== VENTAS ==================== -->
-            @if(in_array(session('user_rol'), ['Administrador', 'Ventas']) || (session('user_usuario') && \App\Models\Usuario::find(session('user_usuario'))?->hasPermiso('ver-ventas')))
-            <div class="menu-label mt-3">Ventas</div>
-            <a href="{{ route('ventas.index') }}" class="nav-link {{ request()->routeIs('ventas.*') ? 'active' : '' }}">
-                <i class="bi bi-cart"></i> Ventas
-                <span class="badge bg-success ms-auto">{{ \App\Models\Venta::count() }}</span>
-            </a>
-            @if(in_array(session('user_rol'), ['Administrador', 'Ventas']) || (session('user_usuario') && \App\Models\Usuario::find(session('user_usuario'))?->hasPermiso('crear-venta')))
-            <a href="{{ route('ventas.create') }}" class="nav-link {{ request()->routeIs('ventas.create') ? 'active' : '' }}" style="padding-left: 55px; font-size: 13px;">
-                <i class="bi bi-plus-circle"></i> Nueva Venta
-            </a>
-            @endif
-            @endif
+       <!-- ==================== VENTAS ==================== -->
+@if(in_array(session('user_rol'), ['Administrador', 'Contabilidad', 'Ventas']) || (session('user_usuario') && \App\Models\Usuario::find(session('user_usuario'))?->hasPermiso('ver-ventas')))
+<div class="menu-label mt-3">Ventas</div>
+@if(in_array(session('user_rol'), ['Administrador', 'Ventas']) || (session('user_usuario') && \App\Models\Usuario::find(session('user_usuario'))?->hasPermiso('ver-ventas')))
+<a href="{{ route('ventas.index') }}" class="nav-link {{ request()->routeIs('ventas.*') ? 'active' : '' }}">
+    <i class="bi bi-cart"></i> Ventas
+    <span class="badge bg-success ms-auto">{{ \App\Models\Venta::count() }}</span>
+</a>
+@endif
+@if(in_array(session('user_rol'), ['Administrador', 'Ventas']) || (session('user_usuario') && \App\Models\Usuario::find(session('user_usuario'))?->hasPermiso('crear-venta')))
+<a href="{{ route('ventas.create') }}" class="nav-link {{ request()->routeIs('ventas.create') ? 'active' : '' }}" style="padding-left: 55px; font-size: 13px;">
+    <i class="bi bi-plus-circle"></i> Nueva Venta
+</a>
+@endif
+@if(in_array(session('user_rol'), ['Administrador', 'Contabilidad', 'Ventas']) || (session('user_usuario') && \App\Models\Usuario::find(session('user_usuario'))?->hasPermiso('ventas-mostrador')))
+<a href="{{ route('ventas_mostrador.index') }}" class="nav-link {{ request()->routeIs('ventas_mostrador.*') ? 'active' : '' }}" style="padding-left: 55px; font-size: 13px;">
+    <i class="bi bi-shop"></i> Ventas de Mostrador
+    <span class="badge bg-success ms-auto">{{ \App\Models\VentaMostrador::count() }}</span>
+</a>
+@endif
+@endif
 <!-- ==================== COTIZACIONES ==================== -->
 @if(in_array(session('user_rol'), ['Administrador', 'Ventas']) || (session('user_usuario') && \App\Models\Usuario::find(session('user_usuario'))?->hasPermiso('ver-ventas')))
 <a href="{{ route('cotizaciones.index') }}" class="nav-link {{ request()->routeIs('cotizaciones.*') ? 'active' : '' }}" style="padding-left: 55px; font-size: 13px;">
