@@ -12,27 +12,36 @@ class VentaMostrador extends Model
     protected $table = 'ventas_mostrador';
 
     protected $fillable = [
-        'proyecto_id',
-        'estado',
-        'total',
-        'observaciones',
-        'creado_por',
-        'modificado_por',
-    ];
+    'proyecto_id',
+    'estado',
+    'subtotal',
+    'iva',
+    'total',
+    'moneda',
+    'observaciones',
+    'creado_por',
+    'modificado_por',
+];
 
-    protected $casts = [
-        'total' => 'decimal:2',
-    ];
+protected $casts = [
+    'subtotal' => 'decimal:2',
+    'iva'      => 'decimal:2',
+    'total'    => 'decimal:2',
+    'moneda'   => 'string',
+];
 
     public const ESTADO_PENDIENTE  = 'pendiente';
-public const ESTADO_COMPLETADA = 'completada';
-public const ESTADO_CANCELADA  = 'cancelada';
+    public const ESTADO_COMPLETADA = 'completada';
+    public const ESTADO_CANCELADA  = 'cancelada';
 
-public const ESTADOS = [
+    public const IVA_RATE      = 0.16;
+    public const MONEDAS       = ['MXN', 'USD'];
+    public const MONEDA_DEFAULT = 'MXN';
+    public const ESTADOS = [
     self::ESTADO_PENDIENTE,
     self::ESTADO_COMPLETADA,
     self::ESTADO_CANCELADA,
-];
+    ];
 
     /**
      * Estados a los que se puede transicionar desde el estado actual.
@@ -93,9 +102,11 @@ public const ESTADOS = [
         return $q->where('estado', 'completada');
     }
 
-    public function recalcularTotal(): void
+   public function recalcularTotales(): void
     {
-        $this->total = $this->detalles()->sum('subtotal');
+        $this->subtotal = (float) $this->detalles()->sum('subtotal');
+        $this->iva      = round($this->subtotal * self::IVA_RATE, 2);
+        $this->total    = $this->subtotal + $this->iva;
         $this->save();
     }
 

@@ -58,6 +58,9 @@
                     <th>ID</th>
                     <th>Proyecto</th>
                     <th>Estado</th>
+                    <th>Moneda</th>
+                    <th>Subtotal</th>
+                    <th>IVA</th>
                     <th>Total</th>
                     <th>Creado por</th>
                     <th>Fecha</th>
@@ -79,22 +82,23 @@
                         @endphp
                         <span class="badge bg-{{ $badge }}">{{ ucfirst($v->estado) }}</span>
                     </td>
-                    <td>${{ number_format($v->total, 2) }}</td>
+                    <td>{{ $v->moneda ?? 'MXN' }}</td>
+                    <td>{{ $v->moneda }} {{ number_format($v->subtotal, 2) }}</td>
+                    <td>{{ $v->moneda }} {{ number_format($v->iva, 2) }}</td>
+                    <td><strong>{{ $v->moneda }} {{ number_format($v->total, 2) }}</strong></td>
                     <td>{{ $v->creado_por }}</td>
                     <td>{{ $v->created_at?->format('d/m/Y H:i') ?? '—' }}</td>
                     <td>
-                        
-    <div class="btn-group">
-        <a href="{{ route('ventas_mostrador.show', $v) }}" class="btn btn-sm btn-info" title="Ver"><i class="bi bi-eye"></i></a>
-        @if($v->puedeEditarse())
-            <a href="{{ route('ventas_mostrador.edit', $v) }}" class="btn btn-sm btn-warning" title="Editar"><i class="bi bi-pencil"></i></a>
-        @endif
-        <a href="{{ route('ventas_mostrador.pdf', $v) }}" class="btn btn-sm btn-outline-danger" title="PDF" target="_blank">
-            <i class="bi bi-file-earmark-pdf"></i>
-        </a>
-    </div>
-</td>
-                      
+                        <div class="btn-group">
+                            <a href="{{ route('ventas_mostrador.show', $v) }}" class="btn btn-sm btn-info" title="Ver"><i class="bi bi-eye"></i></a>
+                            @if($v->puedeEditarse())
+                                <a href="{{ route('ventas_mostrador.edit', $v) }}" class="btn btn-sm btn-warning" title="Editar"><i class="bi bi-pencil"></i></a>
+                            @endif
+                            <a href="{{ route('ventas_mostrador.pdf', $v) }}" class="btn btn-sm btn-outline-danger" title="PDF" target="_blank">
+                                <i class="bi bi-file-earmark-pdf"></i>
+                            </a>
+                        </div>
+                    </td>
                 </tr>
                 @endforeach
             </tbody>

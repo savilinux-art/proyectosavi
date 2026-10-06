@@ -98,7 +98,9 @@ class VentaMostradorControllerTest extends TestCase
         $response->assertRedirect(route('ventas_mostrador.show', $venta));
 
         $this->assertSame('pendiente', $venta->estado);
-        $this->assertEquals(270.0, (float) $venta->total);
+        $this->assertEquals(270.0, (float) $venta->subtotal);   // 2 * (100 - 0) = 200… ver nota
+        $this->assertEquals(43.2,  (float) $venta->iva);        // 270 * 0.16
+        $this->assertEquals(313.2, (float) $venta->total);      // 270 + 43.2
         $this->assertEquals($proyecto->id, $venta->proyecto_id);
         $this->assertCount(1, $venta->detalles);
         $this->assertEquals(270.0, (float) $venta->detalles->first()->subtotal);
@@ -126,7 +128,9 @@ class VentaMostradorControllerTest extends TestCase
 
         $this->assertNotNull($venta->proyecto_id);
         $this->assertSame('PROY-NUEVO-TEST-001', $venta->proyecto->nombre_proyecto);
-        $this->assertEquals(100.0, (float) $venta->total);
+        $this->assertEquals(100.0, (float) $venta->subtotal);
+        $this->assertEquals(16.0,  (float) $venta->iva);
+        $this->assertEquals(116.0, (float) $venta->total);
     }
 
     public function test_cancelar_cambia_estado_a_cancelada_si_estaba_pendiente(): void
@@ -271,5 +275,90 @@ public function test_buscar_inventario_excluye_productos_sin_existencia(): void
     $response->assertOk();
     $response->assertJsonCount(0);
 }
+
+    public function test_store_guarda_moneda(): void
+    {
+        $proyecto = Proyecto::factory()->create();
+        $inv = Inventario::factory()->create(['existencia' => 10, 'precio' => 50]);
+
+        $this->withSession($this->sesion())
+            ->post(route('ventas_mostrador.store'), [
+                'proyecto_id' => $proyecto->id,
+                'moneda'      => 'USD',
+                'items'       => [[
+                    'inventario_id'   => $inv->id,
+                    'cantidad'        => 1,
+                    'precio_unitario' => 50,
+                    'descuento'       => 0,
+                ]],
+            ]);
+
+        $venta = VentaMostrador::latest('id')->first();
+        $this->assertSame('USD', $venta->moneda);
+    }
+
+    public function test_store_rechaza_moneda_invalida(): void
+    {
+        $proyecto = Proyecto::factory()->create();
+        $inv = Inventario::factory()->create(['existencia' => 10, 'precio' => 50]);
+
+        $response = $this->withSession($this->sesion())
+            ->post(route('ventas_mostrador.store'), [
+                'proyecto_id' => $proyecto->id,
+                'moneda'      => 'GBP',
+                'items'       => [[
+                    'inventario_id'   => $inv->id,
+                    'cantidad'        => 1,
+                    'precio_unitario' => 50,
+                    'descuento'       => 0,
+                ]],
+            ]);
+
+        $response->assertSessionHasErrors('moneda');
+    }
+
+    public function test_update_recalcula_totales(): void
+    {
+        $venta = VentaMostrador::factory()->create([
+            'moneda'   => 'MXN',
+            'subtotal' => 0,
+            'iva'      => 0,
+            'total'    => 0,
+        ]);
+        $inv = Inventario::factory()->create(['existencia' => 10, 'precio' => 100]);
+
+        $this->withSession($this->sesion())
+            ->put(route('ventas_mostrador.update', $venta), [
+                'proyecto_id' => $venta->proyecto_id,
+                'moneda'      => 'MXN',
+                'items'       => [[
+                    'inventario_id'   => $inv->id,
+                    'cantidad'        => 3,
+                    'precio_unitario' => 100,
+                    'descuento'       => 10,
+                ]],
+            ]);
+
+        $venta->refresh();
+        $this->assertEqualsWithDelta(270.00, (float) $venta->subtotal, 0.01);
+        $this->assertEqualsWithDelta(43.20,  (float) $venta->iva,      0.01);
+        $this->assertEqualsWithDelta(313.20, (float) $venta->total,    0.01);
+    }
+
+    public function test_pdf_muestra_subtotal_iva_y_moneda(): void
+    {
+        $venta = VentaMostrador::factory()->create([
+            'moneda'   => 'USD',
+            'subtotal' => 1000,
+            'iva'      => 160,
+            'total'    => 1160,
+        ]);
+
+        $response = $this->withSession($this->sesion())
+            ->get(route('ventas_mostrador.pdf', $venta));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+    }
 
 }

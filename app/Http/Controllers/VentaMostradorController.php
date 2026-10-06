@@ -47,6 +47,7 @@ class VentaMostradorController extends Controller
             'proyecto_id'    => 'nullable|exists:proyectos,id|required_without:proyecto_nuevo',
             'proyecto_nuevo' => 'nullable|string|max:255|required_without:proyecto_id',
             'observaciones'  => 'nullable|string',
+            'moneda'         => 'nullable|in:MXN,USD',
             'items'          => 'required|array|min:1',
             'items.*.inventario_id'    => 'required|exists:inventario,id',
             'items.*.cantidad'         => 'required|integer|min:1',
@@ -71,18 +72,21 @@ class VentaMostradorController extends Controller
             }
 
             $venta = VentaMostrador::create([
-                'proyecto_id'    => $proyectoId,
-                'estado'         => 'pendiente',
-                'total'          => 0,
-                'observaciones'  => $request->observaciones,
-                'creado_por'     => $creadoPor,
+                'proyecto_id'   => $proyectoId,
+                'estado'        => 'pendiente',
+                'subtotal'      => 0,
+                'iva'           => 0,
+                'total'         => 0,
+                'moneda'     => $request->moneda ?? 'MXN',
+                'observaciones' => $request->observaciones,
+                'creado_por'    => $creadoPor,
             ]);
 
-            $total = 0;
+            $subtotal = 0;
             foreach ($request->items as $item) {
                 $descuento = $item['descuento'] ?? 0;
-                $subtotal  = $item['cantidad'] * ($item['precio_unitario'] - $descuento);
-                $total    += $subtotal;
+                $lineSub   = $item['cantidad'] * ($item['precio_unitario'] - $descuento);
+                $subtotal += $lineSub;
 
                 VentaMostradorDetalle::create([
                     'venta_mostrador_id' => $venta->id,
@@ -90,11 +94,16 @@ class VentaMostradorController extends Controller
                     'cantidad'           => $item['cantidad'],
                     'precio_unitario'    => $item['precio_unitario'],
                     'descuento'          => $descuento,
-                    'subtotal'           => $subtotal,
+                    'subtotal'           => $lineSub,
                 ]);
             }
 
-            $venta->update(['total' => $total]);
+            $iva = round($subtotal * VentaMostrador::IVA_RATE, 2);
+            $venta->update([
+                'subtotal' => $subtotal,
+                'iva'      => $iva,
+                'total'    => $subtotal + $iva,
+            ]);
 
             DB::commit();
             return redirect()->route('ventas_mostrador.show', $venta)
@@ -106,33 +115,33 @@ class VentaMostradorController extends Controller
         }
     }
 
-   public function show(VentaMostrador $ventasMostrador)
-{
-    $ventasMostrador->load(['proyecto', 'detalles.inventario', 'creadoPor', 'salidas']);
-    return view('ventas_mostrador.show', [
-        'ventaMostrador' => $ventasMostrador,
-    ]);
-}
-
-    public function edit(VentaMostrador $ventasMostrador)
-{
-    if (!$ventasMostrador->puedeEditarse()) {
-        return redirect()->route('ventas_mostrador.show', $ventasMostrador)
-            ->with('error', 'Esta venta no puede editarse en su estado actual.');
+    public function show(VentaMostrador $ventasMostrador)
+    {
+        $ventasMostrador->load(['proyecto', 'detalles.inventario', 'creadoPor', 'salidas']);
+        return view('ventas_mostrador.show', [
+            'ventaMostrador' => $ventasMostrador,
+        ]);
     }
 
-    $ventasMostrador->load('detalles');
-    $proyectos = Proyecto::orderBy('nombre_proyecto')->get();
-    $inventario = Inventario::where('existencia', '>', 0)
-        ->orderBy('modelo')
-        ->get();
+    public function edit(VentaMostrador $ventasMostrador)
+    {
+        if (!$ventasMostrador->puedeEditarse()) {
+            return redirect()->route('ventas_mostrador.show', $ventasMostrador)
+                ->with('error', 'Esta venta no puede editarse en su estado actual.');
+        }
 
-    return view('ventas_mostrador.edit', [
-        'ventaMostrador' => $ventasMostrador,
-        'proyectos'      => $proyectos,
-        'inventario'     => $inventario,
-    ]);
-}
+        $ventasMostrador->load('detalles');
+        $proyectos = Proyecto::orderBy('nombre_proyecto')->get();
+        $inventario = Inventario::where('existencia', '>', 0)
+            ->orderBy('modelo')
+            ->get();
+
+        return view('ventas_mostrador.edit', [
+            'ventaMostrador' => $ventasMostrador,
+            'proyectos'      => $proyectos,
+            'inventario'     => $inventario,
+        ]);
+    }
 
     public function update(Request $request, VentaMostrador $ventasMostrador)
     {
@@ -144,6 +153,7 @@ class VentaMostradorController extends Controller
         $request->validate([
             'proyecto_id'    => 'required|exists:proyectos,id',
             'observaciones'  => 'nullable|string',
+            'moneda'         => 'nullable|in:MXN,USD',
             'items'          => 'required|array|min:1',
             'items.*.inventario_id'    => 'required|exists:inventario,id',
             'items.*.cantidad'         => 'required|integer|min:1',
@@ -154,18 +164,19 @@ class VentaMostradorController extends Controller
         DB::beginTransaction();
         try {
             $ventasMostrador->update([
-                'proyecto_id'     => $request->proyecto_id,
-                'observaciones'   => $request->observaciones,
-                'modificado_por'  => Session::get('user_usuario'),
+                'proyecto_id'    => $request->proyecto_id,
+                'observaciones'  => $request->observaciones,
+                'moneda'         => $request->moneda,
+                'modificado_por' => Session::get('user_usuario'),
             ]);
 
             $ventasMostrador->detalles()->delete();
 
-            $total = 0;
+            $subtotal = 0;
             foreach ($request->items as $item) {
                 $descuento = $item['descuento'] ?? 0;
-                $subtotal  = $item['cantidad'] * ($item['precio_unitario'] - $descuento);
-                $total    += $subtotal;
+                $lineSub   = $item['cantidad'] * ($item['precio_unitario'] - $descuento);
+                $subtotal += $lineSub;
 
                 VentaMostradorDetalle::create([
                     'venta_mostrador_id' => $ventasMostrador->id,
@@ -173,11 +184,16 @@ class VentaMostradorController extends Controller
                     'cantidad'           => $item['cantidad'],
                     'precio_unitario'    => $item['precio_unitario'],
                     'descuento'          => $descuento,
-                    'subtotal'           => $subtotal,
+                    'subtotal'           => $lineSub,
                 ]);
             }
 
-            $ventasMostrador->update(['total' => $total]);
+            $iva = round($subtotal * VentaMostrador::IVA_RATE, 2);
+            $ventasMostrador->update([
+                'subtotal' => $subtotal,
+                'iva'      => $iva,
+                'total'    => $subtotal + $iva,
+            ]);
 
             DB::commit();
             return redirect()->route('ventas_mostrador.show', $ventasMostrador)
@@ -202,65 +218,64 @@ class VentaMostradorController extends Controller
 
     public function cambiarEstado(Request $request, VentaMostrador $ventasMostrador)
     {
-    $request->validate([
-        'estado' => 'required|in:' . implode(',', VentaMostrador::ESTADOS),
-    ]);
+        $request->validate([
+            'estado' => 'required|in:' . implode(',', VentaMostrador::ESTADOS),
+        ]);
 
-    $nuevo = $request->estado;
+        $nuevo = $request->estado;
 
-    if (!$ventasMostrador->puedeCambiarEstadoA($nuevo)) {
-        return back()->with('error',
-            "No se puede cambiar el estado de '{$ventasMostrador->estado}' a '{$nuevo}'.");
-    }
+        if (!$ventasMostrador->puedeCambiarEstadoA($nuevo)) {
+            return back()->with('error',
+                "No se puede cambiar el estado de '{$ventasMostrador->estado}' a '{$nuevo}'.");
+        }
 
-    $ventasMostrador->update([
-        'estado'         => $nuevo,
-        'modificado_por' => Session::get('user_usuario'),
-    ]);
+        $ventasMostrador->update([
+            'estado'         => $nuevo,
+            'modificado_por' => Session::get('user_usuario'),
+        ]);
 
-    return redirect()->route('ventas_mostrador.show', $ventasMostrador)
-        ->with('success', 'Estado cambiado a ' . ucfirst($nuevo) . '.');
+        return redirect()->route('ventas_mostrador.show', $ventasMostrador)
+            ->with('success', 'Estado cambiado a ' . ucfirst($nuevo) . '.');
     }
 
     public function pdf(VentaMostrador $ventasMostrador)
-{
-    $ventasMostrador->load(['proyecto', 'detalles.inventario', 'creadoPor']);
+    {
+        $ventasMostrador->load(['proyecto', 'detalles.inventario', 'creadoPor']);
 
-    $logoPath = public_path('images/logo.png');
-    $logoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+        $logoPath = public_path('images/logo.png');
+        $logoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
 
-    $pdf = Pdf::loadView('pdf.venta_mostrador', compact('ventasMostrador', 'logoBase64'));
-    $pdf->setPaper('letter', 'portrait');
-    $pdf->setOptions([
-        'defaultFont'         => 'DejaVu Sans',
-        'isHtml5ParserEnabled' => true,
-        'isRemoteEnabled'      => true,
-    ]);
+        $pdf = Pdf::loadView('pdf.venta_mostrador', compact('ventasMostrador', 'logoBase64'));
+        $pdf->setPaper('letter', 'portrait');
+        $pdf->setOptions([
+            'defaultFont'          => 'DejaVu Sans',
+            'isHtml5ParserEnabled' => true,
+            'isRemoteEnabled'      => true,
+        ]);
 
-    $folio = 'VM-' . str_pad($ventasMostrador->id, 4, '0', STR_PAD_LEFT);
-    return $pdf->download("venta_mostrador_{$folio}.pdf");
-}
-
-public function buscarInventario(Request $request)
-{
-    $q = trim((string) $request->get('q', ''));
-
-    if (mb_strlen($q) < 2) {
-        return response()->json([]);
+        $folio = 'VM-' . str_pad($ventasMostrador->id, 4, '0', STR_PAD_LEFT);
+        return $pdf->download("venta_mostrador_{$folio}.pdf");
     }
 
-    $items = \App\Models\Inventario::where('existencia', '>', 0)
-        ->where(function ($sub) use ($q) {
-            $sub->where('modelo',      'LIKE', "%{$q}%")
-                ->orWhere('descripcion','LIKE', "%{$q}%")
-                ->orWhere('marca',      'LIKE', "%{$q}%")
-                ->orWhere('categoria',  'LIKE', "%{$q}%");
-        })
-        ->orderBy('modelo')
-        ->limit(20)
-        ->get(['id', 'modelo', 'descripcion', 'marca', 'categoria', 'existencia', 'precio']);
+    public function buscarInventario(Request $request)
+    {
+        $q = trim((string) $request->get('q', ''));
 
-    return response()->json($items);
-}
+        if (mb_strlen($q) < 2) {
+            return response()->json([]);
+        }
 
+        $items = Inventario::where('existencia', '>', 0)
+            ->where(function ($sub) use ($q) {
+                $sub->where('modelo',      'LIKE', "%{$q}%")
+                    ->orWhere('descripcion','LIKE', "%{$q}%")
+                    ->orWhere('marca',      'LIKE', "%{$q}%")
+                    ->orWhere('categoria',  'LIKE', "%{$q}%");
+            })
+            ->orderBy('modelo')
+            ->limit(20)
+            ->get(['id', 'modelo', 'descripcion', 'marca', 'categoria', 'existencia', 'precio']);
+
+        return response()->json($items);
+    }
 }
