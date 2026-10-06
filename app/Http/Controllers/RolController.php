@@ -64,9 +64,27 @@ class RolController extends Controller
     }
 
     public function update(Request $request, $id)
-    {
-        // Validar y sincronizar permisos
+{
+    if ($redir = $this->verificarAdmin()) return $redir;
+
+    $rol = Rol::findOrFail($id);
+
+    DB::beginTransaction();
+    try {
+        // Sincronizar permisos (los que llegan del form; el resto se quitan)
+        $permisos = $request->input('permisos', []);
+        $rol->permisos()->sync($permisos);
+
+        DB::commit();
+        return redirect()->route('roles.index')
+            ->with('success', "Rol '{$rol->rol}' actualizado");
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()
+            ->with('error', 'Error al actualizar: ' . $e->getMessage())
+            ->withInput();
     }
+}
 
     public function destroy($id)
     {
