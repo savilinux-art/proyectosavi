@@ -1,0 +1,405 @@
+================================================================================
+              RESUMEN TÉCNICO – SISTEMA PROYECTOSAVI
+              Última actualización: 6 de Octubre de 2026
+              Versión: 2.3.0
+              Repositorio: https://github.com/savilinux-art/proyectosavi
+              HEAD local: 6 commits adelante de origin/main (5a168a8)
+              ⚠️ PENDIENTE: push + deploy al server
+================================================================================
+
+🎯 PROPÓSITO GENERAL
+
+Sistema de gestión empresarial especializado en instalaciones tecnológicas
+(domótica, audiovisuales, redes, seguridad). Ciclo completo:
+
+  • Ventas (prospección → cierre)
+  • Ventas de mostrador (nuevo, cerrado 5-oct-2026)
+  • Proyectos (derivados de ventas ganadas)
+  • Cotizaciones
+  • Instalaciones (planificación, ejecución, evidencias, checklist)
+  • Inventario (productos, movimientos, apartados, salidas, devoluciones)
+  • Clientes
+  • Asignación de instaladores con notificaciones vía Telegram
+  • Seguimiento GPS en tiempo real (Traccar + Reverb WebSocket)
+  • Recordatorios automáticos (Telegram + Email + Web)
+  • Certificados (SSL, CSD SAT, dominios)
+  • Geocercas (alertas entrada/salida)
+  • Roles y permisos granulares
+
+================================================================================
+🧱 ARQUITECTURA TÉCNICA
+================================================================================
+
+Componente          | Tecnología
+--------------------|---------------------------------------------------------
+Backend             | Laravel 13.25.0 (PHP 8.4.25)
+Base de datos       | MariaDB 11.8.9 (dev) / 11.8.6 (prod)
+Frontend            | Blade, Bootstrap 5, jQuery, DataTables, Leaflet.js
+Autenticación       | Sesiones nativas + Middleware custom (NO Auth facade)
+Notificaciones      | Telegram Bot API (irazasyed/telegram-bot-sdk)
+GPS / Seguimiento   | Traccar (servidor independiente, sin Docker)
+Mapas               | Leaflet.js + OpenStreetMap
+WebSockets          | Laravel Reverb v1.11.1
+Broadcasting        | Laravel Echo + pusher-js
+Exportaciones       | Laravel Excel, Dompdf (barryvdh/laravel-dompdf ^3.1)
+Control de acceso   | Sistema propio (permisos + permiso_rol)
+Túneles públicos    | Tailscale Funnel (URL fija)
+Servidor web        | Nginx 1.28.3 + PHP-FPM 8.4 (apache2 ELIMINADO 28-sep)
+Testing             | Pest v4.7.8 (envuelve PHPUnit 11) + DatabaseTransactions
+IDE                 | VS Code (dev) / OpenVSCode (prod)
+
+════════════════════════════════════════════════════════════════════════════════
+⚠️ AUTENTICACIÓN — LÓGICA CUSTOM (NO NEGOCIABLE)
+════════════════════════════════════════════════════════════════════════════════
+
+El sistema NO usa el Auth facade de Laravel.
+Login manual con Session::put('user_id'/'user_usuario'/'user_rol').
+
+Middleware custom (bootstrap/app.php):
+  auth.session     → AuthSessionMiddleware      (verifica user_usuario)
+  permiso:xxx      → PermisoMiddleware          (verifica permiso en BD)
+  administrador    → AdministradorMiddleware    (rol === 'Administrador')
+
+ALIAS QUE NO EXISTEN: auth, guest, verified.
+⚠️ NUNCA usar middleware(['auth']) → rompe login para todos.
+
+INCIDENTE 28-SEP-2026: alias auth.session no estaba registrado en
+bootstrap/app.php → 19 rutas "protegidas" abiertas. Corregido en 73b924f.
+
+Regla: si usás un alias en routes/web.php, DEBE estar registrado.
+Verificación: grep "auth.session" bootstrap/app.php
+
+Reglas detalladas: ver bloque auth en pendientes-v15 (secciones 1-13).
+                   Sigue vigente sin cambios.
+
+================================================================================
+📊 TESTING — ESTADO ACTUAL (5-oct-2026)
+================================================================================
+
+Suite actual: 80 passed / 237 assertions
+
+Evolución del 5-oct-2026:
+  Inicio del día:              66 passed (199 assertions)
+  Etapa 1 (selector estado):   70 passed (208)
+  Etapa 3 (PDF):               73 passed (216)
+  Etapa 2 (buscador):          76 passed (224)
+  Expansión IVA/moneda:        80 passed (237)  ← ACTUAL
+
+Archivos con cobertura:
+  ✅ tests/Feature/FactoriesTest.php                 (11 tests, base)
+  ✅ tests/Feature/DatabaseTest.php                  (aislamiento)
+  ✅ tests/Feature/VentaMostradorControllerTest.php  (20 tests)
+
+Cobertura ausente (⚠️):
+  ❌ #1  Recordatorios (I-01..I-05 pendientes)
+  ❌ #2  Geocercas (3 tablas + controller, CERO tests)
+  ❌ #3  Inventario
+  ❌ #4  Categorías
+  ❌ #5  Salidas inventario
+  ❌ #6  Devoluciones inventario
+  ❌ #7  Movimientos inventario
+  ❌ #8  Ventas
+  ❌ #10 Cotizaciones
+  ❌ #11 Instalaciones (+ InstalacionObserver)
+  ❌ #12 Clientes
+  ❌ #13 Proyectos
+  ❌ #14 Usuarios
+  ❌ #15 Roles
+  ❌ #16 Permisos
+  ❌ #17 Reportes (verificar existencia)
+  ❌ #18 Notificaciones
+  ❌ Telegram (webhook + outbound + comandos bot)
+  ❌ Traccar (Service)
+  ❌ Ubicaciones GPS
+  ❌ Reverb (broadcast)
+  ❌ Regresión auth/permisos (incidente 28-sep)
+
+Calificación de testing: 4/10 (antes 3/10)
+Amenaza principal: falta de AMPLITUD. Si se rompe Inventario, nada
+lo detecta.
+
+================================================================================
+🧩 MÓDULOS FUNCIONALES — LISTA COMPLETA
+================================================================================
+
+ #  | Módulo                       | Controlador / Servicio              | Estado
+----|------------------------------|-------------------------------------|--------
+ 1  | Recordatorios                | RecordatorioController + Procesador | ✅
+ 2  | Geocercas                    | GeocercaAlertaController            | ✅ (sin tests)
+ 3  | Inventario                   | InventarioController                | ✅
+ 4  | Categorías                   | (verificar)                         | ✅
+ 5  | Salidas inventario           | SalidaInventarioController          | ✅
+ 6  | Devoluciones inventario      | DevolucionInventarioController      | ✅
+ 7  | Movimientos de inventario    | (verificar)                         | ✅
+ 8  | Ventas                       | VentaController                     | ✅
+ 9  | Ventas de mostrador          | VentaMostradorController            | ✅ (nuevo 5-oct)
+10  | Cotizaciones                 | CotizacionController                | ✅
+11  | Instalaciones                | InstalacionController + Observer    | ✅
+12  | Clientes                     | (verificar)                         | ✅
+13  | Proyectos                    | ProyectoController                  | ✅
+14  | Usuarios                     | UsuarioController                   | ✅
+15  | Roles                        | RolController                       | ✅
+16  | Permisos                     | PermisoMiddleware + permiso_rol     | ✅
+17  | Reportes                     | (verificar existencia)              | ❓
+18  | Notificaciones               | notificaciones_web + Telegram       | ✅
+
+Integraciones:
+  • Telegram — TelegramService + TelegramWebhookController + SDK
+  • Traccar — TraccarService (puerto 8082, Funnel 8443)
+  • Reverb — canal 'ubicaciones', evento 'ubicacion.actualizada'
+
+Tablas no documentadas en v2.2.1 pero presentes en dump:
+  • agent_conversations + agent_conversation_messages
+    (SDK de AI agents — sin documentación previa, verificar)
+  • geocercas + geocerca_alertas + geocerca_estados
+  • ubicaciones_usuarios
+  • solicitudes_ubicacion
+  • evidencias_entrega
+  • trazabilidad_discrepancias
+  • ventas_mostrador + ventas_mostrador_detalles + venta_mostrador_salida
+
+================================================================================
+💾 SCHEMA — CAMBIOS RECIENTES
+================================================================================
+
+ventas_mostrador (5-oct):
+  + subtotal decimal(12,2) default 0
+  + iva decimal(12,2) default 0
+  + moneda varchar(3) default 'MXN'
+  IVA_RATE = 0.16, MONEDAS = ['MXN', 'USD'] (sin EUR)
+
+================================================================================
+📦 ESTADO DEL REPO
+================================================================================
+
+Rama: main
+origin/main: 5a168a8
+HEAD local: 6 commits adelante
+
+6 commits locales SIN PUSH:
+  (nuevo)  feat(ventas_mostrador): totales con IVA, moneda y PDF extendido
+  fa66c80  feat(ventas_mostrador): buscador de inventario (Etapa 2)
+  7ee973f  feat(ventas_mostrador): selector estado + pdf + fixes binding
+  3985c55  feat(ventas_mostrador): permiso + link sidebar
+  e567005  feat(ventas_mostrador): E.2 CRUD + rutas + tests
+  9c2eb7b  feat(ventas_mostrador): schema + modelos + factories (E.1)
+
+Árbol de trabajo: LIMPIO.
+Push + deploy al server: PENDIENTE (acordado para 6-oct-2026).
+
+================================================================================
+⚙️ CONFIGURACIÓN DE TESTS
+================================================================================
+
+- Framework: Pest v4.7.8 (envuelve PHPUnit 11)
+- Estilo actual: MEZCLADO
+  • FactoriesTest → Pest-style (test('...', fn() => ...))
+  • VentaMostradorControllerTest → class-based (extends TestCase)
+  • Decisión pendiente: elegir uno para los tests nuevos
+- BD testing: proyectosavi_testing (MySQL, aislada)
+- Trait: DatabaseTransactions (NO RefreshDatabase)
+- Regla: PHPUnit 11 NO soporta /** @test */ → usar prefijo test_
+- Assert de decimales: toEqualWithDelta, NO toBe
+
+================================================================================
+🖥️ INFRAESTRUCTURA DEL SERVIDOR
+================================================================================
+
+  Tailscale IP:    100.111.241.50
+  MagicDNS:        savilinux-server.tail50a173.ts.net
+  Certificado:     Válido hasta 21 dic 2026
+
+  Funnel activo:
+    443   → https+insecure://127.0.0.1:8090   ProyectoSAVI
+    8443  → http://127.0.0.1:8082              Traccar
+    10000 → https+insecure://127.0.0.1:8091   Hotel reservas
+
+  Servicios systemd (enabled, arrancan al boot):
+    - tailscaled
+    - mariadb
+    - php8.4-fpm
+    - reverb (127.0.0.1:6001)
+    - nginx
+    - cron
+    - openvscode (127.0.0.1:3000)
+    - savi-startup.service (oneshot, RemainAfterExit=yes)
+
+  Arranque automático:
+    /usr/local/bin/savi-startup.sh (idempotente)
+    /etc/systemd/system/savi-startup.service
+    /var/log/savi-startup.log
+    Estado: probado manualmente 28 y 29-sep ✅
+    Pendiente: probar con `sudo reboot` real
+
+  Nginx vhosts:
+    proyectosavi    → 127.0.0.1:8090 ssl
+    hotel-reservas  → 127.0.0.1:8091 ssl
+    traccar         → 127.0.0.1:8080
+    phpmyadmin      → 0.0.0.0:8081 (solo tailnet)
+    openvscode      → 0.0.0.0:8888 ssl
+    laravel         → DESHABILITADO
+
+  UPS:
+    Site A: 30 min
+    Site B: 30 min (por implementar failover M-05)
+
+================================================================================
+🔒 BLINDAJE DE RUTAS (C-02, 29-sep-2026)
+================================================================================
+
+Commit d72b159. Cambios en routes/web.php:
+
+1. Rutas telegram envueltas en auth.session:
+     POST /telegram/send-location/start/{id}
+     POST /telegram/send-location/end/{id}
+
+2. salidas/{id}/imprimir movida DENTRO del grupo ['auth.session',
+   'permiso:ver-salidas']
+
+3. Rutas de prueba ELIMINADAS:
+     GET /test-telegram-system
+     GET /test-notify/{id}
+
+Verificación (grep sobre el archivo, NO route:list --json):
+  grep -n -A6 "// Telegram Location" routes/web.php
+  grep -n -B2 -A3 "salidas/{id}/imprimir" routes/web.php
+
+⚠️ POST anónimo a rutas con auth.session da 419 (CSRF corre antes).
+   El 419 NO prueba que auth.session esté aplicado. Verificar por grep.
+
+================================================================================
+📝 REGLAS VIGENTES — CONSOLIDADAS
+================================================================================
+
+Del v22 + sesiones previas:
+  - Auth custom: Session::get('user_usuario'), NO Auth::user().
+  - Middleware: 'auth.session', 'permiso:xxx', 'administrador'. NUNCA 'auth'.
+  - Backup antes de tocar routes/web.php, bootstrap/app.php o Blade con scripts.
+  - php artisan optimize:clear después de cambios de rutas/middleware/bootstrap.
+  - Castear a float/int en el map() del @php al inyectar JSON a JS.
+  - PHPUnit 11 NO soporta /** @test */ → usar prefijo test_.
+  - Migración nueva → aplicar TAMBIÉN en proyectosavi_testing.
+  - Assert de decimales con toEqualWithDelta, NO toBe.
+  - Route model binding: argumento = Str::camel($routeParam).
+  - Cambio silencioso → sospechar implicit binding.
+
+Nuevas (5-oct-2026):
+  - @json() de Blade solo expresiones de UNA LÍNEA. Multilínea → @php
+    + {!! json_encode(..., JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT) !!}
+  - Después de tocar .blade.php → SIEMPRE view:clear + optimize:clear.
+    optimize:clear NO siempre limpia vistas compiladas.
+  - compact('var') peligroso en PHP 8.4 (ErrorException si no existe).
+    Preferir array asociativo explícito.
+  - ⚠️ ROUTE ORDERING: rutas GET literales de un solo segmento ANTES
+    del Route::resource del mismo prefijo. El {wildcard} de show gana
+    por ORDEN DE REGISTRO, no por especificidad.
+  - Migración nueva: verificar que no quede con doble extensión .php.php.
+  - Cambio de contrato de campo → decidir nullable+default vs. tests viejos.
+
+================================================================================
+🚀 FASES DEL PROYECTO
+================================================================================
+
+FASE A — Herramientas locales                     ✅ COMPLETADA
+FASE B — Normalización (M0, M10)                  ⏳ SIGUIENTE
+FASE C — Trazabilidad materiales                  ⏳
+FASE D — Aprobación + envío facturación           ⏳
+FASE E — Préstamo herramientas                    ⏳
+FASE F — Facturación México (CFDI 4.0)            ⏳
+FASE G — Staging :8092                            ⏳
+FASE H — API para PWA                             ⏳
+FASE I — PWA offline-first                        ⏳
+FASE J — Refinamientos                            ⏳
+FASE K — Recordatorios y Certificados             ✅ COMPLETADA
+FASE M — Robustez / Seguridad                     ⏳ (C-01..C-03 cerrados)
+FASE N — TESTING: expansión 18 módulos + 2 integ. ⏳ NUEVO (5-oct)
+
+================================================================================
+📈 CALIFICACIÓN ESTIMADA
+================================================================================
+
+  Seguridad        9/10
+  Robustez         6/10
+  Testing          4/10  ← subir con Fase N
+  Observabilidad   5/10
+  Mantenibilidad   7/10
+  Documentación    9/10
+  ─────────────────────
+  Estimado global: 7.5/10
+
+Ruta a 9.0:
+  1. Testing Fases 0-3 (módulos + integraciones)  → +2.0
+  2. CI/CD (M-01)                                  → +0.7
+  3. Testing Fases 4-6 (Recordatorios + auth)      → +0.5
+  4. Observabilidad (M-03)                         → +0.5
+  5. M0 (FKs string → bigint)                      → +0.3
+
+================================================================================
+⚠️ DISCREPANCIAS Y PENDIENTES DE VERIFICACIÓN
+================================================================================
+
+1. Telescope:
+   - v2.2.1 dice "Telescope fue REMOVIDO de producción" (29-sep)
+   - Dump (5-oct) tiene 40.000+ filas y logs de telescope:prune
+   - Hipótesis: (a) dump es de laptop y Telescope solo está en dev,
+                (b) Telescope se reinstaló en prod después del 29-sep
+   - CONFIRMAR antes de tocar tests
+
+2. agent_conversations:
+   - 2 tablas con columnas típicas de SDK de AI agents
+   - NO aparece en ningún resumen técnico previo
+   - NO está en la lista de 18 módulos
+   - ¿Es parte del sistema actual? ¿Qué integración lo usa?
+
+3. Geocercas:
+   - Confirmado que existe (3 tablas + controller)
+   - Datos reales (4 geocercas)
+   - CERO tests → sube de prioridad en Fase N
+
+4. Módulos dudosos:
+   - #17 Reportes: ¿existe código?
+   - #18 Notificaciones: ¿solo notificaciones_web + Telegram?
+   - #7 Movimientos de inventario: ¿tabla propia o dentro de Inventario?
+
+================================================================================
+🔧 COMANDOS ÚTILES
+================================================================================
+
+# Estado git
+git status
+git log --oneline -8
+
+# Suite
+php artisan test
+
+# Rutas ventas_mostrador (esperado: 10 rutas)
+php artisan route:list --path=ventas_mostrador
+
+# Verificar alias auth.session registrado
+grep -n "auth.session" bootstrap/app.php
+
+# Verificar middleware de rutas (método confiable)
+grep -n -A6 "// Telegram Location" routes/web.php
+grep -n -B2 -A3 "salidas/{id}/imprimir" routes/web.php
+
+# Limpiar cachés (SIEMPRE los dos después de tocar Blade)
+php artisan view:clear
+php artisan optimize:clear
+
+# Migraciones aplicadas
+php artisan migrate:status | grep 2026_10_05
+
+# Aplicar migración en testing
+DB_DATABASE=proyectosavi_testing php artisan migrate
+
+# Verificar logo PDF
+ls -la public/images/logo.png
+
+# Inventario de factories/seeders
+ls -1 database/factories/
+ls -1 database/seeders/
+
+================================================================================
+                      FIN DEL RESUMEN TÉCNICO v2.3.0
+                             06/10/2026
+================================================================================
