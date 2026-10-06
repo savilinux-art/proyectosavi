@@ -20,6 +20,7 @@ class PermisoRolSeeder extends Seeder
 
             'Contabilidad' => [
                 'ver-reportes',
+                'ventas-mostrador',
                 'ver-certificados',
                 'ver-recordatorios',
                 'ver-notificaciones',
@@ -43,6 +44,7 @@ class PermisoRolSeeder extends Seeder
 
             'Ventas' => [
                 'crear-cliente',
+                'ventas-mostrador',
                 'editar-cliente',
                 'ver-certificados',
                 'ver-recordatorios',
