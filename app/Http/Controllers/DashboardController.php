@@ -67,13 +67,11 @@ class DashboardController extends Controller
                     $q->where('instalador_usuario', $userUsuario);
                 })->with(['proyecto'])->get();
 
-                $data['proyectos'] = Proyecto::whereHas('venta', function($q) use ($userUsuario) {
-                    $q->whereHas('instalaciones', function($sub) use ($userUsuario) {
-                        $sub->whereHas('instaladores', function($sq) use ($userUsuario) {
-                            $sq->where('instalador_usuario', $userUsuario);
-                        });
-                    });
-                })->get();
+                $data['proyectos'] = Proyecto::whereHas('instalaciones', function($q) use ($userUsuario) {
+                $q->whereHas('instaladores', function($sub) use ($userUsuario) {
+                $sub->where('instalador_usuario', $userUsuario);
+                });
+                })->with(['modificadoPor'])->get();
                 break;
 
             case 'Contabilidad':

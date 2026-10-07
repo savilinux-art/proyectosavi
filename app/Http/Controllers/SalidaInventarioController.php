@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\SalidaInventario;
 use App\Models\SalidaDetalle;
 use App\Models\Inventario;
-use App\Models\Venta;
+use App\Models\Proyecto;
 use App\Models\Usuario;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
@@ -28,7 +28,7 @@ class SalidaInventarioController extends Controller
      */
     public function create()
     {
-        $proyectos = Venta::where('venta_ganada', true)->get();
+        $proyectos = Proyecto::orderBy('nombre_proyecto')->get();
         $usuarios = Usuario::all();
         $productos = Inventario::where('existencia', '>', 0)->get();
         return view('salidas.create', compact('proyectos', 'usuarios', 'productos'));
@@ -65,7 +65,7 @@ class SalidaInventarioController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'nombre_proyecto' => 'required|exists:ventas,nombre_proyecto',
+            'nombre_proyecto' => 'required|exists:proyectos,nombre_proyecto',
             'entregado_a'     => 'required|exists:usuarios,usuario',
             'productos'       => 'required|array|min:1',
             'productos.*.inventario_id' => 'required|exists:inventario,id',
