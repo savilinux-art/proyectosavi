@@ -24,11 +24,7 @@ class Proyecto extends Model
         'modificado_por'
     ];
 
-    public function venta()
-    {
-        return $this->belongsTo(Venta::class, 'nombre_proyecto', 'nombre_proyecto');
-    }
-
+    
     public function modificadoPor()
     {
         return $this->belongsTo(Usuario::class, 'modificado_por', 'usuario');
@@ -42,5 +38,9 @@ class Proyecto extends Model
     {
         return $this->hasMany(MovimientoInventario::class);
     }
-
+    
+    public function instalaciones()
+    {
+    return $this->hasMany(Instalacion::class, 'nombre_proyecto', 'nombre_proyecto');
+    }
 }
