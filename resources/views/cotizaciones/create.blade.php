@@ -19,32 +19,38 @@
         <form action="{{ route('cotizaciones.store') }}" method="POST" id="cotizacionForm">
             @csrf
 
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="cliente_id" class="form-label">Cliente *</label>
-                    <select class="form-select @error('cliente_id') is-invalid @enderror" name="cliente_id" id="cliente_id" required>
-                        <option value="">Seleccionar...</option>
-                        @foreach($clientes as $c)
-                            <option value="{{ $c->id }}" {{ old('cliente_id') == $c->id ? 'selected' : '' }}>{{ $c->razon_social }} - {{ $c->rfc }}</option>
-                        @endforeach
-                    </select>
-                    @error('cliente_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                </div>
+            <div class="mb-3">
+    <label class="form-label">Proyecto *</label>
+    <div class="form-check">
+        <input class="form-check-input" type="radio" name="proyecto_modo" id="modoExistente" value="existente"
+               {{ old('proyecto_modo', 'existente') === 'existente' ? 'checked' : '' }}>
+        <label class="form-check-label" for="modoExistente">Usar proyecto existente</label>
+    </div>
+    <div class="form-check mb-2">
+        <input class="form-check-input" type="radio" name="proyecto_modo" id="modoNuevo" value="nuevo"
+               {{ old('proyecto_modo') === 'nuevo' ? 'checked' : '' }}>
+        <label class="form-check-label" for="modoNuevo">Crear proyecto nuevo</label>
+    </div>
 
-                <div class="col-md-6 mb-3">
-                    <label for="proyecto_id" class="form-label">Proyecto *</label>
-                    <select class="form-select @error('proyecto_id') is-invalid @enderror" name="proyecto_id" id="proyecto_id" required>
-                        <option value="">Seleccionar proyecto...</option>
-                        @foreach($proyectos as $p)
-                            <option value="{{ $p->id }}" {{ old('proyecto_id') == $p->id ? 'selected' : '' }}>
-                                {{ $p->nombre_proyecto }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('proyecto_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                </div>
-            </div>
+    <div id="bloqueExistente" style="{{ old('proyecto_modo') === 'nuevo' ? 'display:none;' : '' }}">
+        <select class="form-select @error('proyecto_id') is-invalid @enderror" name="proyecto_id" id="proyecto_id">
+            <option value="">Seleccionar proyecto...</option>
+            @foreach($proyectos as $p)
+                <option value="{{ $p->id }}" {{ old('proyecto_id') == $p->id ? 'selected' : '' }}>
+                    {{ $p->nombre_proyecto }}
+                </option>
+            @endforeach
+        </select>
+        @error('proyecto_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+    </div>
 
+    <div id="bloqueNuevo" style="{{ old('proyecto_modo') === 'nuevo' ? '' : 'display:none;' }}">
+        <input type="text" class="form-control @error('proyecto_nuevo') is-invalid @enderror"
+               name="proyecto_nuevo" id="proyecto_nuevo" placeholder="Nombre del nuevo proyecto"
+               value="{{ old('proyecto_nuevo') }}">
+        @error('proyecto_nuevo')<div class="invalid-feedback">{{ $message }}</div>@enderror
+    </div>
+</div>
             <div class="row">
                 <div class="col-md-4 mb-3">
                     <label for="fecha_emision" class="form-label">Fecha de emisión *</label>
@@ -166,6 +172,19 @@
 <script>
     let productosSeleccionados = [];
     let timeoutBuscador = null;
+
+        // ========== TOGGLE PROYECTO EXISTENTE / NUEVO ==========
+    function toggleProyectoModo() {
+        const modo = $('input[name="proyecto_modo"]:checked').val() || 'existente';
+        const esNuevo = modo === 'nuevo';
+        $('#bloqueExistente').toggle(!esNuevo);
+        $('#bloqueNuevo').toggle(esNuevo);
+        $('#proyecto_id').prop('required', !esNuevo);
+        $('#proyecto_nuevo').prop('required', esNuevo);
+    }
+
+    $('input[name="proyecto_modo"]').on('change', toggleProyectoModo);
+    toggleProyectoModo();   // estado inicial
 
     // ========== BUSCADOR DE PRODUCTOS ==========
     function buscarProductos() {

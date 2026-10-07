@@ -27,7 +27,6 @@
             <thead>
                 <tr>
                     <th>Folio</th>
-                    <th>Cliente</th>
                     <th>Proyecto</th>
                     <th>Fecha</th>
                     <th>Total</th>
@@ -39,8 +38,7 @@
                 @foreach($cotizaciones as $c)
                 <tr>
                     <td><strong>{{ $c->folio }}</strong></td>
-                    <td>{{ $c->cliente->razon_social ?? 'N/A' }}</td>
-                    <td>{{ $c->proyecto->nombre_proyecto ?? 'N/A' }}</td>
+                    <td><strong>{{ $c->proyecto?->nombre_proyecto ?? 'N/A' }}</strong></td>
                     <td>{{ $c->fecha_emision?->format('d/m/Y') ?? '—' }}</td>
                     <td>{{ $c->moneda }} {{ number_format($c->total, 2) }}</td>
                     <td>

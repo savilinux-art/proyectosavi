@@ -23,15 +23,13 @@ class ProyectoController extends Controller
 
         if ($rol == 'Instalador') {
             // 🔥 CORREGIDO: Usar la relación muchos a muchos a través de instaladores
-            $proyectos = Proyecto::whereHas('venta', function($q) use ($user_usuario) {
-                $q->whereHas('instalaciones', function($sub) use ($user_usuario) {
-                    $sub->whereHas('instaladores', function($inner) use ($user_usuario) {
-                        $inner->where('instalador_usuario', $user_usuario);
-                    });
+            $proyectos = Proyecto::whereHas('instalaciones', function($q) use ($user_usuario) {
+                $q->whereHas('instaladores', function($sub) use ($user_usuario) {
+                    $sub->where('instalador_usuario', $user_usuario);
                 });
-            })->with(['venta', 'modificadoPor'])->get();
-        } else {
-            $proyectos = Proyecto::with(['venta', 'modificadoPor'])->get();
+          })->with(['modificadoPor'])->get();
+         } else {
+            $proyectos = Proyecto::with(['modificadoPor'])->get();
         }
 
         return view('proyectos.index', compact('proyectos'));
@@ -42,9 +40,7 @@ class ProyectoController extends Controller
      */
     public function create()
     {
-        $ventas = Venta::where('venta_ganada', true)->get();
-        $usuarios = Usuario::all();
-        return view('proyectos.create', compact('ventas', 'usuarios'));
+        return view('proyectos.create');
     }
 
     /**
@@ -53,8 +49,8 @@ class ProyectoController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'nombre_proyecto' => 'required|exists:ventas,nombre_proyecto|unique:proyectos',
-            'correo_electronico' => 'required|email|max:255',
+            'nombre_proyecto' => 'required|string|max:255|unique:proyectos,nombre_proyecto',
+            'correo_electronico' => 'nullable|email|max:255',
             'ubicacion' => 'nullable|string|max:255',
             'credenciales' => 'nullable|string',
             'propuesta_economica' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
@@ -101,7 +97,7 @@ class ProyectoController extends Controller
      */
         public function show($id)
     {
-        $proyecto = Proyecto::with(['venta', 'modificadoPor'])->findOrFail($id);
+        $proyecto = Proyecto::with(['modificadoPor'])->findOrFail($id);
 
         $materiales = app(TrazabilidadService::class)->paraProyecto($proyecto);
 
@@ -175,27 +171,25 @@ class ProyectoController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
+    
     public function edit($id)
     {
-        $proyecto = Proyecto::findOrFail($id);
-        $ventas = Venta::where('venta_ganada', true)->get();
-        $usuarios = Usuario::all();
-        return view('proyectos.edit', compact('proyecto', 'ventas', 'usuarios'));
+    $proyecto = Proyecto::findOrFail($id);
+    return view('proyectos.edit', compact('proyecto'));
     }
-
     /**
      * Update the specified resource in storage.
      */
     public function update(Request $request, $id)
     {
         $request->validate([
-            'nombre_proyecto' => 'required|exists:ventas,nombre_proyecto|unique:proyectos,nombre_proyecto,' . $id,
-            'correo_electronico' => 'required|email|max:255',
-            'ubicacion' => 'nullable|string|max:255',
-            'credenciales' => 'nullable|string',
-            'propuesta_economica' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
-            'archivo_as_built' => 'nullable|file|mimes:pdf,dwg|max:5120',
-            'salida_inventario' => 'nullable|file|mimes:pdf|max:5120',
+            'nombre_proyecto'       => 'required|string|max:255|unique:proyectos,nombre_proyecto,' . $id,
+            'correo_electronico'    => 'nullable|email|max:255',
+            'ubicacion'             => 'nullable|string|max:255',
+            'credenciales'          => 'nullable|string',
+            'propuesta_economica'   => 'nullable|file|mimes:pdf,doc,docx|max:5120',
+            'archivo_as_built'      => 'nullable|file|mimes:pdf,dwg|max:5120',
+            'salida_inventario'     => 'nullable|file|mimes:pdf|max:5120',
             'devolucion_inventario' => 'nullable|file|mimes:pdf|max:5120'
         ]);
 

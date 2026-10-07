@@ -12,8 +12,8 @@
     <div class="card-header">
         <h5 class="mb-0">
             {{ $cotizacion->proyecto->nombre_proyecto ?? 'Proyecto' }}
-            @if($cotizacion->cliente)
-                — {{ $cotizacion->cliente->razon_social }}
+           @if($cotizacion->proyecto?->cliente)
+                — {{ $cotizacion->proyecto->cliente->razon_social }}
             @endif
         </h5>
     </div>

@@ -9,23 +9,19 @@
         <form action="{{ route('proyectos.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
             
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="nombre_proyecto" class="form-label">Nombre del Proyecto *</label>
-                    <select class="form-select @error('nombre_proyecto') is-invalid @enderror" 
-                            id="nombre_proyecto" name="nombre_proyecto" required>
-                        <option value="">Seleccionar proyecto</option>
-                        @foreach($ventas as $venta)
-                            <option value="{{ $venta->nombre_proyecto }}" {{ old('nombre_proyecto') == $venta->nombre_proyecto ? 'selected' : '' }}>
-                                {{ $venta->nombre_proyecto }} - {{ $venta->titulo_venta }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('nombre_proyecto')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                    <small class="text-muted">Solo proyectos con venta ganada</small>
-                </div>
+           <div class="mb-3">
+    <label for="nombre_proyecto" class="form-label">Nombre del Proyecto *</label>
+    <input type="text"
+           class="form-control @error('nombre_proyecto') is-invalid @enderror"
+           id="nombre_proyecto"
+           name="nombre_proyecto"
+           value="{{ old('nombre_proyecto') }}"
+           required
+           maxlength="255">
+    @error('nombre_proyecto')
+        <div class="invalid-feedback">{{ $message }}</div>
+    @enderror
+</div>
                 
                 <div class="col-md-6 mb-3">
                     <label for="correo_electronico" class="form-label">Correo Electrónico *</label>

@@ -20,33 +20,20 @@
             @csrf
             @method('PUT')
 
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="cliente_id" class="form-label">Cliente *</label>
-                    <select class="form-select @error('cliente_id') is-invalid @enderror" name="cliente_id" id="cliente_id" required>
-                        <option value="">Seleccionar...</option>
-                        @foreach($clientes as $c)
-                            <option value="{{ $c->id }}" {{ old('cliente_id', $cotizacion->cliente_id) == $c->id ? 'selected' : '' }}>
-                                {{ $c->razon_social }} - {{ $c->rfc }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('cliente_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                </div>
+            
 
-                <div class="col-md-6 mb-3">
-                    <label for="proyecto_id" class="form-label">Proyecto *</label>
-                    <select class="form-select @error('proyecto_id') is-invalid @enderror" name="proyecto_id" id="proyecto_id" required>
-                        <option value="">Seleccionar proyecto...</option>
-                        @foreach($proyectos as $p)
-                            <option value="{{ $p->id }}" {{ old('proyecto_id', $cotizacion->proyecto_id) == $p->id ? 'selected' : '' }}>
-                                {{ $p->nombre_proyecto }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('proyecto_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                </div>
-            </div>
+                <div class="mb-3">
+    <label for="proyecto_id" class="form-label">Proyecto *</label>
+    <select class="form-select @error('proyecto_id') is-invalid @enderror" name="proyecto_id" id="proyecto_id" required>
+        <option value="">Seleccionar proyecto...</option>
+        @foreach($proyectos as $p)
+            <option value="{{ $p->id }}" {{ old('proyecto_id', $cotizacion->proyecto_id) == $p->id ? 'selected' : '' }}>
+                {{ $p->nombre_proyecto }}
+            </option>
+        @endforeach
+    </select>
+    @error('proyecto_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+</div>
 
             <div class="row">
                 <div class="col-md-4 mb-3">

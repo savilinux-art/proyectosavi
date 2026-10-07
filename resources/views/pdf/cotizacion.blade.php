@@ -234,8 +234,8 @@
          ============================================================ -->
     <div class="header">
         <img src="{{ $logoBase64 }}" alt="Logo" class="logo">
-        <div class="cliente-nombre">{{ $cotizacion->cliente->razon_social ?? 'N/A' }}</div>
-        <div class="cliente-email">{{ $cotizacion->cliente->correo_electronico ?? 'N/A' }}</div>
+        <div class="cliente-nombre">{{ $cotizacion->proyecto?->cliente?->razon_social ?? 'N/A' }}</div>
+        <div class="cliente-email">{{ $cotizacion->proyecto?->cliente?->correo_electronico ?? 'N/A' }}</div>
         <div class="proyecto-info">
             <span><strong>Proyecto:</strong> {{ $cotizacion->proyecto->nombre_proyecto ?? 'N/A' }}</span>
             <span><strong>Moneda:</strong> {{ $cotizacion->moneda }}</span>

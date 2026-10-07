@@ -5,39 +5,52 @@
     <div class="card-header">
         <h4><i class="bi bi-pencil"></i> Editar Proyecto</h4>
     </div>
-    <div class="card-body">
+    <div class="card-body">@if ($errors->any())
+    <div class="alert alert-danger">
+        <strong>Corrige los siguientes errores:</strong>
+        <ul class="mb-0">
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
+@if (session('error'))
+    <div class="alert alert-danger">{{ session('error') }}</div>
+@endif
+
         <form action="{{ route('proyectos.update', $proyecto->id) }}" method="POST" enctype="multipart/form-data">
             @csrf
             @method('PUT')
             
             <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="nombre_proyecto" class="form-label">Nombre del Proyecto *</label>
-                    <select class="form-select @error('nombre_proyecto') is-invalid @enderror" 
-                            id="nombre_proyecto" name="nombre_proyecto" required>
-                        <option value="">Seleccionar proyecto</option>
-                        @foreach($ventas as $venta)
-                            <option value="{{ $venta->nombre_proyecto }}" 
-                                    {{ old('nombre_proyecto', $proyecto->nombre_proyecto) == $venta->nombre_proyecto ? 'selected' : '' }}>
-                                {{ $venta->nombre_proyecto }} - {{ $venta->titulo_venta }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('nombre_proyecto')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
-                
-                <div class="col-md-6 mb-3">
-                    <label for="correo_electronico" class="form-label">Correo Electrónico *</label>
-                    <input type="email" class="form-control @error('correo_electronico') is-invalid @enderror" 
-                           id="correo_electronico" name="correo_electronico" 
-                           value="{{ old('correo_electronico', $proyecto->correo_electronico) }}" required>
-                    @error('correo_electronico')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
-            </div>
+            <div class="col-md-6 mb-3">
+                <label for="nombre_proyecto" class="form-label">Nombre del Proyecto *</label>
+                <input type="text"
+                class="form-control @error('nombre_proyecto') is-invalid @enderror"
+                id="nombre_proyecto"
+                name="nombre_proyecto"
+                value="{{ old('nombre_proyecto', $proyecto->nombre_proyecto) }}"
+                required
+                maxlength="255">
+             @error('nombre_proyecto')
+            <div class="invalid-feedback">{{ $message }}</div>
+        @enderror
+    </div>
+
+    <div class="col-md-6 mb-3">
+        <label for="correo_electronico" class="form-label">Correo Electrónico</label>
+        <input type="email"
+               class="form-control @error('correo_electronico') is-invalid @enderror"
+               id="correo_electronico"
+               name="correo_electronico"
+               value="{{ old('correo_electronico', $proyecto->correo_electronico) }}">
+        @error('correo_electronico')
+            <div class="invalid-feedback">{{ $message }}</div>
+        @enderror
+    </div>
+</div>
 
             <div class="row">
                 <div class="col-md-6 mb-3">

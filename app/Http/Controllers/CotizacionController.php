@@ -4,21 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\Cotizacion;
 use App\Models\CotizacionDetalle;
-use App\Models\Cliente;
 use App\Models\Proyecto;
 use App\Models\Inventario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\Log;
+
 
 class CotizacionController extends Controller
 {
     // funciones para manejar las cotizaciones
        public function index(Request $request)
     {
-        $query = Cotizacion::with(['cliente', 'creador', 'proyecto'])
+         $query = Cotizacion::with(['creador', 'proyecto.cliente'])
             ->orderBy('id', 'desc');
 
         $proyectoFiltro = $request->input('proyecto');
@@ -37,31 +36,29 @@ class CotizacionController extends Controller
     // ============== Mostrar formulario para crear una nueva cotización ========================
     public function create()
     {
-        $proyectos = Proyecto::all();
-        $clientes = Cliente::all();
-        $productos = Inventario::all();
-
-        return view('cotizaciones.create', compact('proyectos', 'clientes', 'productos'));
+        $proyectos = Proyecto::orderBy('nombre_proyecto')->get();
+$productos = Inventario::all();
+return view('cotizaciones.create', compact('proyectos', 'productos'));
     }
 
     // =========================== Guardar nueva cotización ======================================
     public function store(Request $request)
 {
-    // Validación
-    $request->validate([
-        'cliente_id' => 'required|exists:clientes,id',
-        'proyecto_id' => 'required|exists:proyectos,id',
-        'fecha_emision' => 'required|date',
-        'fecha_validez' => 'nullable|date|after_or_equal:fecha_emision',
-        'moneda' => 'required|in:MXN,USD,EUR',
-        'condiciones' => 'nullable|string',
-        'productos' => 'required|array|min:1',
-        'productos.*.descripcion' => 'required|string',
-        'productos.*.cantidad' => 'required|integer|min:1',
-        'productos.*.precio_unitario' => 'required|numeric|min:0',
-        'productos.*.inventario_id' => 'nullable|exists:inventario,id',
-    ]);
-
+    // Validación: quitar cliente_id, agregar proyecto_modo/proyecto_nuevo
+$request->validate([
+    'proyecto_id'    => 'nullable|exists:proyectos,id|required_without:proyecto_nuevo',
+    'proyecto_nuevo' => 'nullable|string|max:255|required_without:proyecto_id',
+    'proyecto_modo'  => 'required|in:existente,nuevo',   // opcional, para coherencia
+    'fecha_emision'  => 'required|date',
+    'fecha_validez'  => 'nullable|date|after_or_equal:fecha_emision',
+    'moneda'         => 'required|in:MXN,USD,EUR',
+    'condiciones'    => 'nullable|string',
+    'productos'      => 'required|array|min:1',
+    'productos.*.descripcion'      => 'required|string',
+    'productos.*.cantidad'         => 'required|integer|min:1',
+    'productos.*.precio_unitario'  => 'required|numeric|min:0',
+    'productos.*.inventario_id'    => 'nullable|exists:inventario,id',
+]);
     // Obtener usuario de la sesión o autenticación
     $creadoPor = Session::get('user_usuario');
 
@@ -76,11 +73,18 @@ class CotizacionController extends Controller
 
     DB::beginTransaction();
     try {
+        $proyectoId = $request->proyecto_id;
+    if (!$proyectoId && $request->filled('proyecto_nuevo')) {
+         $proyecto = Proyecto::create([
+        'nombre_proyecto' => $request->proyecto_nuevo,
+        'modificado_por'  => $creadoPor,
+        ]);
+        $proyectoId = $proyecto->id;
+        }
         // Crear cotización
         $cotizacion = Cotizacion::create([
             'folio' => Cotizacion::generarFolio(),
-            'cliente_id' => $request->cliente_id,
-            'proyecto_id' => $request->proyecto_id,
+            'proyecto_id' => $proyectoId,  // ← dinámico (existente o recién creado)
             'fecha_emision' => $request->fecha_emision,
             'fecha_validez' => $request->fecha_validez,
             'moneda' => $request->moneda,
@@ -125,7 +129,7 @@ class CotizacionController extends Controller
     // =========================== Mostrar cotización ======================================
     public function show(Cotizacion $cotizacion)
     {
-        $cotizacion->load(['cliente', 'creador', 'detalles.inventario']);
+        $cotizacion->load(['creador', 'detalles.inventario', 'proyecto.cliente']);
         return view('cotizaciones.show', compact('cotizacion'));
     }
 
@@ -134,8 +138,9 @@ public function update(Request $request, Cotizacion $cotizacion)
 {
     // Validación
     $request->validate([
-        'cliente_id' => 'required|exists:clientes,id',
-        'proyecto_id' => 'required|exists:proyectos,id',
+        'proyecto_id'    => 'nullable|exists:proyectos,id|required_without:proyecto_nuevo',
+        'proyecto_nuevo' => 'nullable|string|max:255|required_without:proyecto_id',
+        'proyecto_modo'  => 'required|in:existente,nuevo',   // opcional, para coherencia
         'fecha_emision' => 'required|date',
         'fecha_validez' => 'nullable|date|after_or_equal:fecha_emision',
         'moneda' => 'required|in:MXN,USD,EUR',
@@ -151,7 +156,7 @@ public function update(Request $request, Cotizacion $cotizacion)
     try {
         // 1. Actualizar datos principales
         $cotizacion->update($request->only([
-            'cliente_id', 'proyecto_id', 'fecha_emision', 
+            'proyecto_id', 'fecha_emision', 
             'fecha_validez', 'moneda', 'condiciones'
         ]));
 
@@ -192,13 +197,12 @@ public function update(Request $request, Cotizacion $cotizacion)
 
 // =========================== Mostrar formulario para editar una cotización ======================================
 public function edit(Cotizacion $cotizacion)
-{
-    $clientes = Cliente::all();
-    $proyectos = Proyecto::all();
+    {
+    $proyectos = Proyecto::orderBy('nombre_proyecto')->get();
     $productos = Inventario::all();
     $cotizacion->load(['detalles.inventario']);
-    return view('cotizaciones.edit', compact('cotizacion', 'clientes', 'proyectos', 'productos'));
-}
+    return view('cotizaciones.edit', compact('cotizacion','proyectos', 'productos'));
+    }
 
     /**
      * Vista de la lista de materiales para el almacenista.
@@ -206,7 +210,7 @@ public function edit(Cotizacion $cotizacion)
      */
     public function vistaAlmacen(Cotizacion $cotizacion)
     {
-        $cotizacion->load(['detalles.inventario', 'proyecto', 'cliente']);
+        $cotizacion->load(['detalles.inventario', 'proyecto.cliente']);
         return view('cotizaciones.almacen', compact('cotizacion'));
     }
 
