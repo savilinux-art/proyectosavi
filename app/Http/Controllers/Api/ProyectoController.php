@@ -4,11 +4,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Proyecto;
-use App\Models\Venta;
-use App\Models\Usuario;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Session;
 
 class ProyectoController extends Controller
 {
@@ -19,21 +16,21 @@ class ProyectoController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Proyecto::with(['venta', 'modificadoPor']);
+        $query = Proyecto::with(['cliente', 'modificadoPor']);
 
         // Filtrar por rol
-        if ($user->rol == 'Instalador') {
-            $query->whereHas('venta', function($q) use ($user) {
-                $q->whereHas('instalaciones', function($sub) use ($user) {
-                    $sub->where('id_usuario_asignado', $user->usuario);
+        if ($user->rol === 'Instalador') {
+            $query->whereHas('instalaciones', function ($q) use ($user) {
+                $q->whereHas('instaladores', function ($sub) use ($user) {
+                    $sub->where('instalador_usuario', $user->usuario);
                 });
             });
         }
 
         // Filtros opcionales
-        if ($request->has('estatus')) {
-            $query->whereHas('venta', function($q) use ($request) {
-                $q->where('estatus', $request->estatus);
+        if ($request->filled('estatus')) {
+            $query->whereHas('instalaciones', function ($q) use ($request) {
+                $q->where('estatus_instalacion', $request->estatus);
             });
         }
 
@@ -61,7 +58,7 @@ class ProyectoController extends Controller
      */
     public function show($id)
     {
-        $proyecto = Proyecto::with(['venta', 'modificadoPor'])->find($id);
+        $proyecto = Proyecto::with(['cliente', 'modificadoPor', 'instalaciones'])->find($id);
         
         if (!$proyecto) {
             return response()->json([
@@ -83,8 +80,8 @@ class ProyectoController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'nombre_proyecto' => 'required|exists:ventas,nombre_proyecto|unique:proyectos',
-            'correo_electronico' => 'required|email|max:255',
+            'nombre_proyecto' => 'required|string|max:255|unique:proyectos,nombre_proyecto',
+            'correo_electronico' => 'nullable|email|max:255',
             'ubicacion' => 'nullable|string|max:255',
             'credenciales' => 'nullable|string',
             'propuesta_economica' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
@@ -148,7 +145,7 @@ class ProyectoController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'nombre_proyecto' => 'sometimes|exists:ventas,nombre_proyecto|unique:proyectos,nombre_proyecto,' . $id,
+            'nombre_proyecto' => 'sometimes|string|max:255|unique:proyectos,nombre_proyecto,' . $id,
             'correo_electronico' => 'sometimes|email|max:255',
             'ubicacion' => 'nullable|string|max:255',
             'credenciales' => 'nullable|string',
@@ -238,7 +235,7 @@ class ProyectoController extends Controller
         $proyectos = Proyecto::where('nombre_proyecto', 'LIKE', "%{$query}%")
             ->orWhere('correo_electronico', 'LIKE', "%{$query}%")
             ->orWhere('credenciales', 'LIKE', "%{$query}%")
-            ->with(['venta', 'modificadoPor'])
+            ->with(['cliente', 'modificadoPor'])
             ->get();
 
         return response()->json([
@@ -254,9 +251,9 @@ class ProyectoController extends Controller
      */
     public function byStatus($estatus)
     {
-        $proyectos = Proyecto::whereHas('venta', function($q) use ($estatus) {
-            $q->where('estatus', $estatus);
-        })->with(['venta', 'modificadoPor'])->get();
+        $proyectos = Proyecto::whereHas('instalaciones', function ($q) use ($estatus) {
+            $q->where('estatus_instalacion', $estatus);
+        })->with(['cliente', 'modificadoPor', 'instalaciones'])->get();
 
         return response()->json([
             'success' => true,
@@ -272,9 +269,10 @@ class ProyectoController extends Controller
     public function resumen()
     {
         $total = Proyecto::count();
-        $porEstatus = Proyecto::select('ventas.estatus', DB::raw('count(*) as total'))
-            ->join('ventas', 'proyectos.nombre_proyecto', '=', 'ventas.nombre_proyecto')
-            ->groupBy('ventas.estatus')
+        $porEstatus = DB::table('instalaciones')
+            ->select('estatus_instalacion', DB::raw('count(DISTINCT nombre_proyecto) as total'))
+            ->whereNotNull('estatus_instalacion')
+            ->groupBy('estatus_instalacion')
             ->get();
 
         $conDocumentos = Proyecto::whereNotNull('propuesta_economica')->count();
@@ -347,7 +345,7 @@ class ProyectoController extends Controller
     {
         $limit = $request->get('limit', 10);
         
-        $proyectos = Proyecto::with(['venta', 'modificadoPor'])
+        $proyectos = Proyecto::with(['cliente', 'modificadoPor'])
             ->orderBy('created_at', 'desc')
             ->limit($limit)
             ->get();

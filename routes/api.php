@@ -75,10 +75,17 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Proyectos
     Route::get('/proyectos', [ProyectoController::class, 'index']);
-    Route::get('/proyectos/{id}', [ProyectoController::class, 'show']);
     Route::post('/proyectos', [ProyectoController::class, 'store']);
+    Route::get('/proyectos/buscar', [ProyectoController::class, 'search']);
+    Route::get('/proyectos/resumen', [ProyectoController::class, 'resumen']);
+    Route::get('/proyectos/recientes', [ProyectoController::class, 'recientes']);
+    Route::get('/proyectos/estatus/{estatus}', [ProyectoController::class, 'byStatus']);
+    Route::get('/proyectos/existe/{nombre}', [ProyectoController::class, 'exists']);
+    // {id} al final (evita shadowing)
+    Route::get('/proyectos/{id}', [ProyectoController::class, 'show']);
     Route::put('/proyectos/{id}', [ProyectoController::class, 'update']);
     Route::delete('/proyectos/{id}', [ProyectoController::class, 'destroy']);
+    Route::get('/proyectos/{id}/archivo/{tipo}', [ProyectoController::class, 'downloadFile']);
     
     // Notificaciones
     Route::get('/notificaciones', [NotificacionController::class, 'index']);
@@ -94,13 +101,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/clientes/regimen/{regimen}', [ClienteController::class, 'byRegimen']);
     Route::get('/clientes/{id}/constancia', [ClienteController::class, 'downloadConstancia']);
 
-    // Proyectos - Rutas adicionales
-    Route::get('/proyectos/buscar', [ProyectoController::class, 'search']);
-    Route::get('/proyectos/resumen', [ProyectoController::class, 'resumen']);
-    Route::get('/proyectos/recientes', [ProyectoController::class, 'recientes']);
-    Route::get('/proyectos/estatus/{estatus}', [ProyectoController::class, 'byStatus']);
-    Route::get('/proyectos/existe/{nombre}', [ProyectoController::class, 'exists']);
-    Route::get('/proyectos/{id}/archivo/{tipo}', [ProyectoController::class, 'downloadFile']);
 
 
 
