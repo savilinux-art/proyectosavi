@@ -6,7 +6,7 @@ use App\Models\Estatus;
 use App\Models\Instalacion;
 use App\Models\InstalacionFoto;
 use App\Models\Usuario;
-use App\Models\Venta;
+use App\Models\Proyecto;
 use App\Services\TelegramService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -122,7 +122,7 @@ class InstalacionController extends Controller
      * ============================================================ */
     public function create()
     {
-        $proyectos    = Venta::where('venta_ganada', true)->orderBy('nombre_proyecto')->get();
+        $proyectos    = Proyecto::orderBy('nombre_proyecto')->get();
         $instaladores = Usuario::where('rol', 'Instalador')->orderBy('nombre')->get();
         $estatus      = Estatus::where('tipo', 'instalacion')->orderBy('estatus')->get();
 
@@ -140,7 +140,7 @@ class InstalacionController extends Controller
         }
 
         $request->validate([
-            'nombre_proyecto'     => 'required|exists:ventas,nombre_proyecto',
+            'nombre_proyecto'     => 'required|exists:proyectos,nombre_proyecto',
             'nombre_instalacion'  => 'required|string|max:255',
             'fecha_hora_inicio'   => 'required|date',
             'estatus_instalacion' => 'required|exists:estatus,estatus',
@@ -252,7 +252,7 @@ class InstalacionController extends Controller
             $instalacion = Instalacion::with(['instaladores', 'fotos'])->findOrFail($id);
             $this->verificarAcceso($instalacion);
 
-            $proyectos    = Venta::where('venta_ganada', true)->orderBy('nombre_proyecto')->get();
+            $proyectos    = Proyecto::orderBy('nombre_proyecto')->get();
             $instaladores = Usuario::where('rol', 'Instalador')->orderBy('nombre')->get();
             $estatus      = Estatus::where('tipo', 'instalacion')->orderBy('estatus')->get();
 
@@ -290,7 +290,7 @@ class InstalacionController extends Controller
         }
 
         $request->validate([
-            'nombre_proyecto'     => 'required|exists:ventas,nombre_proyecto',
+            'nombre_proyecto'     => 'required|exists:proyectos,nombre_proyecto',
             'nombre_instalacion'  => 'required|string|max:255',
             'fecha_hora_inicio'   => 'required|date',
             'fecha_hora_fin'      => 'nullable|date|after_or_equal:fecha_hora_inicio',

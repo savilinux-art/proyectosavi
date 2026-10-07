@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\DevolucionInventario;
 use App\Models\DevolucionDetalle;
 use App\Models\Inventario;
-use App\Models\Venta;
+use App\Models\Proyecto;
 use App\Models\Usuario;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +27,7 @@ class DevolucionInventarioController extends Controller
      */
     public function create()
     {
-        $proyectos = Venta::where('venta_ganada', true)->get();
+        $proyectos = Proyecto::orderBy('nombre_proyecto')->get();
         $usuarios = Usuario::all();
         $productos = Inventario::all(); // Se pueden devolver productos sin stock (para devolver lo que ya se llevaron)
         return view('devoluciones.create', compact('proyectos', 'usuarios', 'productos'));
@@ -64,7 +64,7 @@ class DevolucionInventarioController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'nombre_proyecto' => 'nullable|exists:ventas,nombre_proyecto',
+            'nombre_proyecto' => 'required|exists:proyectos,nombre_proyecto',
             'recibido_por'    => 'required|exists:usuarios,usuario',
             'productos'       => 'required|array|min:1',
             'productos.*.inventario_id' => 'required|exists:inventario,id',
