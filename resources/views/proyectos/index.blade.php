@@ -30,7 +30,7 @@
                         <td>
                             <strong>{{ $proyecto->nombre_proyecto }}</strong>
                             <br>
-                            <small class="text-muted">{{ $proyecto->venta->titulo_venta ?? 'N/A' }}</small>
+                        <small class="text-muted">{{ $proyecto->cliente?->razon_social ?? 'Sin cliente' }}</small>
                         </td>
                         <td>{{ $proyecto->correo_electronico }}</td>
                         <td>{{ $proyecto->ubicacion ?? 'N/A' }}</td>
