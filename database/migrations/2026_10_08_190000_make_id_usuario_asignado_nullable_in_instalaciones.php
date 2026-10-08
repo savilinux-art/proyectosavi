@@ -6,28 +6,28 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration
 {
     /**
-     * Q-101b (revisado 8-oct-2026):
-     *   La columna `instalaciones.id_usuario_asignado` es NULLABLE en dev
-     *   por un ALTER manual que nunca se versionó. En testing seguía siendo
-     *   NOT NULL, lo que rompía los tests al dejar de poblarla desde
-     *   InstalacionFactory.
+     * Q-104 (revisado 8-oct-2026 tras drift descubierto en prod):
      *
-     *   Mismo patrón que `fk_instalaciones_proyecto` (Q-103): drift por
-     *   modificación manual en dev sin migración correspondiente.
+     * Esta migración originalmente hacía ALTER TABLE asumiendo que la
+     * columna id_usuario_asignado existía. En prod NO EXISTE (nunca
+     * existió o fue dropeada manualmente). La hacemos idempotente:
      *
-     *   IDEMPOTENTE: si ya es nullable, no hace nada.
+     *   - Si la columna no existe       → [skip] (equivalente funcional:
+     *                                      sin columna, sin NOT NULL)
+     *   - Si existe y ya es nullable    → [skip]
+     *   - Si existe y NO es nullable    → [modify]
+     *
+     * El objetivo funcional (Q-93: el dominio usa el pivote
+     * instalacion_instalador, no esta columna) se cumple en los 3 casos.
      */
     public function up(): void
     {
-        $col = DB::selectOne("
-            SELECT IS_NULLABLE
-            FROM information_schema.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = 'instalaciones'
-              AND COLUMN_NAME = 'id_usuario_asignado'
-        ");
+        if (!$this->columnExists('id_usuario_asignado')) {
+            echo "  [skip] id_usuario_asignado no existe (nada que hacer).\n";
+            return;
+        }
 
-        if ($col && strtoupper($col->IS_NULLABLE) === 'YES') {
+        if ($this->isNullable('id_usuario_asignado')) {
             echo "  [skip] id_usuario_asignado ya es nullable.\n";
             return;
         }
@@ -36,13 +36,33 @@ return new class extends Migration
             ALTER TABLE `instalaciones`
             MODIFY `id_usuario_asignado` VARCHAR(255) NULL DEFAULT NULL
         ");
-        echo "  [modify] id_usuario_asignado ahora es NULL DEFAULT NULL.\n";
+        echo "  [modify] id_usuario_asignado ahora es nullable.\n";
     }
 
     public function down(): void
     {
-        // No-op intencional (Q-101b): la columna es zombie; el dominio
-        // usa el pivote `instalacion_instalador`. Revertir a NOT NULL
-        // rompería el desacople.
+        // No-op intencional (Q-93: la columna se eliminará en sesión dedicada).
+    }
+
+    private function columnExists(string $col): bool
+    {
+        return (bool) DB::selectOne("
+            SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'instalaciones'
+              AND COLUMN_NAME = ?
+        ", [$col]);
+    }
+
+    private function isNullable(string $col): bool
+    {
+        $row = DB::selectOne("
+            SELECT IS_NULLABLE FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'instalaciones'
+              AND COLUMN_NAME = ?
+        ", [$col]);
+
+        return $row && $row->IS_NULLABLE === 'YES';
     }
 };
