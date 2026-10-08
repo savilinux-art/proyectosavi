@@ -16,6 +16,33 @@ return new class extends Migration
      */
     public function up(): void
     {
+            // === Validación de huérfanos (Q-104) ===
+    // Motivo: en prod, `casa de la paz` (id=37) rompió el ALTER porque
+    // el FK a proyectos no podía crearse con huérfanos. El orden viejo
+    // (drop legacy → add nuevo) dejaba la tabla SIN FK si el add fallaba.
+    // Este bloque corta ANTES de tocar la tabla.
+    $huerfanos = DB::table('instalaciones as i')
+        ->leftJoin('proyectos as p', 'p.nombre_proyecto', '=', 'i.nombre_proyecto')
+        ->whereNull('p.nombre_proyecto')
+        ->distinct()
+        ->pluck('i.nombre_proyecto');
+
+    if ($huerfanos->isNotEmpty()) {
+        foreach ($huerfanos as $h) {
+            echo "  ❌ Huérfano: instalaciones.nombre_proyecto = '{$h}'\n";
+        }
+        throw new \RuntimeException(sprintf(
+            'No se puede crear fk_instalaciones_proyecto: %d huérfanos. ' .
+            'Resolver datos antes de migrar. Ver Q-104.',
+            $huerfanos->count()
+        ));
+    }
+    // === Fin validación ===
+
+    if ($this->fkExists('fk_instalaciones_proyecto')) {
+        echo "  [skip] fk_instalaciones_proyecto ya existe.\n";
+        return;
+    }
         if ($this->fkExists('fk_instalaciones_proyecto')) {
             echo "  [skip] fk_instalaciones_proyecto ya existe.\n";
             return;
