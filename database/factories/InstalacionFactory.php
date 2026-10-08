@@ -4,23 +4,19 @@ namespace Database\Factories;
 
 use App\Models\Estatus;
 use App\Models\Instalacion;
-use App\Models\Usuario;
-use App\Models\Venta;
+use App\Models\Proyecto;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends Factory<Instalacion>
  *
- * NOTA (Q-93/Q-101):
- *  - `id_usuario_asignado` es columna zombie NOT NULL en BD.
- *    El dominio usa el pivote `instalacion_instalador`.
- *    Se puebla aquí para no romper el INSERT, pero el filtro de la API
- *    y el web usan SOLO el pivote.
- *  - Pendiente Q-101b: migrar `id_usuario_asignado` a nullable y dejar
- *    de poblarla.
- *  - Pendiente Q-101c: quitar `Venta::factory()` (legacy del acople),
- *    requiere actualizar InstalacionObserverTest que cuenta con el admin
- *    transitivo de VentaFactory.
+ * Q-101b/c RESUELTOS (8-oct-2026):
+ *   - `id_usuario_asignado` ya es NULLABLE en BD (verificado con DDL).
+ *     El factory ya NO la puebla. El dominio usa SOLO el pivote.
+ *   - Ya NO crea Venta. `nombre_proyecto` se deriva de un Proyecto,
+ *     que es la entidad canónica (FK real desde antes del 4-oct-2026).
+ *   - El `afterCreating` del pivote se mantiene para el caso en que
+ *     un test pase `id_usuario_asignado` vía state().
  */
 class InstalacionFactory extends Factory
 {
@@ -28,19 +24,16 @@ class InstalacionFactory extends Factory
 
     public function definition(): array
     {
-        $venta = Venta::factory()->create();
+        $proyecto = Proyecto::factory()->create();
 
         $estatus = Estatus::firstOrCreate(
             ['estatus' => 'Programada'],
             ['tipo'    => 'instalacion']
         );
 
-        // Columna zombie NOT NULL — se llena, pero el dominio usa el pivote.
-        $instaladorLegacy = Usuario::factory()->instalador()->create();
-
         return [
-            'id_usuario_asignado'      => $instaladorLegacy->usuario,
-            'nombre_proyecto'          => $venta->nombre_proyecto,
+            'id_usuario_asignado'      => null,
+            'nombre_proyecto'          => $proyecto->nombre_proyecto,
             'nombre_instalacion'       => 'Instalación ' . $this->faker->unique()->numerify('###'),
             'ubicacion_actual'         => null,
             'latitud'                  => $this->faker->latitude(),
@@ -58,9 +51,8 @@ class InstalacionFactory extends Factory
     }
 
     /**
-     * Puebla el pivote `instalacion_instalador` con el MISMO instalador
-     * que quedó en `id_usuario_asignado`, manteniendo ambos lados en sync.
-     * El dominio (filtro de la API y web) usa SOLO el pivote.
+     * Si un test pasa `id_usuario_asignado` explícitamente vía state(),
+     * sincroniza el pivote. Si es null (default), no hace nada.
      */
     public function configure(): static
     {

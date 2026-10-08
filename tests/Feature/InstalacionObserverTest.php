@@ -55,7 +55,8 @@ test('cambio a estatus fuera de AVISOS no crea recordatorios', function () {
 test('sin admins no crea recordatorios ni lanza excepción', function () {
     $instalacion = Instalacion::factory()->create(['estatus_instalacion' => 'pendiente']);
 
-    // VentaFactory crea un admin por default. Los borramos.
+    // Los factories crean usuarios colaterales (ProyectoFactory → modificado_por,
++   // ProyectoFactory → Usuario default). Los degradamos a Instalador.
     Usuario::where('rol', 'Administrador')->update(['rol' => 'Instalador']);
 
     $instalacion->update(['estatus_instalacion' => 'completada']);
@@ -73,7 +74,7 @@ test('pasar a completada crea un recordatorio por admin con campos correctos', f
 
     $instalacion = Instalacion::factory()->create(['estatus_instalacion' => 'en_proceso']);
 
-    // Contar TODOS los admins (incluye el que creó VentaFactory transitivamente).
+    // Contar TODOS los admins (incluye los que crean ProyectoFactory transitivamente).
     $totalAdmins = contarAdmins();
 
     $instalacion->update(['estatus_instalacion' => 'completada']);
