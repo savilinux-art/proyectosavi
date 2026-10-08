@@ -140,7 +140,7 @@ public function update(Request $request, Cotizacion $cotizacion)
     $request->validate([
         'proyecto_id'    => 'nullable|exists:proyectos,id|required_without:proyecto_nuevo',
         'proyecto_nuevo' => 'nullable|string|max:255|required_without:proyecto_id',
-        'proyecto_modo'  => 'required|in:existente,nuevo',   // opcional, para coherencia
+        'proyecto_modo' => 'nullable|in:existente,nuevo',  // opcional, para coherencia
         'fecha_emision' => 'required|date',
         'fecha_validez' => 'nullable|date|after_or_equal:fecha_emision',
         'moneda' => 'required|in:MXN,USD,EUR',
