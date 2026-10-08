@@ -81,7 +81,7 @@ class DashboardController extends Controller
                 break;
 
             case 'Sistemas':
-                $data['proyectos'] = Proyecto::with(['venta'])->get();
+                $data['proyectos'] = Proyecto::with(['cliente'])->get();
                 $data['instalaciones'] = Instalacion::with(['proyecto', 'instaladores'])->get();
                 break;
 

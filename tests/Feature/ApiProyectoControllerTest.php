@@ -172,8 +172,8 @@ class ApiProyectoControllerTest extends TestCase
 
         // Asignar SOLO instalador1 → proyectoA, vía pivote
         // (la factory no puebla el pivote, ver Q-101)
-        $inst1->instaladores()->attach($instalador1->usuario);
-        $inst2->instaladores()->attach($instalador2->usuario);
+        $inst1->instaladores()->sync([$instalador1->usuario]);
+        $inst2->instaladores()->sync([$instalador2->usuario]);
 
         // Autenticar como instalador1
         $this->actingAs($instalador1, 'sanctum');

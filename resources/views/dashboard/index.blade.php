@@ -298,12 +298,12 @@
                 @if(isset($proyectos) && $proyectos->count() > 0)
                     <div class="table-responsive">
                         <table class="table table-striped">
-                            <thead><tr><th>Proyecto</th><th>Venta asociada</th><th>Acciones</th></tr></thead>
+                            <thead><tr><th>Proyecto</th><th>Cliente</th><th>Acciones</th></tr></thead>
                             <tbody>
                                 @foreach($proyectos as $proy)
                                 <tr>
                                     <td>{{ $proy->nombre_proyecto }}</td>
-                                    <td>{{ $proy->venta->titulo_venta ?? 'N/A' }}</td>
+                                    <td>{{ $proy->cliente?->razon_social ?? 'Sin cliente' }}</td>
                                     <td><a href="{{ route('proyectos.edit', $proy->id) }}" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i></a></td>
                                 </tr>
                                 @endforeach

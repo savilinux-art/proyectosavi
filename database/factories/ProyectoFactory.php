@@ -7,6 +7,13 @@ use App\Models\Usuario;
 use App\Models\Venta;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/**
+ * @extends Factory<Proyecto>
+ *
+ * NOTA (Q-100b): crea Venta porque la tabla `instalaciones` tiene un FK
+ * (`nombre_proyecto` → `ventas.nombre_proyecto`). Quitar cuando se migre
+ * ese FK a `proyectos.nombre_proyecto`.
+ */
 class ProyectoFactory extends Factory
 {
     protected $model = Proyecto::class;
