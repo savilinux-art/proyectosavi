@@ -10,15 +10,13 @@ return new class extends Migration
      *
      * Esta migración originalmente hacía ALTER TABLE asumiendo que la
      * columna id_usuario_asignado existía. En prod NO EXISTE (nunca
-     * existió o fue dropeada manualmente). La hacemos idempotente:
+     * existió o fue dropeada manualmente — el dominio usa el pivote
+     * instalacion_instalador, ver Q-93).
      *
-     *   - Si la columna no existe       → [skip] (equivalente funcional:
-     *                                      sin columna, sin NOT NULL)
+     * La hacemos idempotente:
+     *   - Si la columna no existe       → [skip] (equivalente funcional)
      *   - Si existe y ya es nullable    → [skip]
      *   - Si existe y NO es nullable    → [modify]
-     *
-     * El objetivo funcional (Q-93: el dominio usa el pivote
-     * instalacion_instalador, no esta columna) se cumple en los 3 casos.
      */
     public function up(): void
     {
