@@ -11,10 +11,8 @@
         <div class="card"><div class="card-header"><h5>Información</h5></div><div class="card-body">
             <table class="table table-bordered">
                 <tr><th width="30%">ID</th><td>{{ $venta->id }}</td></tr>
-                <tr><th>Título</th><td>{{ $venta->titulo_venta }}</td></tr>
                 <tr><th>Proyecto</th><td>{{ $venta->nombre_proyecto }}</td></tr>
                 <tr><th>Moneda</th><td>{{ $venta->moneda }}</td></tr>
-                <tr><th>Monto</th><td>${{ number_format($venta->monto_venta, 2) }}</td></tr>
                 <tr><th>Requerimiento</th><td>{{ $venta->requerimiento_venta }}</td></tr>
                 <tr><th>Vendedor</th><td>{{ $venta->vendedor->nombre ?? 'N/A' }}</td></tr>
                 <tr><th>Fecha Levantamiento</th><td>{{ \Carbon\Carbon::parse($venta->fecha_hora_levantamiento)->format('d/m/Y H:i') }}</td></tr>
@@ -25,13 +23,100 @@
         </div></div>
     </div>
     <div class="col-md-4">
-        <div class="card"><div class="card-header"><h6>Documentos</h6></div><div class="card-body">
-            <div class="list-group">
-                @if($venta->cotizacion)<div class="list-group-item"><i class="bi bi-file-pdf text-danger"></i> Cotización <a href="#" class="btn btn-sm btn-danger float-end"><i class="bi bi-download"></i></a></div>@endif
-                @if($venta->levantamiento)<div class="list-group-item"><i class="bi bi-file-earmark text-primary"></i> Levantamiento <a href="#" class="btn btn-sm btn-primary float-end"><i class="bi bi-download"></i></a></div>@endif
-                @if(!$venta->cotizacion && !$venta->levantamiento)<div class="text-center py-3 text-muted"><i class="bi bi-file-earmark" style="font-size:48px;"></i><p>No hay documentos</p></div>@endif
+              <div class="card"><div class="card-header"><h6>Documentos</h6></div><div class="card-body">
+    <div class="list-group">
+        @if($venta->tieneDocumento('cotizacion'))
+            <div class="list-group-item d-flex align-items-center gap-2">
+                <i class="bi bi-file-pdf text-danger"></i>
+                <span class="flex-grow-1">Cotización</span>
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                        onclick="verDocumento('{{ route('ventas.documento', [$venta, 'cotizacion']) }}', 'Cotización')">
+                    <i class="bi bi-eye"></i> Ver
+                </button>
+                <a href="{{ route('ventas.documento', [$venta, 'cotizacion']) }}"
+                   target="_blank" class="btn btn-sm btn-danger" title="Descargar">
+                    <i class="bi bi-download"></i>
+                </a>
             </div>
-        </div></div>
+        @endif
+        @if($venta->tieneDocumento('levantamiento'))
+            <div class="list-group-item d-flex align-items-center gap-2">
+                <i class="bi bi-file-earmark text-primary"></i>
+                <span class="flex-grow-1">Levantamiento</span>
+                <button type="button" class="btn btn-sm btn-outline-primary"
+                        onclick="verDocumento('{{ route('ventas.documento', [$venta, 'levantamiento']) }}', 'Levantamiento')">
+                    <i class="bi bi-eye"></i> Ver
+                </button>
+                <a href="{{ route('ventas.documento', [$venta, 'levantamiento']) }}"
+                   target="_blank" class="btn btn-sm btn-primary" title="Descargar">
+                    <i class="bi bi-download"></i>
+                </a>
+            </div>
+        @endif
+        @if(!$venta->tieneDocumento('cotizacion') && !$venta->tieneDocumento('levantamiento'))
+            <div class="text-center py-3 text-muted">
+                <i class="bi bi-file-earmark" style="font-size:48px;"></i>
+                <p>No hay documentos</p>
+            </div>
+        @endif
+    </div>
+</div></div>
+</div>
+
+{{-- Modal para previsualizar documentos --}}
+<div class="modal fade" id="modalDocumento" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tituloDocumento">Documento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-0" style="height: 75vh;">
+                <iframe id="iframeDocumento" src="about:blank"
+                        style="width:100%; height:100%; border:0;"></iframe>
+            </div>
+        </div>
     </div>
 </div>
+
+@push('scripts')
+<script>
+    // Listener único (no se re-registra en cada click)
+    document.addEventListener('DOMContentLoaded', function () {
+        const iframe  = document.getElementById('iframeDocumento');
+        const modalEl = document.getElementById('modalDocumento');
+        if (!iframe || !modalEl) return;
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            iframe.src = 'about:blank';
+            iframe.dataset.src = '';
+        });
+    });
+
+    function verDocumento(url, titulo) {
+        const tituloEl = document.getElementById('tituloDocumento');
+        const iframe   = document.getElementById('iframeDocumento');
+        const modalEl  = document.getElementById('modalDocumento');
+        const modal    = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+        tituloEl.textContent = titulo;
+
+        // Caso A: modal ya visible → cambiar src directo
+        if (modalEl.classList.contains('show')) {
+            iframe.src = url;
+            return;
+        }
+
+        // Caso B: modal cerrado → guardar url y cargar en 'shown.bs.modal'
+        iframe.dataset.src = url;
+        modalEl.addEventListener('shown.bs.modal', function () {
+            iframe.src = iframe.dataset.src || 'about:blank';
+            iframe.dataset.src = '';
+        }, { once: true });
+
+        modal.show();
+    }
+</script>
+@endpush
+
 @endsection

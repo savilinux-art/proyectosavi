@@ -87,6 +87,9 @@ Route::middleware(['auth.session', 'permiso:ver-devoluciones'])->group(function 
 // ═══════════════════════════════════════════════════════════
 Route::middleware(['auth.session', 'permiso:ver-ventas'])->group(function () {
     Route::get('ventas/export', [VentaController::class, 'export'])->name('ventas.export');
+    Route::get('ventas/{venta}/documento/{tipo}', [VentaController::class, 'descargarDocumento'])
+        ->name('ventas.documento')
+        ->where('tipo', 'cotizacion|levantamiento');
     Route::resource('ventas', VentaController::class);
 });
 

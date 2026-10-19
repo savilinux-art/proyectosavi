@@ -381,22 +381,65 @@
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-    <script>
-        document.getElementById('sidebarToggle').addEventListener('click', function() {
-            document.getElementById('sidebar').classList.toggle('open');
-            document.getElementById('sidebarOverlay').classList.toggle('active');
-        });
-        document.getElementById('sidebarOverlay').addEventListener('click', function() {
-            document.getElementById('sidebar').classList.remove('open');
-            document.getElementById('sidebarOverlay').classList.remove('active');
-        });
-        setTimeout(function() {
-            document.querySelectorAll('.alert').forEach(function(alert) {
+   <script>
+    (function () {
+        // ========= SIDEBAR: toggle mobile (sin romper si no existe) =========
+        var sidebar = document.getElementById('sidebar');
+        var toggle  = document.getElementById('sidebarToggle');
+        var overlay = document.getElementById('sidebarOverlay');
+
+        if (toggle && sidebar) {
+            toggle.addEventListener('click', function () {
+                sidebar.classList.toggle('open');
+                if (overlay) overlay.classList.toggle('active');
+            });
+        }
+        if (overlay && sidebar) {
+            overlay.addEventListener('click', function () {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('active');
+            });
+        }
+
+        // ========= SIDEBAR: no perder posición entre navegaciones =========
+        if (sidebar) {
+            // 1. Restaurar scroll guardado (si existe) — primero
+            var saved = sessionStorage.getItem('sidebarScrollTop');
+            if (saved !== null) {
+                sidebar.scrollTop = parseInt(saved, 10);
+            }
+
+            // 2. Auto-scroll al link activo (prioridad sobre el guardado)
+            //    El link activo es el que tiene class="nav-link active"
+            var activeLink = sidebar.querySelector('.nav-link.active');
+            if (activeLink) {
+                var sbRect = sidebar.getBoundingClientRect();
+                var lnRect = activeLink.getBoundingClientRect();
+                // Solo si el link activo NO está visible en el viewport del sidebar
+                if (lnRect.top < sbRect.top || lnRect.bottom > sbRect.bottom) {
+                    activeLink.scrollIntoView({ block: 'center', behavior: 'instant' });
+                }
+            }
+
+            // 3. Guardar scroll cada vez que el usuario scrollea
+            var saveTimer;
+            sidebar.addEventListener('scroll', function () {
+                clearTimeout(saveTimer);
+                saveTimer = setTimeout(function () {
+                    sessionStorage.setItem('sidebarScrollTop', sidebar.scrollTop);
+                }, 100);
+            });
+        }
+
+        // ========= AUTO-CERRAR ALERTS =========
+        setTimeout(function () {
+            document.querySelectorAll('.alert').forEach(function (alert) {
                 var bsAlert = new bootstrap.Alert(alert);
                 bsAlert.close();
             });
         }, 5000);
-    </script>
+    })();
+</script>
     @stack('scripts')
 </body>
 </html>
