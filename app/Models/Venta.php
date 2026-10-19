@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Venta extends Model
 {
@@ -25,7 +26,9 @@ class Venta extends Model
         'levantamiento',
         'venta_ganada',
         'razon_perdida_venta',
-        'estatus'
+        'estatus',
+        'cotizacion_path',
+        'levantamiento_path',
     ];
 
     protected $casts = [
@@ -70,7 +73,25 @@ class Venta extends Model
         return $query->where('venta_ganada', false);
     }
 
-    
+  
+public function tieneDocumento(string $tipo): bool
+{
+    if (!in_array($tipo, ['cotizacion', 'levantamiento'], true)) {
+        return false;
+    }
+
+    $path = $this->{"{$tipo}_path"};
+    if (!empty($path) && Storage::disk('local')->exists($path)) {
+        return true;
+    }
+
+    $blob = $this->{$tipo} ?? '';
+    return strlen($blob) > 200 && (
+        str_starts_with($blob, '%PDF-')
+        || str_starts_with($blob, "\xD0\xCF\x11\xE0")
+        || str_starts_with($blob, "PK\x03\x04")
+    );
+}
 
 
 }
