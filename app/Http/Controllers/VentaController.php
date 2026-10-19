@@ -63,7 +63,7 @@ public function edit($id)
     $venta = Venta::findOrFail($id);
 
     // Obtener datos necesarios para el formulario (ej. vendedores, estatus, etc.)
-    $vendedores = Usuario::where('rol', 'Ventas')->get();
+    $vendedores = Usuario::whereIn('rol', ['Ventas', 'Administrador'])->get();
     $estatus = ['prospeccion', 'levantamiento', 'cotizacion', 'cierre_venta'];
 
     return view('ventas.edit', compact('venta', 'vendedores', 'estatus'));
