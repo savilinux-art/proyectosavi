@@ -11,10 +11,8 @@
         <div class="card"><div class="card-header"><h5>Información</h5></div><div class="card-body">
             <table class="table table-bordered">
                 <tr><th width="30%">ID</th><td>{{ $venta->id }}</td></tr>
-                <tr><th>Título</th><td>{{ $venta->titulo_venta }}</td></tr>
                 <tr><th>Proyecto</th><td>{{ $venta->nombre_proyecto }}</td></tr>
                 <tr><th>Moneda</th><td>{{ $venta->moneda }}</td></tr>
-                <tr><th>Monto</th><td>${{ number_format($venta->monto_venta, 2) }}</td></tr>
                 <tr><th>Requerimiento</th><td>{{ $venta->requerimiento_venta }}</td></tr>
                 <tr><th>Vendedor</th><td>{{ $venta->vendedor->nombre ?? 'N/A' }}</td></tr>
                 <tr><th>Fecha Levantamiento</th><td>{{ \Carbon\Carbon::parse($venta->fecha_hora_levantamiento)->format('d/m/Y H:i') }}</td></tr>

@@ -13,7 +13,6 @@
     <div class="col-md-3"><div class="card text-white bg-primary"><div class="card-body"><h6>Total Ventas</h6><h3>{{ $ventas->count() }}</h3></div></div></div>
     <div class="col-md-3"><div class="card text-white bg-success"><div class="card-body"><h6>Ventas Ganadas</h6><h3>{{ $ventas->where('venta_ganada', true)->count() }}</h3></div></div></div>
     <div class="col-md-3"><div class="card text-white bg-danger"><div class="card-body"><h6>Ventas Perdidas</h6><h3>{{ $ventas->where('venta_ganada', false)->count() }}</h3></div></div></div>
-    <div class="col-md-3"><div class="card text-white bg-warning"><div class="card-body"><h6>Monto Total</h6><h3>${{ number_format($ventas->sum('monto_venta'), 2) }}</h3></div></div></div>
 </div>
 
 <div class="card"><div class="card-body">
@@ -21,10 +20,8 @@
         <thead>
             <tr>
                 <th>ID</th>
-                <th>Título</th>
                 <th>Proyecto</th>
                 <th>Moneda</th>
-                <th>Monto</th>
                 <th>Vendedor</th>
                 <th>Estatus</th>
                 <th>Ganada</th>
@@ -35,10 +32,8 @@
             @foreach($ventas as $venta)
             <tr>
                 <td>{{ $venta->id }}</td>
-                <td><strong>{{ Str::limit($venta->titulo_venta, 30) }}</strong></td>
                 <td>{{ $venta->nombre_proyecto }}</td>
                 <td>{{ $venta->moneda }}</td>
-                <td>${{ number_format($venta->monto_venta, 2) }}</td>
                 <td>{{ $venta->vendedor->nombre ?? 'N/A' }}</td>
                 <td><span class="badge bg-{{ $venta->estatus == 'cierre_venta' ? 'success' : ($venta->estatus == 'cotizacion' ? 'warning' : ($venta->estatus == 'levantamiento' ? 'info' : 'secondary')) }}">{{ ucfirst($venta->estatus ?? 'N/A') }}</span></td>
                 <td>@if($venta->venta_ganada)<span class="badge bg-success"><i class="bi bi-check-circle"></i> Sí</span>@else<span class="badge bg-danger"><i class="bi bi-x-circle"></i> No</span>@endif</td>

@@ -28,10 +28,10 @@ class VentaController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'titulo_venta' => 'required|string',
+            'titulo_venta' => 'nullable|string',
             'nombre_proyecto' => 'required|string|unique:ventas',
             'moneda' => 'required|string',
-            'monto_venta' => 'required|numeric',
+            'monto_venta' => 'nullable|numeric',
             'requerimiento_venta' => 'required|string',
             'fecha_hora_levantamiento' => 'required|date',
             'venta_ganada' => 'required|boolean',
@@ -73,10 +73,10 @@ public function edit($id)
 public function update(Request $request, $id)
 {
     $request->validate([
-        'titulo_venta' => 'required|string',
+        'titulo_venta' => 'nullable|string',
         'nombre_proyecto' => 'required|string|unique:ventas,nombre_proyecto,' . $id . ',id',
         'moneda' => 'required|string',
-        'monto_venta' => 'required|numeric',
+        'monto_venta' => 'nullable|numeric',
         'requerimiento_venta' => 'required|string',
         'vendedor' => 'required|exists:usuarios,usuario',
         'estatus' => 'required|exists:estatus,estatus',
