@@ -46,7 +46,7 @@ read -p "¿Continuar con el deploy? (y/N) " resp
 echo ""
 echo "💾 PASO 2 — Backup de BD..."
 BACKUP="/tmp/prod-backup-$(date +%F-%H%M).sql"
-mysqldump -u "$DB_USER" -p "$DB_NAME" > "$BACKUP"
+mysqldump --single-transaction --quick --routines --triggers "$DB_NAME" > "$BACKUP"
 ls -lh "$BACKUP"
 echo "✅ Backup en: $BACKUP"
 
