@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\InventarioController;
 use App\Http\Controllers\Api\VentaController;
 use App\Http\Controllers\Api\InstalacionController;
+use App\Http\Controllers\Api\SalidaApiController;
 use App\Http\Controllers\Api\ClienteController;
 use App\Http\Controllers\Api\ProyectoController;
 use App\Http\Controllers\Api\NotificacionController;
@@ -33,6 +34,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     Route::get('/me',   [AuthController::class, 'me']); 
     Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
+
+    // Salidas (móvil pull propias)
+    Route::get('/salidas', [SalidaApiController::class, 'index']);
     
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);

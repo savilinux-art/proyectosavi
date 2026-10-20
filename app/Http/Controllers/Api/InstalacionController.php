@@ -16,27 +16,40 @@ class InstalacionController extends Controller
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        $query = Instalacion::with(['proyecto', 'usuarioAsignado']);
+        $user    = $request->user();
+        $perPage = min((int) $request->input('per_page', 50), 100);
+
+        $query = Instalacion::with(['proyecto']);
 
         if ($user->rol == 'Instalador') {
-            $query->where('id_usuario_asignado', $user->usuario);
+            // B-11 fix: id_usuario_asignado no existe en prod. Pivote es autoritativo.
+            $query->porInstalador($user->usuario);
         }
 
-        if ($request->has('estatus')) {
-            $query->where('estatus_instalacion', $request->estatus);
+        if ($request->filled('estatus')) {
+            $query->estatus($request->estatus);
         }
 
-        if ($request->has('pendientes')) {
+        if ($request->filled('pendientes')) {
             $query->where('estatus_instalacion', '!=', 'entrega');
         }
 
-        $instalaciones = $query->orderBy('created_at', 'desc')->get();
+        if ($request->filled('since')) {
+            $query->where('updated_at', '>=', $request->input('since'));
+        }
+
+        $instalaciones = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $instalaciones,
-            'total' => $instalaciones->count()
+            'data'    => $instalaciones->items(),
+            'total'   => $instalaciones->total(),
+            'meta'    => [
+                'current_page' => $instalaciones->currentPage(),
+                'last_page'    => $instalaciones->lastPage(),
+                'per_page'     => $instalaciones->perPage(),
+                'total'        => $instalaciones->total(),
+            ],
         ]);
     }
 
@@ -45,7 +58,7 @@ class InstalacionController extends Controller
      */
     public function show($id)
     {
-        $instalacion = Instalacion::with(['proyecto', 'usuarioAsignado'])->findOrFail($id);
+        $instalacion = Instalacion::with(['proyecto'])->findOrFail($id);
         $instalacion->check_list = json_decode($instalacion->check_list);
 
         return response()->json([
