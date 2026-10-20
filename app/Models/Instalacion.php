@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Instalacion extends Model
 {
@@ -53,6 +54,12 @@ class Instalacion extends Model
             'id',
             'usuario'
         )->withPivot('es_principal');
+    }
+
+    public function eventos(): HasMany
+    {
+        return $this->hasMany(InstalacionEvento::class, 'instalacion_id')
+                ->orderBy('capturado_at');
     }
 
     public function ubicaciones()
