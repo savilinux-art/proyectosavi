@@ -7,8 +7,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Sanctum\HasApiTokens;
+
 class Usuario extends Authenticatable
 {
+    use HasApiTokens; // ← NUEVO, junto a HasFactory/Notifiable/SoftDeletes
     use SoftDeletes;   
     use HasFactory, Notifiable;
 
@@ -109,5 +112,9 @@ class Usuario extends Authenticatable
             'Usa soft-delete: $usuario->delete().'
         );
     }
+
+
+
+
 
 }

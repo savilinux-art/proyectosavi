@@ -1,0 +1,734 @@
+================================================================================
+       MODELO DE NEGOCIO — APP MÓVIL OFFLINE-FIRST ProyectoSAVI
+       Documento: docs/movil/MODELO-NEGOCIO-APP-MOVIL-v2.txt
+       Versión: v2 — 20-oct-2026
+       Base: v1 + dump prod 19-oct + dump instalaciones/fotos/instalador 20-oct
+             + decisiones F-1 a F-6 + confirmación opción A + opción B
+       Estado: BORRADOR. Módulo A cerrado. Módulo B cerrado al 90% (2 preguntas).
+================================================================================
+
+INSTRUCCIONES DE LECTURA:
+  ✅ = Decisión confirmada por el usuario o por datos verificados en prod.
+  🔄 = Cambiado respecto a v1. El v1 queda obsoleto en este punto.
+  🚨 = Hallazgo nuevo del dump. Puede afectar diseño o plan.
+  ⏳ = Pendiente de decisión. Se aplica default si no hay respuesta.
+  🔴 = Bloqueante para arrancar la app.
+  🟡 = Importante, no bloqueante.
+  🟢 = Cosmético / postergable.
+
+================================================================================
+§0. ALCANCE COMPLETO DEL MÓVIL
+================================================================================
+
+La app móvil cubre DOS módulos en Fase 1:
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  MÓDULO A — SALIDAS DE INVENTARIO + FIRMA DEL CLIENTE              │
+  │    Estado: CERRADO ✅ (reusa evidencias_entrega existente)          │
+  ├─────────────────────────────────────────────────────────────────────┤
+  │  MÓDULO B — INSTALACIONES + EVIDENCIAS + UBICACIÓN                 │
+  │    Estado: CERRADO AL 90% ✅ (2 preguntas residuales)               │
+  └─────────────────────────────────────────────────────────────────────┘
+
+Fuera de scope Fase 1:
+  - Gestión de usuarios/roles desde el móvil.
+  - Ventas de mostrador (Fase 2).
+  - Cotizaciones (solo lectura de folio para el vale, si aplica).
+  - Reportes/dashboards en el móvil.
+  - Firma de cierre de instalación (I4-A: Fase 3).
+  - Migración de blobs legacy de instalaciones (I6-A: Fase 3).
+
+================================================================================
+§1. ROLES Y DISPOSITIVOS
+================================================================================
+
+  ┌────────────────┬──────────────┬───────────────────────────────────────┐
+  │ Rol            │ Dispositivo  │ Qué hace                              │
+  ├────────────────┼──────────────┼───────────────────────────────────────┤
+  │ Administrador  │ Web (hoy)    │ Todo. No se contempla en móvil F1.    │
+  │ Almacenista    │ Web          │ Crea salidas, imprime PDF, entrega    │
+  │ (Inventarios)  │              │ material al técnico. NO usa el móvil  │
+  │                │              │ en F1.                                │
+  │ Técnico        │ Móvil        │ Recibe material, firma cliente,       │
+  │ (Instalador)   │ (Flutter)    │ inicia/pausa/reanuda/finaliza         │
+  │                │              │ instalaciones, sube evidencias con    │
+  │                │              │ ubicación.                            │
+  │ Vendedor       │ Web + Móvil  │ Consulta ventas. F1: solo lectura en  │
+  │                │ (lectura)    │ móvil. Creación desde web.            │
+  └────────────────┴──────────────┴───────────────────────────────────────┘
+
+  ✅ P1:     Almacenista web crea salida.
+  ✅ P1.1:   Firma es del CLIENTE (no del técnico).
+  ✅ P1.2:   Técnico sube la firma desde el móvil.
+  ✅ P4-A:   Traccar sigue vigente. App no reemplaza trayecto (F-4).
+             App captura hitos (inicio/fin/pausas) — Traccar trayecto.
+
+================================================================================
+§2. MÓDULO A — SALIDAS + FIRMA
+================================================================================
+
+2.1 🔄 Tabla base: evidencias_entrega (NO salida_archivos)
+
+  El v1 proponía crear salida_archivos. El dump 19-oct revela que
+  evidencias_entrega YA EXISTE (migración batch 33, 2026-10-01, 0 filas):
+
+    CREATE TABLE `evidencias_entrega` (
+      id, salida_id bigint NOT NULL,
+      proyecto_id bigint NOT NULL,        -- ⚠️ NOT NULL, no nullable
+      archivo_path varchar(500) NOT NULL,
+      archivo_nombre_original varchar(255) NULL,
+      archivo_mime varchar(100) NULL,
+      archivo_tamano bigint UNSIGNED NULL,
+      notas text NULL,
+      subido_por varchar(255) NOT NULL,
+      created_at, updated_at
+    )
+
+  Decisión: reusar evidencias_entrega. NO crear salida_archivos.
+
+2.2 Extensión necesaria de evidencias_entrega (migración mínima)
+
+  Schema::table('evidencias_entrega', function (Blueprint $t) {
+      $t->enum('tipo', ['firma_cliente','pdf_cliente_firmado','foto_entrega'])
+        ->default('firma_cliente')->after('archivo_tamano');
+      $t->enum('estado', ['vigente','invalidada_por_edicion'])
+        ->default('vigente')->after('tipo');
+      $t->timestamp('invalidada_at')->nullable()->after('estado');
+      $t->string('invalidada_por', 255)->nullable();
+      $t->text('invalidada_motivo')->nullable();
+      $t->index(['salida_id', 'estado']);
+  });
+
+2.3 🚨 Resolver proyecto_id (proyecto_id NOT NULL)
+
+  Como salidas_inventario.nombre_proyecto es string (P3-A) y
+  evidencias_entrega.proyecto_id es NOT NULL, el endpoint debe resolver:
+
+    $proyecto = Proyecto::where('nombre_proyecto', $salida->nombre_proyecto)
+                        ->first();
+    if (!$proyecto) {
+        abort(422, 'Proyecto no encontrado para la salida.');
+    }
+
+  🚨 Nuevo: helper resolverProyecto($nombre) con trim + case-insensitive.
+  Motivo: 'palomar 3 bis ' vs 'palomar 3 bis' rompe el lookup.
+  Log de fallos obligatorio. Nuevo ítem B-08a.
+
+2.4 Storage
+
+  Storage::disk('local') → storage/app/private/evidencias_entrega/{salida_id}/{tipo}_{timestamp}.{ext}
+
+  Regla vigente v31: Storage::response() para servir. Nunca response() plano.
+
+2.5 Endpoints API — Módulo A
+
+  GET  /api/salidas?since=<iso8601>
+       → pull salidas propias (entregado_a = usuario autenticado)
+       → filtro: WHERE entregado_a = :current_user
+
+  GET  /api/salidas/{id}
+       → detalle (proyecto, materiales, evidencias vigentes)
+
+  POST /api/salidas/{id}/evidencias-entrega (multipart)
+       → campos: archivo (JPG|PNG|PDF), tipo, notas
+       → servidor resuelve proyecto_id (ver 2.3)
+       → invalida evidencia previa del mismo tipo (C3-B)
+       → respuesta: { id, tipo, estado, mime, size_bytes }
+
+2.6 Cambios mínimos en web (Laravel)
+
+  SalidaController@download
+    → si hay evidencia vigente de tipo pdf_cliente_firmado o firma_cliente,
+      redirigir a esa. Si no, sirve PDF actual.
+
+  SalidaController@uploadEvidenciaEntrega (NUEVO)
+    → valida mime + size (≤10MB) + magic bytes (%PDF para PDFs)
+    → resuelve proyecto_id (helper resolverProyecto)
+    → invalida evidencia previa vigente del mismo tipo
+    → crea evidencias_entrega
+
+  salidas/show.blade.php
+    → badge "✓ Firmado" / "Pendiente firma"
+    → thumbnail de firma vigente
+    → botón "Invalidar firma" (solo admin/almacenista)
+
+  proyectos/show.blade.php
+    → columna "Firma" en historial de salidas
+    → columna "Firmado" por material en trazabilidad
+
+================================================================================
+§3. MÓDULO B — INSTALACIONES + EVIDENCIAS + UBICACIÓN
+================================================================================
+
+3.1 Contexto real (dump 20-oct)
+
+  Tablas existentes:
+    instalaciones            7 filas  ✅
+    instalacion_instalador   9 filas  ✅
+    instalacion_fotos        0 filas  ✅
+
+  🚨 Hallazgo Q-93: id_usuario_asignado SIGUE EXISTIENDO en prod,
+     con su FK activa a usuarios.usuario. El resumen v2.4.0 dice
+     "drop hecho en prod" — es INCORRECTO. Reabrir Q-93.
+
+  🚨 Hallazgo: instalacion_instalador NO tiene FK a instalaciones
+     ni a usuarios. Tampoco índices. Deuda aceptada en F1, arreglar F2.
+
+  🚨 Hallazgo: es_principal es 0 en TODAS las filas (nunca usado).
+     F1: la app IGNORA este campo.
+
+  🚨 Hallazgo: fecha_hora_inicio tiene NOT NULL + valores ya cargados
+     para instalaciones en 'preparacion' y 'Programada'. Confirma
+     que semánticamente es inicio real (opción B), pero conviene
+     tratar la columna como "primer inicio conocido".
+
+3.2 🔄 Flujo confirmado (F-1): por instalación, no por jornada
+
+  Un técnico puede:
+    A) Hacer 1 instalación en 1 o varios días (Palomar 3 días)
+    B) Hacer hasta 3 instalaciones en 1 día (Redes + Cámaras + Audio)
+    C) Mezclar
+
+  NO se crea tabla jornadas. El timeline vive en instalacion_eventos.
+
+3.3 🔄 Botones (Opción A confirmada)
+
+  Iniciar / Pausar / Reanudar / Finalizar
+
+  Reglas de escritura:
+
+  ┌──────────────┬──────────────────────────┬───────────────────────┐
+  │ Botón        │ instalaciones            │ instalacion_eventos   │
+  ├──────────────┼──────────────────────────┼───────────────────────┤
+  │ Iniciar (1ª) │ fecha_hora_inicio := at  │ tipo='iniciada'       │
+  │              │ estatus := 'en_proceso'  │ + foto + lat/lng      │
+  │ Pausar       │ (no toca nada)           │ tipo='pausada'        │
+  │ Reanudar     │ (no toca nada)           │ tipo='reanudada'      │
+  │ Finalizar    │ fecha_hora_fin := at     │ tipo='finalizada'     │
+  │              │ estatus := ⏳ (ver Q3.4) │ + foto + lat/lng      │
+  └──────────────┴──────────────────────────┴───────────────────────┘
+
+  Regla de oro: fecha_hora_inicio se escribe UNA VEZ.
+  Si el técnico vuelve día 2 y día 3, no se sobreescribe.
+  El timeline completo vive en instalacion_eventos.
+
+3.4 ⏳ Q3.4: estatus al finalizar (PENDIENTE, no bloquea migración)
+
+  Opciones observadas en estatus (dump):
+    pruebas          (instalacion)   — técnico terminó, no entrega
+    entrega          (instalacion)   — técnico entregó al cliente
+    pruebas_finales  (proyecto)
+    terminado        (proyecto)
+
+  Mi voto: 'entrega'. Pendiente de confirmar.
+
+3.5 ⏳ Q3.5: instalaciones legacy sin eventos (PENDIENTE)
+
+  7 instalaciones en 'en_proceso' con fecha_hora_inicio ya cargada
+  y sin eventos (tabla nueva). Al pulsar "Iniciar" en la app:
+
+    Opción A (voto): tratar como primer inicio desde app.
+                     fecha_hora_inicio := capturado_at (sobreescribe).
+                     payload_json guarda {inicio_previo: '...'}.
+    Opción B:        detectar y preguntar "¿Reanudar?".
+    Opción C:        rechazar.
+
+  Voto: A con payload_json como salvaguarda.
+
+3.6 🔄 I5-A → I5-B (CAMBIADO)
+
+  v1:  I5-A (No capturar lat/lng, Traccar sigue)
+  v2:  I5-B (SÍ capturar lat/lng en eventos de la app)
+
+  Motivos:
+    1. Traccar es continuo, no marca "empezó a las 14:02:33".
+    2. Redundancia intencional (si Traccar cae, app es registro).
+    3. Paridad con flujo Telegram actual.
+
+  Traccar NO se retira (P4-A). Convivencia:
+    Traccar  → trayecto continuo
+    App      → hitos con timestamp + fix exacto
+
+3.7 ✅ I2-C confirmado
+
+  Tipos de evidencia en F1:
+    inicio | proceso | fin | incidencia
+
+  incidencia NO obligatoria para el cierre (el flujo puede completarse
+  sin incidencias registradas).
+
+3.8 ✅ I4-A confirmado
+
+  Firma de cierre de instalación: Fase 3.
+  Firma del cliente existe SOLO en Módulo A (salida de materiales).
+
+3.9 ✅ I6-A confirmado por datos
+
+  Blobs legacy (evidencia_inicio, incidencias, evidencia_fin) están
+  NULL en las 7 filas. No hay nada que migrar. Se dropean en Fase 3
+  sin pérdida.
+
+3.10 ✅ I7' interino (CAMBIADO respecto a v1)
+
+  check_list en dump: NULL en 6 filas, '[]' en 2 filas.
+  Ningún ejemplo real de estructura.
+
+  F1: POST /api/instalaciones/{id}/checklist acepta JSON libre.
+      NO valida estructura. Persiste tal cual.
+  Flutter: renderer genérico [{label: string, checked: bool}].
+           Si el JSON no matchea, modo raw.
+  F2: con 1 ejemplo real, congelar schema + FormRequest.
+
+3.11 🚨 Offline + ubicación: promesas honestas
+
+  Lo que SÍ funciona offline:
+    - GPS del teléfono (primer fix puede tardar)
+    - lat/lng/timestamp → SQLite local
+    - Foto → SQLite local
+    - Envío al sync cuando hay red
+
+  Lo que NO funciona offline:
+    - Traccar (no recibe sin red, ya era sabido)
+    - Reverse geocoding (calle desde lat/lng) — NO usar offline
+    - Validar contra geocerca — F2
+
+  Riesgos operativos aceptados:
+    - GPS no fija en interiores → timeout 15s → permitir con
+      fuente='no_disponible' y flag pendiente_revision
+    - Mock location → fuente='mock' + alerta al sync
+    - Hora desviada → capturado_at (dispositivo, confiable)
+                      + created_at (servidor, autoritativo)
+    - Batería → GPS solo en inicio/fin/foto, no continuo
+
+3.12 🚨 Detección de discrepancias app vs Traccar
+
+  Al sincronizar, si hay posición de Traccar en ventana ±5 min:
+    - < 50m   → ok
+    - 50-200m → precision_baja
+    - > 200m  → discrepancia (NO rechazar, marcar para admin)
+
+  Admin ve bandera en proyectos.show (mismo patrón que
+  trazabilidad_discrepancias).
+
+3.13 Migraciones Módulo B (2 archivos)
+
+  Migración 1 — instalacion_eventos (NUEVA):
+
+    CREATE TABLE instalacion_eventos (
+      id              BIGINT UNSIGNED AUTO_INCREMENT PK,
+      instalacion_id  BIGINT UNSIGNED FK → instalaciones.id CASCADE,
+      tipo            ENUM('iniciada','pausada','reanudada','finalizada',
+                           'incidencia','checklist_actualizado','nota_agregada'),
+      latitud         DECIMAL(10,7) NULL,
+      longitud        DECIMAL(10,7) NULL,
+      precision_metros INT UNSIGNED NULL,
+      fuente          VARCHAR(20) NULL,  -- gps|network|cached|mock|no_disponible
+      payload_json    JSON NULL,
+      capturado_at    DATETIME NOT NULL,
+      por             VARCHAR(255) NOT NULL,
+      created_at, updated_at,
+      INDEX (instalacion_id, tipo, capturado_at),
+      INDEX (por, capturado_at)
+    );
+
+  Migración 2 — extend instalacion_fotos:
+
+    ALTER TABLE instalacion_fotos
+      ADD COLUMN latitud DECIMAL(10,7) NULL AFTER descripcion,
+      ADD COLUMN longitud DECIMAL(10,7) NULL AFTER latitud,
+      ADD COLUMN precision_metros INT UNSIGNED NULL AFTER longitud,
+      ADD COLUMN fuente VARCHAR(20) NULL AFTER precision_metros;
+
+  NO tocar instalaciones (todo estructural ya existe).
+  NO crear instalacion_evidencias (usar instalacion_fotos).
+
+3.14 Endpoints API — Módulo B
+
+  GET  /api/instalaciones?since=<iso8601>
+       → pull instalaciones propias (via instalacion_instalador)
+       → filtro: EXISTS (SELECT 1 FROM instalacion_instalador
+                         WHERE instalador_usuario = :current_user)
+
+  GET  /api/instalaciones/{id}
+       → detalle (proyecto, checklist, fotos, eventos)
+
+  POST /api/instalaciones/{id}/iniciar
+       → estatus := 'en_proceso', fecha_hora_inicio := capturado_at
+         (SOLO si estaba NULL o es primer inicio desde app — ver Q3.5)
+       → evento 'iniciada'
+       → multipart opcional con foto tipo='inicio'
+       → payload: capturado_at, lat, lng, precision_metros, fuente
+
+  POST /api/instalaciones/{id}/pausar
+       → evento 'pausada' + foto opcional tipo='proceso'
+       → payload: motivo (en payload_json), capturado_at, lat/lng/precision/fuente
+
+  POST /api/instalaciones/{id}/reanudar
+       → evento 'reanudada' + foto opcional tipo='proceso'
+       → payload: capturado_at, lat/lng/precision/fuente
+
+  POST /api/instalaciones/{id}/finalizar
+       → fecha_hora_fin := capturado_at
+       → estatus := ⏳ (ver Q3.4)
+       → evento 'finalizada' + foto tipo='fin' obligatoria
+       → payload: capturado_at, lat/lng/precision/fuente
+
+  POST /api/instalaciones/{id}/fotos (multipart, batch 1..N)
+       → tipo ∈ inicio|proceso|fin|incidencia
+       → lat/lng/precision/fuente opcional por foto
+       → guarda en instalacion_fotos
+
+  POST /api/instalaciones/{id}/checklist
+       → check_list (JSON libre F1)
+       → evento 'checklist_actualizado'
+
+  POST /api/instalaciones/{id}/eventos
+       → tipo ∈ incidencia|nota_agregada
+       → payload_json libre
+       → evento correspondiente
+
+  Regla del servidor para capturado_at:
+    - si capturado_at > now() + 5 min  → rechazar (reloj desviado)
+    - si capturado_at < now() - 30 días → aceptar + flag pendiente_revision
+
+3.15 ⏳ Telegram vs App (F-6, PENDIENTE)
+
+  F1: conviven.
+    Telegram       → solicitudes_ubicacion
+    App móvil      → instalacion_eventos
+    Admin ve ambas en timeline.
+
+  F2: deprecar Telegram cuando app esté estable.
+  Documentar en docs/movil/DEUDA-TELEGRAM-vs-APP.md.
+
+================================================================================
+§4. MODELO DE DATOS — VISIÓN CONSOLIDADA
+================================================================================
+
+  usuarios (SoftDeletes activo, Q-102 pendiente para HasApiTokens)
+    └── rol → roles.rol
+
+  proyectos (por nombre_proyecto, FK a ventas.nombre_proyecto)
+    ├── cliente_id → clientes.id (SET NULL, 4 NULL en dump 19-oct)
+    ├── movimientos_inventario → proyecto_id (int, CASCADE)
+    ├── salidas_inventario → nombre_proyecto (string, P3-A)
+    │     ├── salida_detalle → inventario.id
+    │     └── evidencias_entrega → salida_id  [REUSA existente]
+    │           + tipo, estado, invalidada_*  [migración mínima]
+    ├── devoluciones_inventario → nombre_proyecto (string, NULL)
+    │     └── devolucion_detalle → inventario.id
+    ├── instalaciones → nombre_proyecto (string)
+    │     ├── instalacion_instalador → usuarios.usuario (N:M)
+    │     │     ⚠️ sin FK ni índice (deuda F2)
+    │     ├── instalacion_fotos (0 filas)
+    │     │     + lat/lng/precision/fuente  [migración mínima]
+    │     └── instalacion_eventos  [NUEVA]
+    │           iniciada|pausada|reanudada|finalizada|
+    │           incidencia|checklist_actualizado|nota_agregada
+    └── cotizaciones → proyecto_id (SIN FK, Q-65)
+          └── cotizacion_detalles → inventario.id
+
+  inventario → categorias.nombre_categoria (o categoria_id, P5-B F2)
+
+  Traccar (fuera de app móvil, P4-A):
+    ubicaciones_usuarios, geocercas, geocerca_alertas, solicitudes_ubicacion
+
+================================================================================
+§5. CATÁLOGO OFFLINE (bootstrap de la app) — volúmenes del dump 19-oct
+================================================================================
+
+  Tabla                     Filas reales   Política
+  ─────────────────────────────────────────────────────────────────
+  usuarios (técnicos)       ~10-12         Full + deleted_at filter
+                                           vía endpoint, no tabla completa
+  proyectos                 11             Full pull (4 sin cliente_id)
+  clientes                  1              Full pull
+  categorias                45             Full pull
+                                           ⚠️ ' PATCHCORD' con espacio
+                                           (TRIM en F2)
+  inventario                1974           Full + delta (~2 MB)
+  estatus                   14             Full pull
+                                           ⚠️ 'Programada' mayúscula
+  salidas_inventario        4              Delta propias
+  salida_detalle            4              Full de propias
+  evidencias_entrega        0              Pull de propias
+  instalaciones             7              Delta propias
+  instalacion_instalador    9              Full de propias
+  instalacion_fotos         0              Pull de propias
+  ─────────────────────────────────────────────────────────────────
+  TOTAL bootstrap ~2 MB
+
+  NO se cachea:
+    ventas_mostrador, venta_mostrador_detalles, cotizaciones completas,
+    movimientos_inventario, devoluciones_inventario,
+    telescope_*, cache, jobs, sessions, personal_access_tokens,
+    ubicaciones_usuarios, geocercas, solicitudes_ubicacion
+
+================================================================================
+§6. BACKEND REQUERIDO (consolidado, actualizado)
+================================================================================
+
+  ID    Cambio                                          Bloquea        Fase
+  ────────────────────────────────────────────────────────────────────────
+  B-01  Q-113: nullable titulo/monto en API             Q-113          🔴 F1
+  B-02  Q-102: HasApiTokens en Usuario                  Login móvil    🔴 F1
+  B-03  Extender evidencias_entrega (+5 cols)           Firma          🔴 F1
+  B-04  Q-65: FK cotizaciones.proyecto_id (0 huérf.)    Cotizaciones   🟡 F1
+  B-05  SalidaController@uploadEvidenciaEntrega         Subida firma   🔴 F1
+  B-06  SalidaController@download redirect              Descarga       🟡 F1
+  B-07  GET /api/salidas (pull)                         Módulo A       🔴 F1
+  B-08  POST /api/salidas/{id}/evidencias-entrega       Firma          🔴 F1
+  B-08a 🔄 Helper resolverProyecto(nombre)              Firma          🔴 F1
+         (trim + case-insensitive + log de fallos)
+  B-09  Migración instalacion_eventos                   Módulo B       🔴 F1
+  B-10  Extender instalacion_fotos (+4 cols geo)        Evidencias     🔴 F1
+  B-11  GET /api/instalaciones (pull)                   Módulo B       🟡 F1
+  B-12  POST /api/instalaciones/{id}/iniciar|pausar|    Flujo inst.    🟡 F1
+         reanudar|finalizar
+  B-13  POST /api/instalaciones/{id}/fotos              Evidencias     🟡 F1
+  B-14  POST /api/instalaciones/{id}/checklist (libre)  Checklist F1   🟡 F1
+  B-15  POST /api/instalaciones/{id}/eventos            Eventos        🟡 F1
+  B-16  POST /api/sync/push (batch)                     Sync general   🔴 F1
+  B-17  GET /api/sync/pull (delta)                      Sync general   🔴 F1
+  B-18  🚨 Detección discrepancia app vs Traccar        Auditoría      🟡 F2
+  B-19  🚨 FK + índice instalacion_instalador           Integridad     🟡 F2
+  B-20  P5-B: inventario.categoria → categoria_id       Catálogos      🟢 F2
+  B-21  Q-53: UNIQUE + TRIM categorias                  Integridad     🟢 F2
+  B-22  Validación estricta de checklist (con I7 real)  Checklist F2   🟡 F2
+  B-23  proyecto_archivos + migración 4 blobs           Fase 3         🟢 F3
+
+================================================================================
+§7. FLUJOS POR ROL
+================================================================================
+
+  7.1 Almacenista (web)
+    - Crea salida, imprime PDF, entrega material al técnico.
+    - Verifica salidas pendientes de firma en el sistema.
+
+  7.2 Técnico (móvil)
+    - Login inicial con red (Sanctum, token 30 días).
+    - Pull inicial: catálogos + salidas + instalaciones asignadas.
+
+    Ciclo Entrega (Módulo A):
+      a. Lleva material + papel al cliente.
+      b. Cliente firma.
+      c. Fotografía el papel.
+      d. Sube cuando hay red.
+
+    Ciclo Instalación (Módulo B):
+      a. Abre instalación asignada.
+      b. Pulsa "Iniciar" (offline) → foto inicio + lat/lng.
+      c. Durante el día: fotos de proceso/incidencia con ubicación.
+      d. Pulsa "Pausar" si se va, "Reanudar" al volver.
+      e. Pulsa "Finalizar" → foto fin + lat/lng.
+      f. Todo se sincroniza al recuperar red.
+
+    Ve estado de sync de cada elemento.
+
+  7.3 Cliente
+    - No usa la app. Firma en papel.
+
+  7.4 Administrador (web)
+    - Ve badges "firmado" en proyectos/salidas.
+    - Ve timeline de eventos por instalación.
+    - Puede invalidar firmas con motivo.
+    - Ve banderas de discrepancia app vs Traccar (F2).
+
+================================================================================
+§8. DECISIONES CERRADAS Y PENDIENTES
+================================================================================
+
+  8.1 ✅ CERRADAS
+    P1, P1.1, P1.2, P2-A, P3-A, P4-A, P6-A, P7.2-C,
+    C1-A, C2, C3-B, C4-B, C5-A, P8-C,
+    I1-A, I2-C, I3-B, I4-A, I5-B, I6-A,
+    F-1 (por instalación), F-2 (fotos inicio/fin obligatorias),
+    F-3 (permitir con bandera si no hay GPS),
+    F-4 (Traccar convive), F-5 (geo opcional en proceso/incidencia),
+    Opción A (Iniciar/Pausar/Reanudar/Finalizar),
+    Opción B (fecha_hora_inicio = inicio real, escribe una vez),
+    Reusar evidencias_entrega, Reusar instalacion_fotos,
+    Crear instalacion_eventos.
+
+  8.2 ⏳ PENDIENTES (no bloquean migraciones)
+    Q3.4  Estatus al finalizar ('entrega' voto).
+    Q3.5  Tratamiento de instalaciones legacy (Opción A voto).
+    P3.1  ¿Migrar salidas a int FK? (B para F1 voto).
+    P5.1  ¿Móvil antes o después de categorías? (B voto).
+    C3.1  ¿Ediciones post-firma raras/frecuentes? (B voto).
+    F-6   ¿Telegram convive o se depreca? (convive F1 voto).
+    I7    estructura de check_list (conseguir 1 ejemplo real).
+
+  8.3 🚨 REABIERTAS
+    Q-93  id_usuario_asignado sigue existiendo en prod. El resumen
+          v2.4.0 dice "drop hecho" — es incorrecto. Corregir doc.
+    Q-53  Debe incluir TRIM en categorias.nombre_categoria
+          (' PATCHCORD' con espacio inicial confirmado en dump).
+
+================================================================================
+§9. PLAN DE COMMITS (actualizado)
+================================================================================
+
+  BLOQUE 1 — Independiente (30 min)
+    1. fix(deploy): mysqldump vía ~/.my.cnf                   (Q-122)
+    2. feat(api): titulo_venta/monto_venta nullable + test    (Q-113)
+    3. feat(api): HasApiTokens en Usuario + test              (Q-102)
+
+  BLOQUE 2 — Módulo A backend (4-6 h)
+    4. feat(db): FK cotizaciones.proyecto_id                  (Q-65)
+    5. feat(db): extender evidencias_entrega (+5 columnas)
+    6. feat(api): helper resolverProyecto + tests             (B-08a)
+    7. feat(api): POST /api/salidas/{id}/evidencias-entrega + test
+    8. feat(api): GET /api/salidas + test
+    9. feat(web): badge Firmado + redirect download + tests
+   10. feat(web): proyecto show columna Firmado + tests
+
+  BLOQUE 3 — Módulo B backend (5-7 h)
+   11. feat(db): instalacion_eventos + modelo + relaciones
+   12. feat(db): extender instalacion_fotos (+4 columnas geo)
+   13. feat(api): POST /api/instalaciones/{id}/iniciar + test
+   14. feat(api): POST /api/instalaciones/{id}/pausar + test
+   15. feat(api): POST /api/instalaciones/{id}/reanudar + test
+   16. feat(api): POST /api/instalaciones/{id}/finalizar + test
+   17. feat(api): POST /api/instalaciones/{id}/fotos + test
+   18. feat(api): POST /api/instalaciones/{id}/checklist + test
+   19. feat(api): POST /api/instalaciones/{id}/eventos + test
+   20. feat(api): GET /api/instalaciones (pull) + test
+   21. feat(web): timeline instalación con eventos + mapa
+
+  BLOQUE 4 — Sync (2-4 h)
+   22. feat(api): GET /api/sync/pull + test
+   23. feat(api): POST /api/sync/push + test
+
+  BLOQUE 5 — Flutter (días)
+   24. Bootstrap: login + pull catálogo + pull salidas
+   25. Módulo Salidas: listar + subir firma + sync
+   26. Módulo Instalaciones: iniciar/pausar/reanudar/finalizar
+       + fotos + checklist + ubicación + sync
+   27. Sync engine: outbox + retry + conflictos
+   28. Servicio de ubicación (timeout 15s, fuente, mock detection)
+
+  BLOQUE 6 — F2 (post-MVP, no bloquea)
+   29. FK + índice instalacion_instalador
+   30. Detección discrepancia app vs Traccar
+   31. Validación estricta de checklist (con I7 real)
+   32. Deprecar Telegram vs App
+   33. P5-B: inventario.categoria → categoria_id
+   34. Q-53: UNIQUE + TRIM categorias
+
+================================================================================
+§10. CRITERIOS DE SALIDA
+================================================================================
+
+  10.1 Backend F1 — Módulo A
+    [ ] Q-122, Q-113, Q-102, Q-65 cerrados
+    [ ] evidencias_entrega extendida + tests verdes
+    [ ] Helper resolverProyecto + tests
+    [ ] POST /api/salidas/{id}/evidencias-entrega funciona (multipart)
+    [ ] GET /api/salidas funciona
+    [ ] Badge Firmado en salidas/show y proyectos/show
+    [ ] Suite verde
+
+  10.2 Backend F1 — Módulo B
+    [ ] instalacion_eventos + instalacion_fotos extendida
+    [ ] 5 endpoints nuevos + tests
+    [ ] Q3.4 y Q3.5 decididos
+    [ ] Timeline visible en proyectos/show (con o sin mapa)
+
+  10.3 App móvil
+    [ ] Login + token en secure storage
+    [ ] Pull catálogo (~2 MB)
+    [ ] Salidas: listar + subir firma + sync
+    [ ] Instalaciones: iniciar/pausar/reanudar/finalizar
+    [ ] Fotos + checklist + ubicación
+    [ ] Outbox sobrevive reinicio
+    [ ] Resolución server-wins con log
+    [ ] Tests unit + integration + E2E
+
+  10.4 Deploy
+    [ ] Server HEAD = origin/main
+    [ ] Q-106 (Telegram gate) cerrado
+    [ ] pull-prod.sh funcional
+    [ ] Verificación post-deploy
+
+================================================================================
+§11. BLOQUEANTES 🔴 INMEDIATOS
+================================================================================
+
+  1. Q-122  — deploy-prod.sh (5 min)
+  2. Q-113  — nullable titulo/monto API (5 min)
+  3. Q-102  — HasApiTokens Usuario (15 min)
+  4. Q-65   — FK cotizaciones.proyecto_id (10 min)
+  5. Respuesta Q3.4 (estatus al finalizar)
+  6. Respuesta Q3.5 (instalaciones legacy)
+  7. Dump SQL COMANDO 3 (confirmar huerfanos cotizaciones = 0)
+  8. Dump SQL COMANDO 4 (proyectos.cliente_id: 4 NULL confirmados)
+
+  Items 1-4 son código independiente — se pueden hacer hoy.
+  Items 5-8 definen redacción exacta de migraciones Módulo A y B.
+
+================================================================================
+§12. CAMBIOS RESPECTO A v1 (resumen ejecutivo)
+================================================================================
+
+  ┌────────────────────────────┬──────────────┬──────────────┬───────────┐
+  │ Punto                      │ v1           │ v2           │ Motivo    │
+  ├────────────────────────────┼──────────────┼──────────────┼───────────┤
+  │ Tabla Módulo A             │ crear        │ reusar       │ Existe    │
+  │                            │ salida_       │ evidencias_  │ (batch 33)│
+  │                            │ archivos     │ entrega      │           │
+  │ Tabla Módulo B fotos       │ crear        │ reusar       │ Existe    │
+  │                            │ instalacion_ │ instalacion_ │ (0 filas) │
+  │                            │ evidencias   │ fotos        │           │
+  │ Captura lat/lng            │ I5-A (no)    │ I5-B (sí)    │ Traccar   │
+  │                            │              │              │ puntual   │
+  │ Tipo evidencias            │ I2-B voto    │ I2-C (4)     │ Flujo     │
+  │                            │              │              │ confirmado│
+  │ check_list                 │ validar      │ libre F1     │ Sin       │
+  │                            │ estructura   │              │ ejemplo   │
+  │ fecha_hora_inicio          │ ambiguo      │ inicio real  │ Dump      │
+  │                            │              │ (opción B)   │ 20-oct    │
+  │ Botones                    │ Iniciar/     │ Iniciar/     │ Opción A  │
+  │                            │ Finalizar    │ Pausar/      │ usuario   │
+  │                            │              │ Reanudar/    │           │
+  │                            │              │ Finalizar    │           │
+  │ proyecto_id en evidencia   │ nullable     │ NOT NULL +   │ Schema    │
+  │                            │              │ resolver     │ real      │
+  │ Q-93                       │ "drop hecho" │ Reabrir      │ Dump      │
+  │                            │              │              │ 20-oct    │
+  │ instalacion_instalador FK  │ asumidas OK  │ sin FK       │ Dump      │
+  │                            │              │ (deuda F2)   │ 20-oct    │
+  └────────────────────────────┴──────────────┴──────────────┴───────────┘
+
+================================================================================
+§13. LECCIONES DE ESTA SESIÓN
+================================================================================
+
+  1. El dump es la fuente de verdad, no el resumen. El resumen v2.4.0
+     decía "drop id_usuario_asignado hecho" — el dump lo desmintió.
+     Regla: antes de diseñar sobre un campo, verificar en dump.
+
+  2. Reusar > crear. Dos tablas del v1 (salida_archivos, instalacion_
+     evidencias) ya existían con otro nombre. Antes de proponer nueva
+     tabla, buscar en dump por nombre aproximado y por columnas.
+
+  3. La semántica de las columnas es tan importante como el tipo.
+     fecha_hora_inicio NULL/valor era ambiguo. Confirmar con el usuario
+     qué significa cada fecha antes de escribir migraciones.
+
+  4. Traccar + App no son excluyentes. Traccar = trayecto continuo;
+     App = hitos con timestamp. Convivencia limpia, no reemplazo.
+
+  5. Offline es un compromiso. No todo lo que hay online funciona
+     offline (geocoding, validación contra geocerca). Documentar
+     los límites explícitamente para no prometer lo que no se cumple.
+
+  6. El flujo Telegram ya resuelve el problema de negocio. La app
+     móvil reimplementa lo mismo, offline. Paridad funcional primero,
+     mejoras después.
+
+================================================================================
+FIN DEL MODELO DE NEGOCIO — v2
+Guardar en: docs/movil/MODELO-NEGOCIO-APP-MOVIL-v2.txt
+Reemplaza: v1 (docs/movil/MODELO-NEGOCIO-APP-MOVIL-v1.txt)
+================================================================================

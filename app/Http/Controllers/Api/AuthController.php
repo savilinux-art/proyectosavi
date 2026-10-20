@@ -16,6 +16,11 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
+                // Alias password → contraseña (clientes móviles)
+        if (!$request->filled('contraseña') && $request->filled('password')) {
+            $request->merge(['contraseña' => $request->input('password')]);
+        }
+
         $validator = Validator::make($request->all(), [
             'usuario' => 'required|string',
             'contraseña' => 'required|string',
@@ -129,6 +134,17 @@ class AuthController extends Controller
             'user' => $request->user()
         ]);
     }
+
+
+        /**
+     * GET /api/me
+     * Alias de user() para clientes móviles.
+     */
+    public function me(Request $request)
+    {
+        return $this->user($request);
+    }
+
 
     /**
      * Refrescar token

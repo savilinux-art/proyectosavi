@@ -31,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
+    Route::get('/me',   [AuthController::class, 'me']); 
     Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
     
     // Dashboard
