@@ -37,7 +37,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Salidas (móvil pull propias)
     Route::get('/salidas', [SalidaApiController::class, 'index']);
+
+    Route::get('/salidas', [SalidaApiController::class, 'index'])->name('api.salidas.index');
+
     
+    // B-08: subir evidencia de entrega (firma cliente, PDF, foto)
+    Route::post('/salidas/{id}/evidencias-entrega', [SalidaApiController::class, 'uploadEvidenciaEntrega'])
+    ->whereNumber('id');
+
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
