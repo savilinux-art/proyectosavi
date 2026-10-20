@@ -16,12 +16,18 @@ class EvidenciaEntrega extends Model
         'archivo_nombre_original',
         'archivo_mime',
         'archivo_tamano',
+        'tipo',              // B-03
+        'estado',            // B-03
         'notas',
         'subido_por',
+        'invalidada_at',     // B-03
+        'invalidada_por',    // B-03
+        'invalidada_motivo', // B-03
     ];
 
     protected $casts = [
         'archivo_tamano' => 'integer',
+        'invalidada_at'  => 'datetime', // B-03
     ];
 
     public function salida(): BelongsTo
@@ -32,5 +38,13 @@ class EvidenciaEntrega extends Model
     public function proyecto(): BelongsTo
     {
         return $this->belongsTo(Proyecto::class, 'proyecto_id');
+    }
+
+    /**
+     * B-03: solo evidencias vigentes (no invalidadas por edición).
+     */
+    public function scopeVigente($query)
+    {
+        return $query->where('estado', 'vigente');
     }
 }
