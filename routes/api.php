@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\ProyectoController;
 use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\TelegramWebhookController;
+use App\Http\Controllers\Api\InstalacionEventoController;
 
 /*
 |--------------------------------------------------------------------------
@@ -62,7 +63,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/instalaciones/{id}/checklist', [InstalacionController::class, 'updateChecklist']);
     
    
-  
+      // ─── Instalaciones: flujo (iniciar/pausar/reanudar/finalizar) ───
+    Route::prefix('instalaciones/{instalacion}')
+        ->name('api.instalaciones.')
+        ->group(function () {
+            Route::post('iniciar',   [InstalacionEventoController::class, 'iniciar'])->name('iniciar');
+            Route::post('pausar',    [InstalacionEventoController::class, 'pausar'])->name('pausar');
+            Route::post('reanudar',  [InstalacionEventoController::class, 'reanudar'])->name('reanudar');
+            Route::post('finalizar', [InstalacionEventoController::class, 'finalizar'])->name('finalizar');
+        });
    
 
 

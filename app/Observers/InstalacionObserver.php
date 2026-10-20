@@ -12,6 +12,7 @@ class InstalacionObserver
     /**
      * Avisos por estatus:
      *   completada → revisar y entregar al cliente
+     *   terminada  → revisar y entregar al cliente (flujo móvil)
      *   entrega    → pendiente de facturar (cierra los pendientes previos)
      *   cancelada  → instalación cancelada (cierra todos los pendientes previos)
      */
@@ -19,6 +20,10 @@ class InstalacionObserver
         'completada' => [
             'titulo'      => 'completada — Revisar y entregar',
             'descripcion' => 'El instalador terminó la instalación. Revisar y marcar como entregada al cliente.',
+        ],
+        'terminada' => [
+            'titulo'      => 'terminada — Revisar y entregar',
+            'descripcion' => 'El instalador terminó la instalación en campo. Revisar y marcar como entregada al cliente.',
         ],
         'entrega'    => [
             'titulo'      => 'entregada — Pendiente de facturar',

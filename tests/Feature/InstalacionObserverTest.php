@@ -96,6 +96,33 @@ test('pasar a completada crea un recordatorio por admin con campos correctos', f
     expect(Recordatorio::where('usuario_id', $admin2->id)->exists())->toBeTrue();
 });
 
+test('pasar a terminada crea un recordatorio por admin con campos correctos', function () {
+    $admin1 = crearAdmin();
+    $admin2 = crearAdmin();
+
+    $instalacion = Instalacion::factory()->create(['estatus_instalacion' => 'en_proceso']);
+
+    $totalAdmins = contarAdmins();
+
+    $instalacion->update(['estatus_instalacion' => 'terminada']);
+
+    expect(Recordatorio::count())->toBe($totalAdmins);
+
+    $r = Recordatorio::where('usuario_id', $admin1->id)->first();
+    expect($r)->not->toBeNull();
+    expect($r->tipo)->toBe('sistema');
+    expect($r->canal)->toBe(['telegram', 'web']);
+    expect($r->estatus)->toBe('pendiente');
+    expect($r->intentos)->toBe(0);
+    expect($r->recordable_type)->toBe(Instalacion::class);
+    expect($r->recordable_id)->toBe($instalacion->id);
+    expect($r->metadata['estatus_previo'])->toBe('en_proceso');
+    expect($r->metadata['estatus_nuevo'])->toBe('terminada');
+    expect($r->metadata['instalacion_id'])->toBe($instalacion->id);
+
+    expect(Recordatorio::where('usuario_id', $admin2->id)->exists())->toBeTrue();
+});
+
 test('pasar a entrega cierra previos tipo=sistema pendientes y crea nuevos', function () {
     $admin = crearAdmin();
     $instalacion = Instalacion::factory()->create(['estatus_instalacion' => 'completada']);
