@@ -10,6 +10,8 @@ use App\Models\Proyecto;
 use App\Models\Usuario;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
+use App\Models\EvidenciaEntrega;
+use Illuminate\Support\Facades\Storage;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class SalidaInventarioController extends Controller
@@ -130,12 +132,35 @@ class SalidaInventarioController extends Controller
     /**
      * Genera y descarga el PDF de la salida.
      */
-    public function downloadPDF($id, $copia = null)
+        public function downloadPDF($id, $copia = null)
     {
         $salida = SalidaInventario::with(['proyecto', 'entregadoPor', 'entregadoA', 'detalles.inventario'])
                     ->findOrFail($id);
 
-        $productos = $salida->detalles; // Ya tiene los datos del inventario
+        // B-06: en "PDF General" (sin copia específica), servir evidencia vigente si existe.
+        // Las copias (administracion/cliente/instalador) conservan su PDF generado.
+        if ($copia === null) {
+            $evidencia = EvidenciaEntrega::query()
+                ->where('salida_id', $salida->id)
+                ->vigente()
+                ->whereIn('tipo', ['pdf_cliente_firmado', 'firma_cliente'])
+                ->orderByRaw("FIELD(tipo, 'pdf_cliente_firmado', 'firma_cliente')")
+                ->orderByDesc('id')
+                ->first();
+
+            if ($evidencia && Storage::disk('local')->exists($evidencia->archivo_path)) {
+                $ext = pathinfo($evidencia->archivo_path, PATHINFO_EXTENSION);
+                $nombreDescarga = $evidencia->archivo_nombre_original
+                    ?: "salida_{$salida->id}_evidencia.{$ext}";
+
+                return Storage::disk('local')->response(
+                    $evidencia->archivo_path,
+                    $nombreDescarga
+                );
+            }
+        }
+
+        $productos = $salida->detalles;
 
         $copias = ['administracion' => 'Administración', 'cliente' => 'Cliente', 'instalador' => 'Instalador'];
         $tipoCopia = $copia ? ($copias[$copia] ?? 'General') : 'General';
@@ -143,7 +168,6 @@ class SalidaInventarioController extends Controller
         $pdf = Pdf::loadView('pdf.salida_inventario', compact('salida', 'productos', 'tipoCopia'));
         return $pdf->download("salida_{$salida->id}_{$tipoCopia}.pdf");
     }
-
     // Opcional: método para eliminar (con cascada definida en la BD)
     public function destroy($id)
     {

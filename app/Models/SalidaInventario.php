@@ -44,4 +44,10 @@ class SalidaInventario extends Model
     {
         return $this->belongsTo(Usuario::class, 'entregado_a', 'usuario');
     }
+
+        public function evidencias()
+    {
+        return $this->hasMany(EvidenciaEntrega::class, 'salida_id');
+    }
+
 }
