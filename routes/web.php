@@ -66,6 +66,9 @@ Route::middleware(['auth.session', 'permiso:ver-salidas'])->group(function () {
 
     Route::get('salidas/{id}/download/{copia?}', [SalidaInventarioController::class, 'downloadPDF'])
         ->name('salidas.download');
+    Route::post('salidas/{id}/evidencias', [SalidaInventarioController::class, 'uploadEvidenciaWeb'])
+        ->name('salidas.evidencias.store');
+
     Route::get('salidas/{id}/imprimir', [SalidaInventarioController::class, 'imprimir'])
         ->name('salidas.imprimir');
 

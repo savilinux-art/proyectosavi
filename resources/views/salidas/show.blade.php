@@ -98,5 +98,75 @@
             </div>
         @endif
     </div>
+
+{{-- B-05: Evidencia de entrega --}}
+<div class="card mt-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-paperclip"></i> Evidencia de entrega</h5>
+    </div>
+    <div class="card-body">
+        @if(session('success'))
+            <div class="alert alert-success">{{ session('success') }}</div>
+        @endif
+
+        @php
+            $evidenciasVigentes = $salida->evidencias()->vigente()->orderByDesc('id')->get();
+        @endphp
+
+        @if($evidenciasVigentes->isNotEmpty())
+            <h6 class="text-muted">Evidencias vigentes</h6>
+            <ul class="list-group mb-3">
+                @foreach($evidenciasVigentes as $ev)
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>
+                            <span class="badge bg-info">{{ $ev->tipo }}</span>
+                            {{ $ev->archivo_nombre_original }}
+                            <small class="text-muted">({{ number_format($ev->archivo_tamano / 1024, 1) }} KB)</small>
+                        </span>
+                        <small class="text-muted">{{ $ev->created_at?->format('d/m/Y H:i') }}</small>
+                    </li>
+                @endforeach
+            </ul>
+        @else
+            <p class="text-muted">Aún no hay evidencia vigente para esta salida.</p>
+        @endif
+
+        <form action="{{ route('salidas.evidencias.store', $salida->id) }}"
+              method="POST" enctype="multipart/form-data">
+            @csrf
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label">Tipo</label>
+                    <select name="tipo" class="form-select form-select-sm">
+                        <option value="firma_cliente">Firma cliente</option>
+                        <option value="pdf_cliente_firmado">PDF cliente firmado</option>
+                        <option value="foto_entrega">Foto entrega</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Archivo (JPG/PNG/PDF, ≤10 MB)</label>
+                    <input type="file" name="archivo" class="form-control form-control-sm"
+                           accept=".jpg,.jpeg,.png,.pdf" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Notas (opcional)</label>
+                    <input type="text" name="notas" class="form-control form-control-sm" maxlength="2000">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-primary btn-sm w-100" type="submit">
+                        <i class="bi bi-upload"></i> Subir
+                    </button>
+                </div>
+            </div>
+            @if($errors->any())
+                <div class="alert alert-danger mt-2 mb-0">
+                    <ul class="mb-0">
+                        @foreach($errors->all() as $err)<li>{{ $err }}</li>@endforeach
+                    </ul>
+                </div>
+            @endif
+        </form>
+    </div>
+</div>
 </div>
 @endsection

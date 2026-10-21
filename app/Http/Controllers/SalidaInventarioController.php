@@ -178,4 +178,46 @@ class SalidaInventarioController extends Controller
         return redirect()->route('salidas.index')
             ->with('success', 'Salida eliminada correctamente.');
     }
+
+    /**
+     * B-05: upload de evidencia desde la web (no API).
+     * Autorización: 403 si la salida no pertenece al usuario autenticado.
+     */
+    public function uploadEvidenciaWeb(
+        \Illuminate\Http\Request $request,
+        int $id,
+        \App\Services\EvidenciaEntregaService $service
+    ) {
+        $user   = \Illuminate\Support\Facades\Auth::user();
+        $salida = SalidaInventario::findOrFail($id);
+
+        if ($salida->entregado_a !== $user->usuario) {
+            abort(403, 'No tienes permiso para subir evidencias a esta salida.');
+        }
+
+        $validated = $request->validate([
+            'archivo' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:10240'],
+            'tipo'    => ['nullable', 'in:firma_cliente,pdf_cliente_firmado,foto_entrega'],
+            'notas'   => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $service->guardar(
+                $salida,
+                $request->file('archivo'),
+                $validated['tipo'] ?? 'firma_cliente',
+                $user->usuario,
+                $validated['notas'] ?? null
+            );
+        } catch (\App\Exceptions\ProyectoNoEncontradoException $e) {
+            return back()->withErrors([
+                'archivo' => 'El proyecto asociado no existe. Contacta al administrador.',
+            ])->withInput();
+        }
+
+        return redirect()
+            ->route('salidas.show', $salida->id)
+            ->with('success', 'Evidencia subida correctamente.');
+    }
+
 }
