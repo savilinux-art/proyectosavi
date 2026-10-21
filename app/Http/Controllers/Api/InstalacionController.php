@@ -59,7 +59,6 @@ class InstalacionController extends Controller
     public function show($id)
     {
         $instalacion = Instalacion::with(['proyecto'])->findOrFail($id);
-        $instalacion->check_list = json_decode($instalacion->check_list);
 
         return response()->json([
             'success' => true,
