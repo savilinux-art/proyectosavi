@@ -1,0 +1,1046 @@
+================================================================================
+       MODELO DE NEGOCIO — APP MÓVIL OFFLINE-FIRST ProyectoSAVI
+       Documento: docs/movil/MODELO-NEGOCIO-APP-MOVIL-v3.txt
+       Versión: v3 — 20-oct-2026
+       Base: v2 + decisiones SYNC D-1 a D-6 cerradas + Q3.4 corregido
+             + reglas de negocio confirmadas por el usuario
+       Estado: Módulo A cerrado. Módulo B cerrado. SYNC cerrado.
+               Listo para implementar B-16/B-17.
+================================================================================
+
+INSTRUCCIONES DE LECTURA:
+  ✅ = Decisión confirmada por el usuario o por datos verificados en prod.
+  🔄 = Cambiado respecto a la versión anterior. La versión previa queda obsoleta.
+  🚨 = Hallazgo nuevo. Puede afectar diseño o plan.
+  ⏳ = Pendiente de decisión. Se aplica default si no hay respuesta.
+  🔴 = Bloqueante para arrancar la app.
+  🟡 = Importante, no bloqueante.
+  🟢 = Cosmético / postergable.
+
+  CAMBIOS RESPECTO A v2 (resumen ejecutivo):
+    - §3.4 Q3.4 CERRADA: finalizar → 'pruebas' (NO 'entrega').
+    - §3.13 FKs de eventos y fotos: RESTRICT (no CASCADE).
+    - §6 B-09 y B-10 actualizados con RESTRICT.
+    - §14 NUEVO: decisiones de SYNC D-1 a D-6.
+    - §15 NUEVO: reglas de negocio confirmadas.
+    - §16 NUEVO: deudas y hallazgos Q-135 a Q-140.
+    - §17 ACTUALIZADO: bloqueantes inmediatos.
+
+================================================================================
+§0. ALCANCE COMPLETO DEL MÓVIL
+================================================================================
+
+La app móvil cubre DOS módulos en Fase 1:
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  MÓDULO A — SALIDAS DE INVENTARIO + FIRMA DEL CLIENTE              │
+  │    Estado: CERRADO ✅ (reusa evidencias_entrega existente)          │
+  ├─────────────────────────────────────────────────────────────────────┤
+  │  MÓDULO B — INSTALACIONES + EVIDENCIAS + UBICACIÓN                 │
+  │    Estado: CERRADO ✅                                              │
+  ├─────────────────────────────────────────────────────────────────────┤
+  │  MÓDULO C — SYNC (B-16/B-17)                                        │
+  │    Estado: CERRADO ✅ (decisiones D-1 a D-6 tomadas, §14)           │
+  └─────────────────────────────────────────────────────────────────────┘
+
+Fuera de scope Fase 1:
+  - Gestión de usuarios/roles desde el móvil.
+  - Ventas de mostrador (Fase 2).
+  - Cotizaciones (solo lectura de folio para el vale, si aplica).
+  - Reportes/dashboards en el móvil.
+  - Firma de cierre de instalación (I4-A: Fase 3).
+  - Migración de blobs legacy de instalaciones (I6-A: Fase 3).
+  - Aceptación/rechazo de salida por el técnico (proceso físico, §15).
+
+================================================================================
+§1. ROLES Y DISPOSITIVOS
+================================================================================
+
+  ┌────────────────┬──────────────┬───────────────────────────────────────┐
+  │ Rol            │ Dispositivo  │ Qué hace                              │
+  ├────────────────┼──────────────┼───────────────────────────────────────┤
+  │ Administrador  │ Web (hoy)    │ Todo. No se contempla en móvil F1.    │
+  │ Almacenista    │ Web          │ Crea salidas, imprime PDF, entrega    │
+  │ (Inventarios)  │              │ material al técnico. NO usa el móvil  │
+  │                │              │ en F1.                                │
+  │ Supervisor     │ Web          │ Verifica trabajo del técnico, marca   │
+  │ (NUEVO, §16)   │              │ estatus := 'entrega' al cliente.      │
+  │                │              │ No usa el móvil en F1.                │
+  │ Técnico        │ Móvil        │ Recibe material, ejecuta trabajo,     │
+  │ (Instalador)   │ (Flutter)    │ registra eventos y evidencias con     │
+  │                │              │ ubicación. NO entrega al cliente.     │
+  │ Vendedor       │ Web + Móvil  │ Consulta ventas. F1: solo lectura en  │
+  │                │ (lectura)    │ móvil. Creación desde web.            │
+  └────────────────┴──────────────┴───────────────────────────────────────┘
+
+  ✅ P1:     Almacenista web crea salida.
+  ✅ P1.1:   Firma es del CLIENTE (no del técnico).
+  ✅ P1.2:   Técnico sube la firma desde el móvil.
+  ✅ P4-A:   Traccar sigue vigente. App no reemplaza trayecto (F-4).
+             App captura hitos (inicio/fin/pausas) — Traccar trayecto.
+  ✅ P1.3:   Supervisor hace la entrega al cliente. Técnico NUNCA entrega.
+  ✅ P1.4:   Asignación de técnico a instalación es INMUTABLE (§15).
+
+================================================================================
+§2. MÓDULO A — SALIDAS + FIRMA
+================================================================================
+
+2.1 ✅ Tabla base: evidencias_entrega (NO salida_archivos)
+
+  El v1 proponía crear salida_archivos. El dump 19-oct revela que
+  evidencias_entrega YA EXISTE (migración batch 33, 2026-10-01, 0 filas):
+
+    CREATE TABLE `evidencias_entrega` (
+      id, salida_id bigint NOT NULL,
+      proyecto_id bigint NOT NULL,        -- ⚠️ NOT NULL, no nullable
+      archivo_path varchar(500) NOT NULL,
+      archivo_nombre_original varchar(255) NULL,
+      archivo_mime varchar(100) NULL,
+      archivo_tamano bigint UNSIGNED NULL,
+      notas text NULL,
+      subido_por varchar(255) NOT NULL,
+      created_at, updated_at
+    )
+
+  Decisión: reusar evidencias_entrega. NO crear salida_archivos.
+
+2.2 Extensión necesaria de evidencias_entrega (migración mínima)
+
+  Schema::table('evidencias_entrega', function (Blueprint $t) {
+      $t->enum('tipo', ['firma_cliente','pdf_cliente_firmado','foto_entrega'])
+        ->default('firma_cliente')->after('archivo_tamano');
+      $t->enum('estado', ['vigente','invalidada_por_edicion'])
+        ->default('vigente')->after('tipo');
+      $t->timestamp('invalidada_at')->nullable()->after('estado');
+      $t->string('invalidada_por', 255)->nullable();
+      $t->text('invalidada_motivo')->nullable();
+      $t->index(['salida_id', 'estado']);
+  });
+
+2.3 🚨 Resolver proyecto_id (proyecto_id NOT NULL)
+
+  Como salidas_inventario.nombre_proyecto es string (P3-A) y
+  evidencias_entrega.proyecto_id es NOT NULL, el endpoint debe resolver:
+
+    $proyecto = Proyecto::where('nombre_proyecto', $salida->nombre_proyecto)
+                        ->first();
+    if (!$proyecto) {
+        abort(422, 'Proyecto no encontrado para la salida.');
+    }
+
+  🚨 Helper resolverProyecto($nombre) con trim + case-insensitive.
+  Log de fallos obligatorio. Nuevo ítem B-08a.
+
+2.4 Storage
+
+  Storage::disk('local') →
+    storage/app/private/evidencias_entrega/{salida_id}/{tipo}_{timestamp}.{ext}
+
+  Regla vigente v31: Storage::response() para servir. Nunca response() plano.
+
+2.5 Endpoints API — Módulo A
+
+  GET  /api/salidas?since=<iso8601>
+       → pull salidas propias (entregado_a = usuario autenticado)
+       → filtro: WHERE entregado_a = :current_user
+
+  GET  /api/salidas/{id}
+       → detalle (proyecto, materiales, evidencias vigentes)
+
+  POST /api/salidas/{id}/evidencias-entrega (multipart)
+       → campos: archivo (JPG|PNG|PDF), tipo, notas
+       → servidor resuelve proyecto_id (ver 2.3)
+       → invalida evidencia previa del mismo tipo (C3-B)
+       → respuesta: { id, tipo, estado, mime, size_bytes }
+
+2.6 Cambios mínimos en web (Laravel)
+
+  SalidaController@download
+    → si hay evidencia vigente de tipo pdf_cliente_firmado o firma_cliente,
+      redirigir a esa. Si no, sirve PDF actual.
+
+  SalidaController@uploadEvidenciaEntrega (NUEVO)
+    → valida mime + size (≤10MB) + magic bytes (%PDF para PDFs)
+    → resuelve proyecto_id (helper resolverProyecto)
+    → invalida evidencia previa vigente del mismo tipo
+    → crea evidencias_entrega
+
+  salidas/show.blade.php
+    → badge "✓ Firmado" / "Pendiente firma"
+    → thumbnail de firma vigente
+    → botón "Invalidar firma" (solo admin/almacenista/supervisor)
+
+  proyectos/show.blade.php
+    → columna "Firma" en historial de salidas
+    → columna "Firmado" por material en trazabilidad
+
+================================================================================
+§3. MÓDULO B — INSTALACIONES + EVIDENCIAS + UBICACIÓN
+================================================================================
+
+3.1 Contexto real (dump 20-oct)
+
+  Tablas existentes:
+    instalaciones            7 filas  ✅
+    instalacion_instalador   9 filas  ✅
+    instalacion_fotos        0 filas  ✅
+
+  🚨 Hallazgo Q-93: id_usuario_asignado SIGUE EXISTIENDO en prod.
+     Reabrir Q-93.
+
+  🚨 Hallazgo: instalacion_instalador NO tiene FK a instalaciones
+     ni a usuarios. Tampoco índices. Deuda aceptada en F1, arreglar F2.
+
+  🚨 Hallazgo: es_principal es 0 en TODAS las filas. F1 ignora.
+
+  🚨 Hallazgo: fecha_hora_inicio tiene NOT NULL + valores ya cargados
+     para instalaciones en 'preparacion' y 'Programada'.
+
+3.2 ✅ Flujo confirmado (F-1): por instalación, no por jornada
+
+  Un técnico puede:
+    A) Hacer 1 instalación en 1 o varios días (Palomar 3 días)
+    B) Hacer hasta 3 instalaciones en 1 día (Redes + Cámaras + Audio)
+    C) Mezclar
+
+  NO se crea tabla jornadas. El timeline vive en instalacion_eventos.
+
+  🔄 NUEVO (v3): la jornada de trabajo puede transcurrir COMPLETA sin
+  internet (§15.4). El outbox del cliente acumula eventos de toda la
+  jornada. El sync drena el outbox cuando vuelve la red. Esto NO cambia
+  el modelo de datos, pero sí las expectativas de tamaño de batch y la
+  criticidad de la política de retry (§16 Q-137).
+
+3.3 ✅ Botones (Opción A confirmada) y side effects
+
+  Iniciar / Pausar / Reanudar / Finalizar
+
+  ┌──────────────┬──────────────────────────┬───────────────────────┐
+  │ Botón        │ instalaciones            │ instalacion_eventos   │
+  ├──────────────┼──────────────────────────┼───────────────────────┤
+  │ Iniciar (1ª) │ fecha_hora_inicio := at  │ tipo='iniciada'       │
+  │              │ (SOLO si estaba NULL)    │ + foto + lat/lng      │
+  │              │ estatus := 'en_proceso'  │                       │
+  │ Pausar       │ (no toca nada)           │ tipo='pausada'        │
+  │ Reanudar     │ (no toca nada)           │ tipo='reanudada'      │
+  │ Finalizar    │ fecha_hora_fin := at     │ tipo='finalizada'     │
+  │              │ estatus := 'pruebas'     │ + foto + lat/lng      │
+  │              │ (🔄 v3, NO 'entrega')    │                       │
+  └──────────────┴──────────────────────────┴───────────────────────┘
+
+  Regla de oro: fecha_hora_inicio se escribe UNA VEZ.
+  Si el técnico vuelve día 2 y día 3, no se sobreescribe.
+
+3.4 ✅ Q3.4: estatus al finalizar (CERRADA v3 = 'pruebas')
+
+  La v2 votaba 'entrega' por error de proceso. La v3 corrige:
+
+    Finalizar (técnico) → estatus := 'pruebas'
+                          (NO 'entrega')
+    fecha_hora_fin := capturado_at
+
+  La transición a 'entrega' la hace el SUPERVISOR desde web (§1),
+  tras verificar que el técnico hizo buen trabajo.
+  Esa transición NO está en scope de la app móvil ni de B-16/B-17.
+
+  Justificación: el técnico NUNCA entrega al cliente (§15.1).
+
+3.5 ✅ Q3.5: instalaciones legacy sin eventos (CERRADA v3 = A)
+
+  7 instalaciones en 'en_proceso' con fecha_hora_inicio ya cargada
+  y sin eventos. Al pulsar "Iniciar" desde la app:
+
+    Opción A (aceptada): tratar como primer inicio desde app PERO
+                         no sobreescribir fecha_hora_inicio si ya
+                         tiene valor (regla de oro §3.3).
+                         payload_json guarda {inicio_previo: '...'}.
+
+3.6 ✅ I5-B: SÍ capturar lat/lng en eventos de la app
+
+  Traccar NO se retira (P4-A). Convivencia:
+    Traccar  → trayecto continuo
+    App      → hitos con timestamp + fix exacto
+
+3.7 ✅ I2-C: tipos de evidencia en F1
+
+  inicio | proceso | fin | incidencia
+  incidencia NO obligatoria para el cierre.
+
+3.8 ✅ I4-A: firma de cierre de instalación → Fase 3.
+  Firma del cliente existe SOLO en Módulo A (salida de materiales).
+
+3.9 ✅ I6-A: blobs legacy en NULL. Se dropean en Fase 3 sin pérdida.
+
+3.10 ✅ I7': check_list F1 = JSON libre sin validación estructurada
+  F1: POST /api/instalaciones/{id}/checklist acepta JSON libre.
+      Persiste tal cual. Cada actualización CREA evento
+      'checklist_actualizado' en instalacion_eventos (histórico
+      completo, §14).
+  F2: con 1 ejemplo real, congelar schema + FormRequest.
+
+3.11 🚨 Offline + ubicación: promesas honestas
+
+  Lo que SÍ funciona offline:
+    - GPS del teléfono (primer fix puede tardar)
+    - lat/lng/timestamp → SQLite local
+    - Foto → SQLite local
+    - Envío al sync cuando hay red (puede ser jornada completa)
+
+  Lo que NO funciona offline:
+    - Traccar (no recibe sin red)
+    - Reverse geocoding (calle desde lat/lng) — NO usar offline
+    - Validar contra geocerca — F2
+
+  Riesgos operativos aceptados:
+    - GPS no fija en interiores → timeout 15s → permitir con
+      fuente='no_disponible' y flag pendiente_revision
+    - Mock location → fuente='mock' + alerta al sync
+    - Hora desviada → capturado_at (dispositivo, confiable)
+                      + created_at (servidor, autoritativo)
+    - Batería → GPS solo en inicio/fin/foto, no continuo
+
+3.12 🚨 Detección de discrepancias app vs Traccar (F2, B-18)
+
+  Al sincronizar, si hay posición de Traccar en ventana ±5 min:
+    - < 50m   → ok
+    - 50-200m → precision_baja
+    - > 200m  → discrepancia (NO rechazar, marcar para admin)
+
+3.13 🔄 Migraciones Módulo B (2 archivos — RESTRICT en FKs)
+
+  Migración 1 — instalacion_eventos (NUEVA):
+
+    CREATE TABLE instalacion_eventos (
+      id              BIGINT UNSIGNED AUTO_INCREMENT PK,
+      instalacion_id  BIGINT UNSIGNED NOT NULL,
+      uuid_cliente    CHAR(36) NOT NULL UNIQUE,    -- 🔄 v3, idempotencia
+      tipo            ENUM('iniciada','pausada','reanudada','finalizada',
+                           'incidencia','checklist_actualizado','nota_agregada'),
+      latitud         DECIMAL(10,7) NULL,
+      longitud        DECIMAL(10,7) NULL,
+      precision_metros INT UNSIGNED NULL,
+      fuente          VARCHAR(20) NULL,
+      payload_json    JSON NULL,
+      capturado_at    DATETIME NOT NULL,
+      por             VARCHAR(255) NOT NULL,
+      created_at, updated_at,
+      INDEX (instalacion_id, tipo, capturado_at),
+      INDEX (por, capturado_at),
+      INDEX (updated_at),                          -- 🔄 v3, pull delta
+      CONSTRAINT fk_instalacion_eventos_instalacion
+        FOREIGN KEY (instalacion_id) REFERENCES instalaciones(id)
+        ON DELETE RESTRICT                          -- 🔄 v3, era CASCADE
+    );
+
+  Migración 2 — extend instalacion_fotos (multi-columna):
+
+    ALTER TABLE instalacion_fotos
+      ADD COLUMN uuid_cliente CHAR(36) NULL AFTER id,
+      ADD COLUMN latitud DECIMAL(10,7) NULL AFTER descripcion,
+      ADD COLUMN longitud DECIMAL(10,7) NULL AFTER latitud,
+      ADD COLUMN precision_metros INT UNSIGNED NULL AFTER longitud,
+      ADD COLUMN fuente VARCHAR(20) NULL AFTER precision_metros,
+      ADD INDEX idx_instalacion_fotos_updated_at (updated_at);
+
+    ALTER TABLE instalacion_fotos
+      ADD UNIQUE KEY uq_instalacion_fotos_uuid (uuid_cliente);
+
+    ALTER TABLE instalacion_fotos
+      DROP FOREIGN KEY <nombre_fk_existente>,
+      ADD CONSTRAINT fk_instalacion_fotos_instalacion
+        FOREIGN KEY (instalacion_id) REFERENCES instalaciones(id)
+        ON DELETE RESTRICT;                         -- 🔄 v3, era CASCADE
+
+  NO tocar instalaciones (todo estructural ya existe).
+  NO crear instalacion_evidencias (usar instalacion_fotos).
+
+  ⚠️ Nota: el uuid_cliente en instalacion_fotos se agrega NULL inicialmente
+  para no romper filas existentes (0 en dump actual, pero por seguridad).
+  Se puede poner NOT NULL en F2 cuando se confirme que la app siempre lo envía.
+
+3.14 Endpoints API — Módulo B (igual que v2, + capturado_at en eventos)
+
+  GET  /api/instalaciones?since=<iso8601>
+  GET  /api/instalaciones/{id}
+  POST /api/instalaciones/{id}/iniciar
+  POST /api/instalaciones/{id}/pausar
+  POST /api/instalaciones/{id}/reanudar
+  POST /api/instalaciones/{id}/finalizar
+  POST /api/instalaciones/{id}/fotos (multipart, batch 1..N)
+  POST /api/instalaciones/{id}/checklist
+  POST /api/instalaciones/{id}/eventos
+
+  Regla del servidor para capturado_at:
+    - si capturado_at > now() + 5 min   → rechazar (reloj desviado)
+    - si capturado_at < now() - 30 días → aceptar + flag pendiente_revision
+
+3.15 ⏳ F-6: Telegram vs App (conviven F1, deprecar F2)
+
+================================================================================
+§4. MODELO DE DATOS — VISIÓN CONSOLIDADA (actualizada v3)
+================================================================================
+
+  usuarios (SoftDeletes activo, HasApiTokens ✅)
+    └── rol → roles.rol
+
+  proyectos (por nombre_proyecto, FK a ventas.nombre_proyecto)
+    ├── cliente_id → clientes.id (SET NULL, 4 NULL)
+    ├── movimientos_inventario → proyecto_id (int, CASCADE)
+    ├── salidas_inventario → nombre_proyecto (string)
+    │     ├── salida_detalle → inventario.id
+    │     └── evidencias_entrega → salida_id  [REUSA existente]
+    │           + tipo, estado, invalidada_*  [migración mínima]
+    ├── devoluciones_inventario → nombre_proyecto (string, NULL)
+    │     └── devolucion_detalle → inventario.id
+    ├── instalaciones → nombre_proyecto (string)
+    │     ├── instalacion_instalador → usuarios.usuario (N:M)
+    │     │     ⚠️ sin FK ni índice (deuda F2, B-19)
+    │     ├── instalacion_fotos (0 filas)  [REUSA + extender]
+    │     │     + uuid_cliente, lat/lng/precision/fuente
+    │     │     + FK → RESTRICT  (🔄 v3)
+    │     └── instalacion_eventos  [NUEVA]
+    │           + uuid_cliente UNIQUE
+    │           + FK → RESTRICT  (🔄 v3)
+    │           iniciada|pausada|reanudada|finalizada|
+    │           incidencia|checklist_actualizado|nota_agregada
+    └── cotizaciones → proyecto_id (SIN FK, Q-65)
+          └── cotizacion_detalles → inventario.id
+
+  inventario → categorias.nombre_categoria
+
+  sync_log  [NUEVA, §14]  — log de problemas + idempotencia de check_list
+
+  Traccar (fuera de app móvil, P4-A):
+    ubicaciones_usuarios, geocercas, geocerca_alertas, solicitudes_ubicacion
+
+================================================================================
+§5. CATÁLOGO OFFLINE (bootstrap) — igual que v2
+================================================================================
+
+  Total bootstrap ~2 MB. No cachear ventas_mostrador, movimientos_inventario,
+  cotizaciones completas, ubicaciones_usuarios, geocercas, etc.
+
+  ✅ Política de paginación pull F1: SIN paginar (todo en una request).
+     Migración a keyset en F2 si el catálogo crece (§14 D-6).
+
+================================================================================
+§6. BACKEND REQUERIDO (consolidado v3)
+================================================================================
+
+  ID    Cambio                                          Bloquea        Fase
+  ────────────────────────────────────────────────────────────────────────
+  B-01  Q-113: nullable titulo/monto en API             Q-113          🔴 F1
+  B-02  Q-102: HasApiTokens en Usuario ✅ HECHO         Login móvil    ✅
+  B-03  Extender evidencias_entrega (+5 cols)           Firma          🔴 F1
+  B-04  Q-65: FK cotizaciones.proyecto_id (0 huérf.)    Cotizaciones   🟡 F1
+  B-05  SalidaController@uploadEvidenciaEntrega         Subida firma   🔴 F1
+  B-06  SalidaController@download redirect              Descarga       🟡 F1
+  B-07  GET /api/salidas (pull)                         Módulo A       🔴 F1
+  B-08  POST /api/salidas/{id}/evidencias-entrega       Firma          🔴 F1
+  B-08a Helper resolverProyecto(nombre)                 Firma          🔴 F1
+  B-09  🔄 Migración instalacion_eventos (RESTRICT +    Módulo B       🔴 F1
+        uuid_cliente UNIQUE)                            
+  B-10  🔄 Extender instalacion_fotos (+4 geo +         Evidencias     🔴 F1
+        uuid_cliente + FK RESTRICT)                     
+  B-11  GET /api/instalaciones (pull)       ✅ HECHO    Módulo B       ✅
+  B-12  POST /api/instalaciones/{id}/iniciar|pausar|    Flujo inst.    🟡 F1
+        reanudar|finalizar
+  B-13  POST /api/instalaciones/{id}/fotos              Evidencias     🟡 F1
+  B-14  POST /api/instalaciones/{id}/checklist  ✅ HECHO Checklist F1  ✅
+  B-15  POST /api/instalaciones/{id}/eventos    ✅ HECHO Eventos       ✅
+  B-16  POST /api/sync/push (batch)                     Sync general   🔴 F1
+  B-17  GET /api/sync/pull (delta)                      Sync general   🔴 F1
+  B-18  🚨 Detección discrepancia app vs Traccar        Auditoría      🟡 F2
+  B-19  🚨 FK + índice instalacion_instalador           Integridad     🟡 F2
+  B-20  P5-B: inventario.categoria → categoria_id       Catálogos      🟢 F2
+  B-21  Q-53: UNIQUE + TRIM categorias                  Integridad     🟢 F2
+  B-22  Validación estricta de checklist (con I7 real)  Checklist F2   🟡 F2
+  B-23  proyecto_archivos + migración 4 blobs           Fase 3         🟢 F3
+  B-24  🔄 Migración sync_log (§14 D-1)                 Sync           🔴 F1
+  B-25  🔄 UX: mensaje legible al intentar borrar       Admin UX       🟢 F2
+        instalación con evidencia (Q-140)
+
+================================================================================
+§7. FLUJOS POR ROL
+================================================================================
+
+  7.1 Almacenista (web)
+    - Crea salida, imprime PDF, entrega material al técnico.
+    - Verifica salidas pendientes de firma.
+
+  7.2 Técnico (móvil)
+    - Login inicial con red (Sanctum, token 30 días).
+    - Pull inicial: catálogos + salidas + instalaciones asignadas.
+
+    Ciclo Entrega (Módulo A):
+      a. Lleva material + papel al cliente.
+      b. Cliente firma (físico).
+      c. Fotografía el papel.
+      d. Sube cuando hay red.
+      ✅ Técnico NO entrega al cliente, solo recaba evidencia.
+
+    Ciclo Instalación (Módulo B):
+      a. Abre instalación asignada.
+      b. Pulsa "Iniciar" (offline) → foto inicio + lat/lng.
+      c. Durante el día: fotos de proceso/incidencia con ubicación.
+      d. Pulsa "Pausar" si se va, "Reanudar" al volver.
+      e. Pulsa "Finalizar" → foto fin + lat/lng.
+         → estatus := 'pruebas' (NO 'entrega')
+      f. Todo se sincroniza al recuperar red (puede ser jornada completa).
+
+    Ve estado de sync de cada elemento.
+
+  7.3 Cliente
+    - No usa la app. Firma en papel.
+
+  7.4 Supervisor (web)
+    - Verifica trabajo del técnico.
+    - Marca estatus := 'entrega' cuando entrega al cliente.
+    - Puede invalidar firmas con motivo.
+
+  7.5 Administrador (web)
+    - Ve badges "firmado" en proyectos/salidas.
+    - Ve timeline de eventos por instalación.
+    - Puede pausar instalaciones (NO cancelar, NO borrar si ya inició).
+    - Ve banderas de discrepancia app vs Traccar (F2).
+
+================================================================================
+§8. DECISIONES CERRADAS Y PENDIENTES
+================================================================================
+
+  8.1 ✅ CERRADAS
+    P1, P1.1, P1.2, P1.3, P1.4, P2-A, P3-A, P4-A, P6-A, P7.2-C,
+    C1-A, C2, C3-B, C4-B, C5-A, P8-C,
+    I1-A, I2-C, I3-B, I4-A, I5-B, I6-A, I7',
+    F-1 (por instalación), F-2 (fotos inicio/fin obligatorias),
+    F-3 (permitir con bandera si no hay GPS),
+    F-4 (Traccar convive), F-5 (geo opcional en proceso/incidencia),
+    Opción A (Iniciar/Pausar/Reanudar/Finalizar),
+    Opción B (fecha_hora_inicio = inicio real, escribe una vez),
+    Reusar evidencias_entrega, Reusar instalacion_fotos,
+    Crear instalacion_eventos,
+    Q3.4 (finalizar → 'pruebas', supervisor entrega),
+    Q3.5 (tratar legacy como primer inicio desde app sin sobreescribir),
+    D-1 a D-6 de SYNC (§14).
+
+  8.2 ⏳ PENDIENTES (no bloquean migraciones)
+    P3.1  ¿Migrar salidas a int FK? (B para F1 voto).
+    P5.1  ¿Móvil antes o después de categorías? (B voto).
+    C3.1  ¿Ediciones post-firma raras/frecuentes? (B voto).
+    F-6   ¿Telegram convive o se depreca? (convive F1 voto).
+    I7    estructura de check_list (conseguir 1 ejemplo real).
+    Q-138 ¿Se puede quitar técnico antes de iniciar trabajo?
+    Q-139 ¿Pausar admin == pausar técnico? (mismo enum o no)
+
+  8.3 🚨 REABIERTAS
+    Q-93  id_usuario_asignado sigue existiendo en prod. Corregir doc.
+    Q-53  Debe incluir TRIM en categorias.nombre_categoria.
+
+================================================================================
+§9. PLAN DE COMMITS (actualizado v3)
+================================================================================
+
+  BLOQUE 1 — Independiente
+    1. fix(deploy): mysqldump vía ~/.my.cnf                   (Q-122)
+    2. feat(api): titulo_venta/monto_venta nullable + test    (Q-113)
+    3. feat(api): HasApiTokens en Usuario + test              (Q-102) ✅
+
+  BLOQUE 2 — Módulo A backend (4-6 h)
+    4. feat(db): FK cotizaciones.proyecto_id                  (Q-65)
+    5. feat(db): extender evidencias_entrega (+5 columnas)
+    6. feat(api): helper resolverProyecto + tests             (B-08a)
+    7. feat(api): POST /api/salidas/{id}/evidencias-entrega   (B-08)
+    8. feat(api): GET /api/salidas                            (B-07)
+    9. feat(web): badge Firmado + redirect download           (B-05, B-06)
+   10. feat(web): proyecto show columna Firmado
+
+  BLOQUE 3 — Módulo B backend (5-7 h)
+   11. feat(db): instalacion_eventos + modelo + relaciones    (B-09, RESTRICT)
+   12. feat(db): extender instalacion_fotos (+geo +uuid)      (B-10, RESTRICT)
+   13. feat(api): iniciar/pausar/reanudar/finalizar           (B-12)
+   14. feat(api): POST /api/instalaciones/{id}/fotos          (B-13)
+   15. feat(api): POST /api/instalaciones/{id}/checklist      (B-14) ✅
+   16. feat(api): POST /api/instalaciones/{id}/eventos        (B-15) ✅
+   17. feat(api): GET /api/instalaciones (pull)               (B-11) ✅
+   18. feat(web): timeline instalación + mapa
+
+  BLOQUE 4 — Sync (2-4 h)
+   19. feat(db): migración sync_log                           (B-24)
+   20. feat(api): GET /api/sync/pull + test                   (B-17)
+   21. feat(api): POST /api/sync/push + test                  (B-16)
+   22. test: idempotencia, conflicto, huérfano, duplicado_distinto
+
+  BLOQUE 5 — Flutter (días)
+   23. Bootstrap: login + pull catálogo + pull salidas
+   24. Módulo Salidas: listar + subir firma + sync
+   25. Módulo Instalaciones: iniciar/pausar/reanudar/finalizar
+   26. Sync engine: outbox + retry + conflictos
+   27. Servicio de ubicación (timeout 15s, fuente, mock)
+
+  BLOQUE 6 — F2
+   ... igual que v2 + B-25 UX borrado instalación
+
+================================================================================
+§10. CRITERIOS DE SALIDA (actualizados v3)
+================================================================================
+
+  10.1 Backend F1 — Módulo A
+    [ ] Q-122, Q-113, Q-102 (✅), Q-65 cerrados
+    [ ] evidencias_entrega extendida + tests
+    [ ] Helper resolverProyecto + tests
+    [ ] POST /api/salidas/{id}/evidencias-entrega funciona
+    [ ] GET /api/salidas funciona
+    [ ] Badge Firmado en salidas/show y proyectos/show
+
+  10.2 Backend F1 — Módulo B
+    [ ] instalacion_eventos + instalacion_fotos extendidas (RESTRICT)
+    [ ] 5 endpoints nuevos + tests
+    [ ] Q3.4 (✅) y Q3.5 (✅) decididos
+    [ ] Timeline visible en proyectos/show
+
+  10.3 Backend F1 — Sync (NUEVO)
+    [ ] Migración sync_log + índices
+    [ ] GET /api/sync/pull funcional (normalizado, sin paginar, since=updated_at)
+    [ ] POST /api/sync/push funcional (atómico, reordenado por capturado_at)
+    [ ] Tests: idempotencia, conflicto check_list, huérfano,
+        duplicado_distinto, batch atómico
+
+  10.4 App móvil
+    [ ] Login + token en secure storage
+    [ ] Pull catálogo (~2 MB)
+    [ ] Salidas: listar + subir firma + sync
+    [ ] Instalaciones: iniciar/pausar/reanudar/finalizar
+    [ ] Fotos + checklist + ubicación
+    [ ] Outbox sobrevive reinicio Y JORNADA COMPLETA offline
+    [ ] Retry con backoff exponencial (Q-137)
+    [ ] Resolución server-wins con log
+
+  10.5 Deploy
+    [ ] Server HEAD = origin/main
+    [ ] Q-106 (Telegram gate) cerrado
+    [ ] pull-prod.sh funcional
+
+================================================================================
+§11. BLOQUEANTES 🔴 INMEDIATOS (actualizado v3)
+================================================================================
+
+  1. Q-122  — deploy-prod.sh (5 min)
+  2. Q-113  — nullable titulo/monto API (5 min)
+  3. Q-102  — HasApiTokens Usuario (✅ HECHO)
+  4. Q-65   — FK cotizaciones.proyecto_id (10 min)
+  5. Q3.4   — estatus al finalizar (✅ CERRADO = 'pruebas')
+  6. Q3.5   — instalaciones legacy (✅ CERRADO = A sin sobreescribir)
+  7. D-1..D-6 — Sync (✅ CERRADOS, §14)
+
+  Próximos bloqueantes reales para arrancar B-16/B-17:
+    - Escribir migración sync_log (B-24)
+    - B-17 pull primero (más simple, valida el modelo)
+    - B-16 push después (idempotencia obligatoria)
+    - Tests de idempotencia / conflicto / huérfano / duplicado_distinto
+
+================================================================================
+§12. CAMBIOS RESPECTO A v2 (resumen ejecutivo)
+================================================================================
+
+  ┌────────────────────────────┬──────────────┬──────────────┬───────────┐
+  │ Punto                      │ v2           │ v3           │ Motivo    │
+  ├────────────────────────────┼──────────────┼──────────────┼───────────┤
+  │ Q3.4 estatus al finalizar  │ 'entrega' voto│ 'pruebas'  ✅│ Técnico   │
+  │                            │              │              │ no entrega│
+  │ Rol Supervisor             │ no existe    │ §1, §7.4     │ Proceso   │
+  │                            │              │              │ real      │
+  │ FK eventos/fotos           │ CASCADE      │ RESTRICT     │ Auditoría │
+  │ uuid_cliente               │ no definido  │ en eventos   │ Sync      │
+  │                            │              │ y fotos      │ D-1       │
+  │ sync_log                   │ no definido  │ §14 completo │ Sync D-1  │
+  │ check_list sync            │ no definido  │ evento por   │ Histórico │
+  │                            │              │ update       │ §14 D-4   │
+  │ Estructura pull            │ "delta por   │ normalizado, │ §14 D-6   │
+  │                            │ updated_at"  │ sin paginar  │           │
+  │ Offline duration           │ "momentos"   │ "jornada     │ §15.4     │
+  │                            │              │ completa"    │           │
+  │ Borrado instalaciones      │ ambiguo      │ RESTRICT si  │ §15.2     │
+  │                            │              │ ya inició    │           │
+  └────────────────────────────┴──────────────┴──────────────┴───────────┘
+
+================================================================================
+§13. LECCIONES DE LA SESIÓN v3
+================================================================================
+
+  1. Preguntar "¿quién hace X?" antes de asumir. La v2 votaba 'entrega'
+     al finalizar sin saber que el técnico NUNCA entrega al cliente.
+     La consecuencia era un enum incorrecto en el side effect del sync.
+
+  2. El propósito guía el diseño. Cuando el usuario dijo "evidencias para
+     histórico", cambió todo: check_list no descarta updates, eventos son
+     inmutables, FK RESTRICT en vez de CASCADE, sync_log solo guarda
+     problemas (los eventos son el log completo).
+
+  3. La regla de negocio se refleja en el esquema. "Nunca se borra una
+     instalación iniciada" = FK RESTRICT. No hace falta SoftDeletes
+     (que bloquearía también las no iniciadas). El esquema debe expresar
+     la regla exacta, no una aproximación.
+
+  4. Offline de jornada completa ≠ offline de minutos. Cambia:
+     tamaño del batch, frecuencia de reintentos, criticidad de retry
+     policy, ventana de huérfanos. El diseño lo tolera (batch atómico,
+     orden por capturado_at), pero las pruebas de carga deben ser
+     realistas.
+
+  5. Las decisiones de arquitectura se cierran con trade-offs explícitos,
+     no con votos. D-1..D-6 tienen cada una su "por qué" documentado en
+     §14. Si en F2 alguien quiere cambiar una, sabe qué se ganó y qué
+     se perdió.
+
+================================================================================
+§14. SYNC — DECISIONES CERRADAS D-1 a D-6
+================================================================================
+
+14.1 D-1: Híbrido — uuid_cliente UNIQUE + sync_log dual
+
+  Almacenamiento de idempotencia:
+
+  ┌──────────────────┬──────────────────────────────────────────────────┐
+  │ Tabla            │ Estrategia                                       │
+  ├──────────────────┼──────────────────────────────────────────────────┤
+  │ instalacion_     │ uuid_cliente CHAR(36) UNIQUE en la tabla.        │
+  │ eventos          │ El INSERT es el chequeo.                         │
+  │ instalacion_     │ uuid_cliente CHAR(36) UNIQUE en la tabla.        │
+  │ fotos            │ El INSERT es el chequeo.                         │
+  │ check_list       │ sync_log UNIQUE (tabla, uuid_cliente).           │
+  │                  │ Es columna JSON en instalaciones, no tabla.      │
+  └──────────────────┴──────────────────────────────────────────────────┘
+
+  Schema sync_log:
+
+    CREATE TABLE sync_log (
+      id              BIGINT UNSIGNED AUTO_INCREMENT PK,
+      tabla           VARCHAR(50) NOT NULL,
+      registro_id     BIGINT UNSIGNED NULL,
+      uuid_cliente    CHAR(36) NOT NULL,
+      operacion       VARCHAR(20) NOT NULL,   -- create|update
+      payload_json    JSON NOT NULL,
+      resultado       VARCHAR(20) NOT NULL,   -- ver §14.1.1
+      detalle         TEXT NULL,
+      intentado_at    TIMESTAMP NOT NULL,
+      aplicado_at     TIMESTAMP NULL,
+      created_at, updated_at,
+      UNIQUE KEY uq_sync_log_tabla_uuid (tabla, uuid_cliente),
+      INDEX idx_sync_log_resultado_fecha (resultado, intentado_at),
+      INDEX idx_sync_log_registro (registro_id)
+    );
+
+  14.1.1 Valores permitidos de resultado:
+
+    - 'ok'                  — se aplicó correctamente (SOLO check_list
+                              lo persiste en sync_log; eventos/fotos
+                              usan uuid_cliente UNIQUE en su tabla)
+    - 'conflicto'           — server-wins por registro (§14.2)
+    - 'huerfano'            — instalación no existe (§14.5)
+    - 'error'               — fallo no-recuperable (validación, FK, etc.)
+    - 'duplicado_distinto'  — mismo uuid_cliente, payload DIFERENTE
+                              al registrado antes. Se detecta con hash
+                              sha1 del payload canónico (JSON ordenado).
+                              Se responde 409 al cliente.
+
+  Rol dual de sync_log:
+    - eventos/fotos: solo guarda no-ok
+                     (conflicto, huerfano, error, duplicado_distinto)
+    - check_list:    guarda TODAS las ops
+                     (es su único lugar para el UUID)
+
+14.2 D-2: Server-wins por REGISTRO — aplica SOLO a check_list
+
+  Eventos y fotos son append-only:
+    - No hay update sobre instalacion_eventos (los cambios de estado
+      crean eventos NUEVOS, no mutan anteriores).
+    - No hay update sobre instalacion_fotos (se sube otra foto, no se
+      edita).
+    - Sin conflicto posible → solo idempotencia (D-1).
+
+  check_list:
+    - Es columna JSON en instalaciones.
+    - Si instalaciones.updated_at > push.timestamp:
+        rechazar el update
+        registrar sync_log.resultado='conflicto'
+        responder 409 al cliente con el estado actual del servidor
+    - Si es la primera actualización tras el pull inicial:
+        aplicar sin conflicto
+
+14.3 D-3: Alcance transaccional (3 tablas)
+
+  Catálogo (pull-only):       proyectos, clientes, categorias,
+                              inventario, estatus, salidas, salida_detalle,
+                              evidencias_entrega
+  Transaccional (push+pull):  instalacion_eventos, instalacion_fotos,
+                              check_list
+  Fuera de B-16:              evidencias_entrega
+                              (Módulo A, tiene su propio endpoint
+                               multipart y su propio servicio en F2)
+
+  Técnico NO descuenta inventario (es trabajo del almacenista).
+  Técnico NO acepta/rechaza salidas desde la app (proceso físico).
+
+14.4 D-4: Orden, atomicidad y side effects
+
+  - Reordenar batch por capturado_at ASC (no por orden de llegada).
+    Razón: si el retry reordena y llega finalizada antes que iniciada,
+    el side effect escribiría fecha_hora_fin antes de fecha_hora_inicio.
+
+  - Batch atómico (DB::transaction):
+    - Fallo no-recuperable → rollback total → 422 con detalle por op.
+    - Idempotentes (mismo uuid) → skip silencioso, batch continúa.
+
+  - Side effects (X en F1, Y en F2):
+
+      iniciada   → fecha_hora_inicio := capturado_at (si era NULL)
+                   estatus := 'en_proceso'
+      pausada    → (no toca instalaciones)
+      reanudada  → (no toca instalaciones)
+      finalizada → fecha_hora_fin := capturado_at
+                   estatus := 'pruebas'  ← Q3.4 cerrado (§3.4)
+      incidencia → (no toca instalaciones)
+      nota_agregada → (no toca instalaciones)
+      checklist_actualizado → ver §14.4.1
+
+  14.4.1 check_list — cada update crea evento + solo el último
+         actualiza la columna:
+
+    Dentro de un batch con N updates de check_list para la misma
+    instalación:
+      1. Insertar N eventos en instalacion_eventos
+         (tipo='checklist_actualizado', payload completo)
+      2. Ordenar por capturado_at ASC
+      3. Actualizar instalaciones.check_list SOLO con el de
+         capturado_at más reciente
+
+    Ningún update se "descarta": todos quedan como evento (histórico).
+    Solo el más reciente aplica al caché (columna).
+
+  14.4.2 Service compartido (interpretación 3):
+
+    La lógica de iniciar/pausar/reanudar/finalizar/checklist/eventos
+    vive en un Service (patrón InstalacionFotoService de B-15).
+    Los endpoints HTTP y el sync push AMBOS llaman al Service.
+    NO se duplica lógica. NO se hace replay interno de HTTP.
+
+14.5 D-5: Huérfanos y borrado
+
+  1. Huérfanos (instalación_id no existe al aplicar push):
+     - Aceptar con sync_log.resultado='huerfano' + payload completo.
+     - Cliente recibe 200 (operación registrada, no reintenta).
+     - Admin recupera manual desde web.
+     - Frecuencia esperada: ~0 (regla §15.2 impide borrar instalaciones
+       ya iniciadas; regla §15.1 impide reasignar técnicos).
+     - Test mínimo: push a instalación inexistente no rompe ni pierde
+       payload ni fuerza reintento del cliente.
+
+  2. Borrado de instalaciones:
+     - FK RESTRICT en instalacion_eventos.instalacion_id
+     - FK RESTRICT en instalacion_fotos.instalacion_id
+     - Sin SoftDeletes en Instalacion.
+     - Regla de negocio: no se borra una instalación ya iniciada
+       (con eventos o fotos). RESTRICT lo hace imposible por esquema.
+     - Instalaciones no iniciadas sí se pueden borrar (no hay RESTRICT
+       activa porque no tienen filas hijas).
+     - Q-140 (F2): mensaje legible en el admin al intentar borrar.
+
+14.6 D-6: Pull — estructura, paginación, since
+
+  1. Estructura del response: NORMALIZADA POR TABLA
+     {
+       "since": "2026-10-20T14:30:00Z",
+       "next_since": "2026-10-20T18:45:12Z",
+       "instalaciones": [...],
+       "instalacion_eventos": [...],
+       "instalacion_fotos": [...],
+       "check_list": [...],       // solo las filas con cambios
+       "salidas": [...],
+       "evidencias_entrega": [...],
+       "catalogos": {
+         "proyectos": [...],
+         "clientes": [...],
+         "categorias": [...],
+         "inventario": [...],
+         "estatus": [...]
+       }
+     }
+
+  2. Paginación: SIN PAGINAR EN F1
+     - Bootstrap completo ~2 MB en una request.
+     - Deltas diarios mucho menores.
+     - Migración a keyset en F2 si el catálogo crece (sin cambiar
+       el contrato HTTP: el cliente acepta `cursor` opcional).
+
+  3. `since` se compara contra `updated_at` UNIFORME en todas las tablas.
+     - Incluso en instalacion_eventos, because updated_at mide
+       "cuándo cambió en servidor", no cuándo fue capturado.
+     - El cliente ordena por capturado_at localmente si lo necesita
+       para el timeline.
+
+  4. Formato de `since`: ISO 8601 UTC (2026-10-20T14:30:00Z).
+     Sin ambigüedad de zona horaria.
+
+  5. Filtros de scope:
+     - instalaciones: EXISTS instalacion_instalador
+                      WHERE instalador_usuario = :current_user
+     - salidas: WHERE entregado_a = :current_user
+     - instalacion_eventos, instalacion_fotos, check_list:
+                WHERE instalacion_id IN (las anteriores)
+
+================================================================================
+§15. REGLAS DE NEGOCIO CONFIRMADAS (v3)
+================================================================================
+
+  15.1 Asignación de técnico es INMUTABLE
+
+    Una vez asignado un técnico a una instalación, NO se puede reasignar
+    a otro. Motivo: evitar conflictos entre técnicos sobre quién hizo qué.
+
+    Consecuencias:
+      - instalacion_instalador: mapping estable, el pull no cambia por
+        reasignación.
+      - Huérfanos por reasignación: imposibles.
+      - Multi-técnico: coexiste (9 filas para 7 instalaciones), pero
+        agregar técnico no es reasignar.
+
+    ⏳ Q-138: confirmar si "quitar técnico antes de iniciar trabajo" es
+    una corrección de error de asignación (permitida) o también prohibido.
+
+  15.2 El admin NO cancela instalaciones — solo las PAUSA
+
+    "Cancelar" no existe como transición. El admin pausa por impedimento.
+    La instalación pausada sigue existiendo, sus eventos y fotos se
+    aplican normalmente.
+
+    ⏳ Q-139: ¿"pausar admin" == "pausar técnico" (mismo estatus) o son
+    dos estatus distintos?
+
+    Regla derivada: NUNCA se borra una instalación YA INICIADA. Se
+    conserva para histórico. Solo se pueden borrar instalaciones sin
+    eventos ni fotos. Se garantiza por FK RESTRICT (§14.5).
+
+  15.3 Propósito de las evidencias: HISTÓRICO / AUDITORÍA
+
+    Todas las evidencias del técnico (eventos, fotos, cambios de
+    checklist) existen para crear un registro histórico que sirva
+    como prueba en caso de disputas, auditorías o reclamos del cliente.
+
+    Consecuencias de diseño:
+      - instalacion_eventos: inmutable. Nunca se edita. Nunca se borra.
+      - instalacion_fotos: inmutable. Si se "corrige", se sube otra y
+        se marca vigente vs invalidada (patrón §2.2).
+      - check_list: la columna es caché; el histórico vive en eventos
+        checklist_actualizado.
+      - FK RESTRICT: protege la evidencia ante borrados accidentales.
+      - created_at (servidor) y capturado_at (dispositivo) se preservan
+        ambos para auditoría forense.
+
+    ⏳ Q-136: confirmar política de inmutabilidad para el admin en web
+    (¿puede invalidar sin borrar? ¿o puede borrar?).
+
+  15.4 Offline puede ser JORNADA COMPLETA
+
+    Aunque el diseño conceptual es "offline para momentos sin red",
+    operativamente una jornada completa puede transcurrir sin internet.
+    El outbox del cliente acumula 20-50+ operaciones y se drena cuando
+    vuelve la red.
+
+    Consecuencias:
+      - Batch atómico por jornada (DB::transaction).
+      - Orden por capturado_at ASC crítico (retry puede reordenar).
+      - Retry con backoff exponencial (Q-137).
+      - Test E2E con batch de jornada completa (10+ eventos,
+        5+ fotos, 5+ updates de check_list).
+
+  15.5 El técnico NO entrega al cliente. El SUPERVISOR sí.
+
+    El técnico recaba evidencias (fotos de proceso, inicio, fin,
+    incidencias) y las sincroniza. La entrega formal al cliente la
+    hace el SUPERVISOR desde web, tras verificar el trabajo.
+    Eso cambia el estatus a 'entrega'.
+
+    Consecuencia: el side effect de 'finalizada' deja estatus='pruebas'
+    (§3.4).
+
+  15.6 El técnico NO acepta/rechaza salidas desde la app
+
+    El técnico revisa el material físicamente contra la salida de
+    inventario. Si no coincide, NO acepta la salida — proceso físico,
+    regla de empresa. No se automatiza.
+
+    Consecuencia: salidas NO son transaccionales en el sync.
+    evidencias_entrega (Módulo A) tiene su propio endpoint multipart.
+
+  15.7 El técnico NO descuenta inventario
+
+    El inventario lo maneja el almacenista. El técnico solo consulta.
+
+    Consecuencia: movimientos_inventario NO es transaccional en el sync.
+
+================================================================================
+§16. DEUDAS Y HALLAZGOS NUEVOS (v3)
+================================================================================
+
+  Q-135 (rol supervisor no documentado)
+    El doc v1/v2 definía 4 roles. Existe un quinto: Supervisor, que
+    verifica el trabajo del técnico y marca estatus := 'entrega'.
+    Confirmar si es rol formal en roles.rol o es admin con permiso.
+
+  Q-136 (política de inmutabilidad para el admin)
+    Confirmar: ¿el admin puede invalidar eventos/fotos sin borrarlos
+    (patrón §2.2), o puede borrar físicamente? La regla de auditoría
+    (§15.3) sugiere invalidación, no borrado.
+
+  Q-137 (retry policy en cliente)
+    Fuera de scope backend, pero crítico para Flutter (BLOQUE 5):
+    backoff exponencial, no reintentos infinitos. Si tras N intentos
+    falla por 4xx, mover a dead letter local y mostrar al técnico.
+    Reintentos infinitos en 4xx generan bucles.
+
+  Q-138 (quitar técnico antes de iniciar trabajo)
+    ¿Se permite corregir un error de asignación previo al inicio del
+    trabajo? No rompe §15.1 (la regla es anti-reasignación, no
+    anti-corrección), pero confirmar.
+
+  Q-139 (pausar admin vs pausar técnico)
+    ¿Son el mismo estatus='pausada' o son dos valores distintos?
+    Si son distintos, el enum de estatus crece.
+
+  Q-140 (UX borrado bloqueado)
+    Cuando el admin intenta borrar una instalación con evidencia,
+    el sistema devuelve error de FK (feo). En F2 agregar check en
+    InstalacionController@destroy que devuelva 422 con mensaje
+    legible: "Esta instalación ya fue iniciada y tiene evidencia
+    histórica. No se puede borrar."
+
+================================================================================
+§17. BLOQUEANTES INMEDIATOS (v3)
+================================================================================
+
+  Código independiente (se puede hacer hoy):
+    1. Q-122  — deploy-prod.sh
+    2. Q-113  — nullable titulo/monto API
+    3. Q-65   — FK cotizaciones.proyecto_id
+    4. Q-102  — HasApiTokens en Usuario (✅ HECHO)
+
+  Decisiones ya cerradas (no bloquean):
+    - Q3.4 ✅ ('pruebas')
+    - Q3.5 ✅ (A sin sobreescribir)
+    - D-1 a D-6 ✅ (§14)
+
+  Próximos pasos para B-16/B-17:
+    1. Migración sync_log (B-24)
+    2. B-17 pull primero (más simple, valida modelo de respuesta)
+    3. B-16 push después (idempotencia obligatoria)
+    4. Tests de idempotencia / conflicto / huérfano / duplicado_distinto
+
+  Decisiones pendientes no bloqueantes:
+    - Q-135, Q-136, Q-137, Q-138, Q-139, Q-140 (§16)
+    - P3.1, P5.1, C3.1, F-6, I7 (§8.2)
+
+================================================================================
+FIN DEL MODELO DE NEGOCIO — v3
+Guardar en: docs/movil/MODELO-NEGOCIO-APP-MOVIL-v3.txt
+Reemplaza: v2 (docs/movil/MODELO-NEGOCIO-APP-MOVIL-v2.txt)
+================================================================================
