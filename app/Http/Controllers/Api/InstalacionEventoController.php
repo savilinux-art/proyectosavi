@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\InstalacionEventoRequest;
+use App\Http\Requests\InstalacionEventoSimpleRequest;
+use App\Services\InstalacionFotoService;
 use App\Models\Instalacion;
 use App\Models\InstalacionEvento;
 use App\Models\InstalacionFoto;
@@ -13,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 
 class InstalacionEventoController extends Controller
 {
+    public function __construct(private InstalacionFotoService $fotoService) {}
     public function iniciar(InstalacionEventoRequest $request, Instalacion $instalacion): JsonResponse
     {
         $this->autorizar($request, $instalacion);
@@ -181,7 +184,7 @@ class InstalacionEventoController extends Controller
             ->first();
     }
 
-    private function respuesta(Instalacion $instalacion, string $mensaje): JsonResponse
+       private function respuesta(Instalacion $instalacion, string $mensaje, int $status = 200): JsonResponse
     {
         return response()->json([
             'message'     => $mensaje,
@@ -191,11 +194,49 @@ class InstalacionEventoController extends Controller
                 'fecha_hora_inicio'   => $instalacion->fecha_hora_inicio,
                 'fecha_hora_fin'      => $instalacion->fecha_hora_fin,
             ],
-        ]);
+        ], $status);
     }
 
     private function rechazo(string $mensaje): JsonResponse
     {
         return response()->json(['message' => $mensaje], 422);
     }
+
+
+        /**
+     * B-15 — registra un evento simple: incidencia o nota_agregada.
+     * Los tipos iniciada|pausada|reanudada|finalizada tienen sus propios endpoints.
+     */
+    public function store(InstalacionEventoSimpleRequest $request, Instalacion $instalacion): JsonResponse
+    {
+        $this->autorizar($request, $instalacion);
+
+        $payload = (array) ($request->input('payload_json') ?? []);
+        if ($request->filled('descripcion')) {
+            $payload['descripcion'] = $request->input('descripcion');
+        }
+
+        DB::transaction(function () use ($instalacion, $request, $payload) {
+            $this->crearEvento($instalacion, $request->input('tipo'), $request, $payload);
+
+            if ($request->hasFile('foto')) {
+                $tipoFoto = $request->input('tipo') === 'incidencia' ? 'incidencia' : 'proceso';
+
+                $this->fotoService->guardar(
+                    instalacion:     $instalacion,
+                    archivo:         $request->file('foto'),
+                    tipo:            $tipoFoto,
+                    subidaPor:       $request->user(),
+                    descripcion:     $request->input('descripcion'),
+                    latitud:         $request->input('latitud') !== null ? (float) $request->input('latitud') : null,
+                    longitud:        $request->input('longitud') !== null ? (float) $request->input('longitud') : null,
+                    precisionMetros: $request->input('precision_metros'),
+                    fuente:          $request->input('fuente'),
+                );
+            }
+        });
+
+        return $this->respuesta($instalacion, 'Evento ' . $request->input('tipo') . ' registrado', 201);
+    }
+
 }

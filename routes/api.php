@@ -83,6 +83,8 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('pausar',    [InstalacionEventoController::class, 'pausar'])->name('pausar');
             Route::post('reanudar',  [InstalacionEventoController::class, 'reanudar'])->name('reanudar');
             Route::post('finalizar', [InstalacionEventoController::class, 'finalizar'])->name('finalizar');
+            Route::post('eventos',   [InstalacionEventoController::class, 'store'])->name('eventos');
+        
         });
    
 
