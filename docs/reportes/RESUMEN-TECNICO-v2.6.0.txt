@@ -1,0 +1,646 @@
+================================================================================
+              RESUMEN TÉCNICO – SISTEMA PROYECTOSAVI
+              Última actualización: 20 de Octubre de 2026
+              Versión: 2.5.0
+              Repositorio: https://github.com/savilinux-art/proyectosavi
+              HEAD local: (pendiente commit — bloque endpoints móvil sin versionar)
+              Estado: 104 tests passed / 316 assertions / working tree con cambios
+================================================================================
+
+🎯 PROPÓSITO GENERAL
+
+Sistema de gestión empresarial especializado en instalaciones tecnológicas
+(domótica, audiovisuales, redes, seguridad). Ciclo completo:
+
+  • Ventas (prospección → cierre)  ← sin titulo_venta ni monto_venta (v30)
+  • Ventas de mostrador
+  • Proyectos (derivados de ventas ganadas)
+  • Cotizaciones
+  • Instalaciones (planificación, ejecución, evidencias, checklist)
+  • Inventario (productos, movimientos, apartados, salidas, devoluciones)
+  • Clientes
+  • Asignación de instaladores con notificaciones vía Telegram
+  • Seguimiento GPS en tiempo real (Traccar + Reverb WebSocket)
+  • Recordatorios automáticos (Telegram + Email + Web)
+  • Certificados (SSL, CSD SAT, dominios)
+  • Geocercas (alertas entrada/salida)
+  • Roles y permisos granulares
+  • Trazabilidad de materiales  ← ✅ COMPLETADA (19-oct)
+  • App móvil offline-first     ← ⏳ SIGUIENTE (backend bloque 3 cerrado 20-oct)
+
+================================================================================
+🎯 SESIÓN 20-OCT-2026 — BLOQUE ENDPOINTS MÓVIL (CERRADO)
+================================================================================
+
+Se completó el bloque de endpoints para app móvil (B-09 a B-12 + B-12a).
+Backend listo para Flutter. Suite: 94 → 104 tests (+10).
+
+COMPLETADO:
+  ✅ B-09  Migración instalacion_eventos (nueva tabla, 7 tipos)
+  ✅ B-10  Migración instalacion_fotos (+4 cols geo: lat/lng/precisión/fuente)
+  ✅ B-11a Estatus 'terminada' agregado al catálogo (migración)
+  ✅ B-12  Endpoints POST iniciar/pausar/reanudar/finalizar (4 rutas)
+  ✅ B-12a Observer: 'terminada' en AVISOS + notifica admin
+
+ARCHIVOS NUEVOS:
+  • app/Models/InstalacionEvento.php
+  • app/Http/Requests/InstalacionEventoRequest.php
+  • app/Http/Controllers/Api/InstalacionEventoController.php
+  • tests/Feature/InstalacionEventoTest.php (3 tests)
+  • tests/Feature/InstalacionFlujoTest.php (6 tests)
+
+ARCHIVOS MODIFICADOS:
+  • app/Models/InstalacionFoto.php (+4 cols fillable/casts, url() fix)
+  • app/Observers/InstalacionObserver.php (+'terminada' en AVISOS)
+  • routes/api.php (+4 rutas bajo auth:sanctum, líneas 67-74)
+  • tests/Feature/InstalacionObserverTest.php (+1 test 'terminada')
+  • database/migrations/ (3 migraciones nuevas aplicadas)
+
+DECISIONES RESUELTAS EN ESTA SESIÓN:
+  Q3.4 → estatus al finalizar = 'terminada' (NO 'entrega' como voto v2)
+  Q3.5 → Opción A: primer inicio desde app, payload_json guarda {inicio_previo}
+
+🎓 LECCIONES NUEVAS:
+  • Rutas duplicadas web.php/api.php rompen route() y auth.
+    Regla nueva: un endpoint = UN archivo (api.php o web.php, nunca ambos).
+  • El Observer tiene 'completada'/'cancelada' en AVISOS pero NO existen
+    en tabla estatus (código muerto, ver Discrepancias #6).
+  • Tests de Pest con helpers globales (crearAdmin, contarAdmins) NO pueden
+    estar en archivos PHPUnit-style. Si el archivo es Pest, el test también.
+
+================================================================================
+🧱 ARQUITECTURA TÉCNICA
+================================================================================
+
+Componente          | Tecnología
+--------------------|---------------------------------------------------------
+Backend             | Laravel 13.25.0 (PHP 8.4.25)
+Base de datos       | MariaDB 11.8.9 (dev) / 11.8.6 (prod)
+Frontend            | Blade, Bootstrap 5, jQuery, DataTables, Leaflet.js
+Autenticación       | Sesiones nativas + Middleware custom (NO Auth facade)
+                      + Sanctum para API móvil (parcial: ver B-02)
+Notificaciones      | Telegram Bot API (irazasyed/telegram-bot-sdk)
+GPS / Seguimiento   | Traccar (servidor independiente, sin Docker)
+Mapas               | Leaflet.js + OpenStreetMap
+WebSockets          | Laravel Reverb v1.11.1
+Broadcasting        | Laravel Echo + pusher-js
+Exportaciones       | Laravel Excel, Dompdf (barryvdh/laravel-dompdf ^3.1)
+Control de acceso   | Sistema propio (permisos + permiso_rol)
+Túneles públicos    | Tailscale Funnel (URL fija)
+Servidor web        | Nginx 1.28.3 + PHP-FPM 8.4 (apache2 ELIMINADO 28-sep)
+Testing             | PHPUnit 12.5.12 + Pest 4.7 (conviven)
+Storage archivos    | Storage::disk('local') (v31, Q-110)
+Deploy              | scripts/deploy-prod.sh con ~/.my.cnf (Q-122)
+IDE                 | VS Code (dev) / OpenVSCode (prod)
+
+════════════════════════════════════════════════════════════════════════════════
+⚠️ AUTENTICACIÓN — LÓGICA CUSTOM (NO NEGOCIABLE)
+════════════════════════════════════════════════════════════════════════════════
+
+El sistema NO usa el Auth facade de Laravel.
+Login manual con Session::put('user_id'/'user_usuario'/'user_rol').
+
+  ⚠️  user_id: SE ESCRIBE en AuthController.php:27, uso en lectura
+      NO CONFIRMADO (grep amplio pendiente). El middleware usa
+      user_usuario y user_rol.
+
+Middleware custom (bootstrap/app.php):
+  auth.session     → AuthSessionMiddleware      (verifica user_usuario)
+  permiso:xxx      → PermisoMiddleware          (verifica permiso por SLUG)
+  administrador    → AdministradorMiddleware    (rol === 'Administrador')
+
+ALIAS QUE NO EXISTEN: auth, guest, verified.
+⚠️ NUNCA usar middleware(['auth']) → rompe login para todos.
+⚠️ La API SÍ usa 'auth:sanctum' (rutas en routes/api.php).
+⚠️ Usuario NO tiene HasApiTokens todavía (B-02, Q-102) — BLOQUEANTE para móvil.
+   Tests API usan actingAs($u, 'sanctum') que funciona sin HasApiTokens.
+
+INCIDENTE 28-SEP-2026: alias auth.session no estaba registrado en
+bootstrap/app.php → 19 rutas "protegidas" abiertas. Corregido en 73b924f.
+
+Regla: si usás un alias en routes/web.php, DEBE estar registrado.
+Verificación: grep "auth.session" bootstrap/app.php
+
+════════════════════════════════════════════════════════════════════════════════
+📊 TESTING — ESTADO ACTUAL (20-oct-2026)
+════════════════════════════════════════════════════════════════════════════════
+
+Suite actual: 104 passed / 316 assertions / ~17s
+
+Evolución:
+  5-oct-2026 (v2.3.0):  80 passed / 237 assertions
+  19-oct-2026 (v2.4.0): 94 passed / 280 assertions
+  20-oct-2026 (v2.5.0): 104 passed / 316 assertions  ← ACTUAL (+10 tests)
+
+Tests nuevos 20-oct (todos verdes):
+  • InstalacionEventoTest           (3)  tabla, modelo, cascade
+  • InstalacionFlujoTest            (6)  iniciar/pausar/reanudar/finalizar
+  • InstalacionObserverTest         (+1) pasar a 'terminada' crea recordatorio
+
+Stack de testing:
+  • PHPUnit 12.5.12 (motor)
+  • Pest 4.7 (wrapper, tests/Pest.php)
+  • Conviven sin política explícita (ver Discrepancias #4)
+
+⚠️ PHPUnit 12.x: `/** @test */` YA NO FUNCIONA.
+   Usar `#[Test]` (con use PHPUnit\Framework\Attributes\Test) o
+   prefijo test_* en el nombre del método.
+⚠️ Pest: los tests usan helpers globales (crearAdmin(), contarAdmins()).
+   Ese archivo NO puede ser PHPUnit-style. Todo Pest o todo PHPUnit.
+
+Convención de trait de DB:
+  • Default: DatabaseTransactions (Pest.php → in('Feature'))
+  • Excepción: RefreshDatabase SOLO en VentaDocumentosTest.php
+
+TestCase::setUp():
+  Siembra 6 roles vía insertOrIgnore (idempotente, ambos traits).
+
+Archivos con cobertura (15 archivos):
+
+  Pest style: test('...')
+    • tests/Feature/DatabaseTest.php
+    • tests/Feature/FactoriesTest.php
+    • tests/Feature/InstalacionEventoTest.php         ← NUEVO 20-oct
+    • tests/Feature/InstalacionObserverTest.php       (+1 test 20-oct)
+    • tests/Feature/ProcesadorTest.php
+    • tests/Feature/TrazabilidadServiceTest.php
+
+  PHPUnit style: #[Test]
+    • tests/Feature/ApiProyectoControllerTest.php
+    • tests/Feature/InstalacionFlujoTest.php          ← NUEVO 20-oct
+    • tests/Feature/VentaDocumentosTest.php
+
+  PHPUnit style: function test_*
+    • tests/Feature/CotizacionAlmacenTest.php
+    • tests/Feature/ExampleTest.php
+    • tests/Feature/ProyectoControllerTest.php
+    • tests/Feature/VentaMostradorControllerTest.php
+    • tests/Unit/ExampleTest.php
+
+Cobertura ausente / parcial:
+  ⚠️ PARCIAL: Cotizaciones, Proyectos, Trazabilidad
+  ❌ #1  Recordatorios (I-01..I-05)
+  ❌ #2  Geocercas (3 tablas + controller, CERO tests)
+  ❌ #3  Inventario
+  ❌ #4  Categorías
+  ❌ #5  Salidas inventario
+  ❌ #6  Devoluciones inventario
+  ❌ #7  Movimientos inventario
+  ❌ #8  Ventas CRUD (documentos ya cubiertos)
+  ❌ #10 Cotizaciones
+  ⚠️ #11 Instalaciones — Observer ✅, flujo móvil ✅, CRUD web ❌
+  ❌ #12 Clientes
+  ❌ #13 Proyectos completos
+  ❌ #14 Usuarios
+  ❌ #15 Roles
+  ❌ #16 Permisos (PermisoMiddleware real — Q-117)
+  ❌ #17 Reportes
+  ❌ #18 Notificaciones
+  ❌ Telegram (webhook + outbound + comandos bot)
+  ❌ Traccar (Service)
+  ❌ Ubicaciones GPS
+  ❌ Reverb (broadcast)
+  ❌ Regresión auth/permisos (incidente 28-sep)
+
+Calificación de testing: 6.1/10  (+0.4 vs v2.4.0)
+
+Tests pendientes específicos (v32):
+  [ ] SalidaInventarioControllerTest
+  [ ] DevolucionInventarioControllerTest
+  [ ] InstalacionControllerTest (web CRUD)
+  [ ] DashboardControllerTest
+  [ ] Auth + Permisos (Q-117)
+  [ ] Regresión Q-113: venta vía API sin titulo/monto → 200
+  [ ] Gate de Telegram (Q-106)
+  [ ] Observer de Venta (Q-116)
+  [ ] GET /api/instalaciones (B-11) — pull móvil
+  [ ] POST /api/instalaciones/{id}/fotos (B-13)
+  [ ] POST /api/instalaciones/{id}/checklist (B-14)
+  [ ] POST /api/instalaciones/{id}/eventos (B-15)
+  [ ] POST /api/sync/push (B-16)
+  [ ] GET /api/sync/pull (B-17)
+  [ ] Q-102 HasApiTokens Usuario
+
+================================================================================
+🧩 MÓDULOS FUNCIONALES — LISTA COMPLETA
+================================================================================
+
+ #  | Módulo                       | Controlador / Servicio              | Estado
+----|------------------------------|-------------------------------------|--------
+ 1  | Recordatorios                | RecordatorioController + Procesador | ✅
+ 2  | Geocercas                    | GeocercaAlertaController            | ✅ (sin tests)
+ 3  | Inventario                   | InventarioController                | ✅
+ 4  | Categorías                   | (verificar)                         | ✅
+ 5  | Salidas inventario           | SalidaInventarioController          | ✅
+ 6  | Devoluciones inventario      | DevolucionInventarioController      | ✅
+ 7  | Movimientos de inventario    | (verificar)                         | ✅
+ 8  | Ventas                       | VentaController                     | ✅ (v30)
+ 9  | Ventas de mostrador          | VentaMostradorController            | ✅
+10  | Cotizaciones                 | CotizacionController                | ✅
+11  | Instalaciones                | InstalacionController + Observer    | ✅ + FLUJO MÓVIL (20-oct)
+12  | Clientes                     | (verificar)                         | ✅
+13  | Proyectos                    | ProyectoController                  | ✅
+14  | Usuarios                     | UsuarioController                   | ✅
+15  | Roles                        | RolController                       | ✅
+16  | Permisos                     | PermisoMiddleware + permiso_rol     | ✅
+17  | Reportes                     | ReporteController + DashboardCtrl   | ✅ (Q-121)
+18  | Notificaciones               | notificaciones_web + Telegram       | ✅
+
+Módulo #11 Instalaciones — estado detallado (20-oct):
+  ✅ Observer con AVISOS (completada, terminada, entrega, cancelada)
+  ✅ Migración instalacion_eventos (7 tipos)
+  ✅ Migración instalacion_fotos +4 cols geo
+  ✅ Modelo InstalacionEvento + relaciones
+  ✅ Modelo InstalacionFoto + geo fillable
+  ✅ 4 endpoints POST (iniciar/pausar/reanudar/finalizar)
+  ✅ 6 tests flujo + 3 tests modelo + 1 test observer
+  ❌ GET /api/instalaciones (pull para móvil — B-11)
+  ❌ POST /api/instalaciones/{id}/fotos (B-13)
+  ❌ POST /api/instalaciones/{id}/checklist (B-14)
+  ❌ POST /api/instalaciones/{id}/eventos (B-15)
+  ❌ CRUD web tests
+
+Integraciones:
+  • Telegram — TelegramService + TelegramWebhookController + SDK
+  • Traccar — TraccarService (puerto 8082, Funnel 8443)
+  • Reverb — canal 'ubicaciones', evento 'ubicacion.actualizada'
+
+Tablas no documentadas pero presentes en dump:
+  • agent_conversations + agent_conversation_messages (SDK AI, verificar)
+  • geocercas + geocerca_alertas + geocerca_estados
+  • ubicaciones_usuarios
+  • solicitudes_ubicacion
+  • evidencias_entrega
+  • trazabilidad_discrepancias
+  • ventas_mostrador + ventas_mostrador_detalles + venta_mostrador_salida
+  • instalacion_eventos         ← NUEVA 20-oct
+
+================================================================================
+💾 SCHEMA — CAMBIOS ACUMULADOS (5-oct → 20-oct)
+================================================================================
+
+ventas_mostrador (5-oct, v2.3.0):
+  + subtotal decimal(12,2) default 0
+  + iva decimal(12,2) default 0
+  + moneda varchar(3) default 'MXN'
+  IVA_RATE = 0.16, MONEDAS = ['MXN', 'USD']
+
+ventas (v30, 19-oct):
+  ~ titulo_venta: varchar(255) NULL (antes required)
+  ~ monto_venta:  decimal(10,2) NULL (antes required)
+
+ventas (v31, 19-oct, Q-110):
+  + cotizacion_path varchar(255) NULL
+  + levantamiento_path varchar(255) NULL
+  · cotizacion/levantamiento MEDIUMBLOB (LEGACY, drop Fase 3)
+
+instalacion_eventos (v2.5.0, 20-oct) — NUEVA:
+  id, instalacion_id (FK CASCADE), tipo ENUM,
+  latitud, longitud, precision_metros, fuente,
+  payload_json JSON, capturado_at DATETIME, por VARCHAR(255),
+  created_at, updated_at
+  INDEX (instalacion_id, tipo, capturado_at)
+  INDEX (por, capturado_at)
+
+instalacion_fotos (v2.5.0, 20-oct):
+  + latitud DECIMAL(10,7) NULL
+  + longitud DECIMAL(10,7) NULL
+  + precision_metros INT UNSIGNED NULL
+  + fuente VARCHAR(20) NULL
+
+estatus (v2.5.0, 20-oct):
+  + 'terminada' (tipo=instalacion) — dispara Observer
+
+Otras (drift prod):
+  · drop id_usuario_asignado (prod); dev/testing todavía lo tienen (Q-93)
+  · instalacion_instalador sin FK ni índice (B-19, Fase 2)
+
+Storage (v31):
+  • Disk 'local': storage/app/private/
+  • Path ventas: ventas/{venta_id}/{tipo}.{ext}
+  • Path instalaciones: instalaciones/{id}/{tipo}_{timestamp}.{ext}
+  • Servir con Storage::response() (respeta Range requests)
+
+================================================================================
+📦 ESTADO DEL REPO (20-oct-2026)
+================================================================================
+
+Rama: main
+origin/main: f7628506ad4f18a6b5a7a4fb42d8457fd4f422b4
+HEAD local (laptop): f762850 + cambios sin commitear (bloque endpoints móvil)
+HEAD server (prod):  f762850 (working tree sucio: Q-106)
+
+⚠️ ACCIÓN PENDIENTE ANTES DE FLUTTER: commitear bloque endpoints.
+   git add -A && git commit -m "feat(instalaciones): flujo móvil
+   iniciar/pausar/reanudar/finalizar + observer terminada"
+
+Deuda de working tree server:
+  • Q-106: TelegramWebhookController.php (+8 líneas Log::info, sin versionar)
+
+================================================================================
+⚙️ CONFIGURACIÓN DE TESTS
+================================================================================
+
+- Framework: PHPUnit 12.5.12 + Pest 4.7 (conviven)
+- Estilo actual: MIXTO ESTABLE
+  • 6 archivos Pest-style: test('...')
+  • 3 archivos PHPUnit: #[Test]      (+1 archivo 20-oct)
+  • 5 archivos PHPUnit: test_*
+- BD testing: proyectosavi_testing (MySQL aislada, phpunit.xml)
+- NO existe .env.testing — usar DB_DATABASE=proyectosavi_testing
+- Trait default: DatabaseTransactions (Pest.php in('Feature'))
+- Excepción: VentaDocumentosTest usa RefreshDatabase
+- Regla: PHPUnit 12 NO soporta /** @test */ → #[Test] o test_*
+- Assert decimales: toEqualWithDelta, NO toBe
+- Tests web con middleware custom: $this->withSession([...]) POR REQUEST
+- NUNCA Session::put() en setUp() — no viaja al request HTTP
+
+================================================================================
+🖥️ INFRAESTRUCTURA DEL SERVIDOR
+================================================================================
+
+  Tailscale IP:    100.111.241.50
+  MagicDNS:        savilinux-server.tail50a173.ts.net
+  Certificado:     Válido hasta 21 dic 2026
+
+  SSH: savilinux@savilinux-server (clave SSH; si pide password, cargar
+       con ssh-add en la sesión actual)
+
+  Funnel activo:
+    443   → https+insecure://127.0.0.1:8090   ProyectoSAVI
+    8443  → http://127.0.0.1:8082              Traccar
+    10000 → https+insecure://127.0.0.1:8091   Hotel reservas
+
+  Servicios systemd (enabled, arrancan al boot):
+    - tailscaled, mariadb, php8.4-fpm, reverb (127.0.0.1:6001),
+      nginx, cron, openvscode (127.0.0.1:3000), savi-startup.service
+
+  Nginx vhosts:
+    proyectosavi    → 127.0.0.1:8090 ssl
+    hotel-reservas  → 127.0.0.1:8091 ssl
+    traccar         → 127.0.0.1:8080
+    phpmyadmin      → 0.0.0.0:8081 (solo tailnet)
+    openvscode      → 0.0.0.0:8888 ssl
+
+  MySQL:
+    Credenciales en ~/.my.cnf (chmod 600) en AMBAS máquinas
+    NUNCA pasar -u/-p a mysqldump
+
+================================================================================
+📝 REGLAS VIGENTES — CONSOLIDADAS
+================================================================================
+
+Del v22 + sesiones previas:
+  - Auth custom: Session::get('user_usuario'), NO Auth::user().
+  - Middleware: 'auth.session', 'permiso:xxx', 'administrador'. NUNCA 'auth'.
+  - Backup antes de tocar routes/web.php, bootstrap/app.php o Blade.
+  - php artisan optimize:clear después de cambios de rutas/middleware/bootstrap.
+  - Castear a float/int en @php al inyectar JSON a JS.
+  - PHPUnit 12: NO /** @test */ → #[Test] o test_*.
+  - Migración nueva → aplicar TAMBIÉN en proyectosavi_testing.
+  - Assert decimales: toEqualWithDelta, NO toBe.
+  - Route model binding: argumento = Str::camel($routeParam).
+  - @json() Blade: solo expresiones de UNA LÍNEA.
+  - compact('var') peligroso en PHP 8.4 → array asociativo explícito.
+  - ROUTE ORDERING: GET literales ANTES del Route::resource.
+  - Migración: verificar doble extensión .php.php.
+
+De v30/v31 (19-oct):
+  - SIEMPRE except() archivos antes de create/update. NUNCA $request->all().
+  - Verificar magic bytes (%PDF) ANTES de perseguir headers.
+  - Storage::response() > response() para archivos.
+  - withSession() es one-shot por request.
+  - Seeders mínimos de FKs van en TestCase::setUp().
+  - Scripts MySQL usan ~/.my.cnf, NO -u/-p.
+  - git status LIMPIO en laptop antes de cerrar sesión.
+  - Cualquier edit en server es DEUDA → anotar Q-XXX y cerrar ASAP.
+
+NUEVAS v2.5.0 (20-oct):
+  - Un endpoint = UN archivo de rutas (api.php o web.php, NUNCA ambos).
+    Verificar con: php artisan route:list | grep <recurso>
+  - Al agregar un estatus nuevo al catálogo, verificar si debe ir en
+    Observer::AVISOS (si no, no notifica admin).
+  - Pest: archivos con helpers globales (crearAdmin) NO mezclan con
+    PHPUnit-style (#[Test]). Si el archivo es Pest, todos los tests
+    del archivo son Pest.
+  - Después de editar routes/*.php: SIEMPRE php artisan optimize:clear
+    (la caché de rutas sobrevive al reinicio).
+  - Modelo con columnas nuevas: agregar a $fillable y $casts en el
+    mismo commit. Si no, create() descarta los valores silenciosamente.
+  - InstalacionFoto::url() usa disk('public'), pero controller guarda
+    en disk('local'). Servir vía Storage::response() en controlador,
+    nunca confiar en url() del modelo.
+
+================================================================================
+🚀 FASES DEL PROYECTO
+================================================================================
+
+FASE A — Herramientas locales                     ✅ COMPLETADA
+FASE B — Normalización (M0, M10)                  ⏳ SIGUIENTE (no bloquea móvil)
+FASE C — Trazabilidad materiales                  ✅ COMPLETADA (19-oct)
+FASE D — Aprobación + envío facturación           ⏳
+FASE E — Préstamo herramientas                    ⏳
+FASE F — Facturación México (CFDI 4.0)            ⏳
+FASE G — Staging :8092                            ⏳
+FASE H — API móvil (offline-first)                🔄 PARCIAL (bloque 3 cerrado 20-oct)
+                                                    Ver sección "APP MÓVIL PENDIENTE"
+FASE I — App móvil offline-first (Flutter)        ⏳ SIGUIENTE (bloqueante: B-02)
+FASE J — Refinamientos                            ⏳
+FASE K — Recordatorios y Certificados             ✅ COMPLETADA
+FASE M — Robustez / Seguridad                     ⏳ (C-01..C-03 cerrados)
+FASE N — TESTING: expansión 18 módulos + 2 integr. ⏳
+
+================================================================================
+📱 APP MÓVIL OFFLINE — BACKEND PENDIENTE (PRIORIDAD)
+================================================================================
+
+CONTEXTO:
+  La app Flutter cubre DOS módulos en Fase 1:
+    • Módulo A — Salidas de inventario + firma del cliente
+    • Módulo B — Instalaciones + evidencias + ubicación
+
+  Modelo de negocio completo en: docs/movil/MODELO-NEGOCIO-APP-MOVIL-v2.txt
+  Endpoints Módulo B (flujo) ya en producción de dev → Flutter puede empezar.
+
+────────────────────────────────────────────────────────────────────────────────
+🔴 BLOQUEANTES PARA ARRANCAR FLUTTER (HACER PRIMERO)
+────────────────────────────────────────────────────────────────────────────────
+
+  B-02  Q-102: agregar HasApiTokens trait a Usuario              🔴 15 min
+        Sin esto, POST /login desde Flutter falla con 500.
+        Es el ÚNICO blocker real para escribir la primera pantalla.
+        Test: LoginApiTest verifica token + /api/me.
+
+  B-07  GET /api/salidas (pull propias)                           🔴 30 min
+        WHERE entregado_a = current_user.
+        Necesario para Módulo A (lista de salidas).
+
+  B-11  GET /api/instalaciones (pull propias vía pivote)          🔴 30 min
+        WHERE EXISTS instalacion_instalador WHERE instalador_usuario = user.
+        Necesario para Módulo B (lista de instalaciones).
+
+  B-16  POST /api/sync/push (batch de cambios offline)            🔴 2-4 h
+        Recibe eventos+fotos+checklist acumulados en SQLite local.
+        Idempotente por UUID de cliente. Resolución server-wins.
+        Sin esto, la app "funciona" pero pierde datos al reinstalar.
+
+  B-17  GET /api/sync/pull?since=<iso> (delta)                    🔴 2-3 h
+        Devuelve cambios desde timestamp. Catálogos + asignaciones.
+        Sin esto, la app no se actualiza sola.
+
+  B-08a Helper resolverProyecto(nombre)                           🔴 30 min
+        trim + case-insensitive. Log de fallos.
+        Bloqueante para B-08 (firma Módulo A).
+
+  B-08  POST /api/salidas/{id}/evidencias-entrega (multipart)     🔴 1-2 h
+        Firma cliente, resuelve proyecto_id, invalida previa.
+        Es el endpoint principal del Módulo A.
+
+────────────────────────────────────────────────────────────────────────────────
+🟡 IMPORTANTE NO BLOQUEANTE (puede ir en paralelo con Flutter)
+────────────────────────────────────────────────────────────────────────────────
+
+  B-03  Migración evidencias_entrega (+5 cols tipo/estado/invalidada_*)  🟡 15 min
+  B-05  SalidaController@uploadEvidenciaEntrega (web)                    🟡 1 h
+  B-06  SalidaController@download redirect                               🟡 30 min
+  B-13  POST /api/instalaciones/{id}/fotos (multipart batch)             🟡 1 h
+  B-14  POST /api/instalaciones/{id}/checklist (JSON libre F1)           🟡 30 min
+  B-15  POST /api/instalaciones/{id}/eventos (incidencia/nota)           🟡 45 min
+
+────────────────────────────────────────────────────────────────────────────────
+🟢 FASE 2 (post-MVP, no bloquea Flutter)
+────────────────────────────────────────────────────────────────────────────────
+
+  B-04  Q-65 FK cotizaciones.proyecto_id                          🟢 10 min
+  B-18  Detección discrepancia app vs Traccar                     🟢 2-3 h
+  B-19  FK + índice instalacion_instalador                        🟢 30 min
+  B-20  P5-B: inventario.categoria → categoria_id                 🟢 2 h
+  B-21  Q-53: UNIQUE + TRIM categorias                            🟢 30 min
+  B-22  Validación estricta checklist (con I7 real)               🟢 1 h
+  B-23  proyecto_archivos + migración 4 blobs legacy              🟢 Fase 3
+
+────────────────────────────────────────────────────────────────────────────────
+📋 ORDEN RECOMENDADO PARA LLEGAR A FLUTTER
+────────────────────────────────────────────────────────────────────────────────
+
+  PASO 1 (hoy, 30 min):
+    • Commit bloque endpoints (v2.5.0)
+    • B-02 HasApiTokens + test login
+    → Flutter puede escribir pantalla de Login YA
+
+  PASO 2 (2-3 h, mañana):
+    • B-11 GET instalaciones
+    • B-07 GET salidas
+    → Flutter puede escribir pantallas de listas
+
+  PASO 3 (paralelo, 1 semana):
+    • Flutter Módulo B UI (lista, iniciar/pausar/reanudar/finalizar)
+    • Mientras backend: B-08a, B-08, B-03, B-05, B-06
+
+  PASO 4 (2 días):
+    • B-16 sync/push + B-17 sync/pull
+    • Flutter Sync Engine + outbox SQLite
+
+  PASO 5 (iterativo):
+    • B-13, B-14, B-15
+    • Módulo A UI completa
+
+================================================================================
+📈 CALIFICACIÓN ESTIMADA (20-oct-2026)
+================================================================================
+
+  Seguridad        9.5/10
+  Robustez         8.8/10
+  Testing          6.1/10  (+0.4 vs v2.4.0)
+  Observabilidad   5.0/10
+  Mantenibilidad   9.7/10  (-0.1 por deuda de routes duplicadas, ya corregida)
+  Documentación    9.6/10  (+0.1)
+  ─────────────────────
+  Estimado global: 8.5/10  (+0.1 vs v2.4.0)
+
+Ruta a 9.0:
+  1. Cerrar Q-113 (nullable API)                   → +0.1
+  2. Fase 1 tests (Auth + Permisos)                → +1.8
+  3. Cerrar Q-106 (gate Telegram)                  → +0.1
+  4. Cerrar Q-104/Q-108 (drift 3-way)              → +0.3
+  5. CI/CD (M-01)                                  → +0.7
+  6. Observabilidad (M-03)                         → +0.5
+  7. App móvil (nueva dimensión)                   → próximo nivel
+
+================================================================================
+⚠️ DISCREPANCIAS ABIERTAS (20-oct-2026)
+================================================================================
+
+1. agent_conversations + agent_conversation_messages
+   ¿Qué SDK las creó? ¿Se usan? Sin documentar.
+
+2. Telescope en prod
+   v2.3.0 dice "removido". Dump 5-oct tiene 40K+ filas. Verificar.
+
+3. user_id en sesión
+   AuthController:27 lo escribe. Grep amplio pendiente de lecturas.
+
+4. Política Pest vs PHPUnit
+   Conviven sin regla escrita. ¿Se congela (cada archivo su estilo)
+   o se unifica (todo PHPUnit puro)?
+
+5. Módulo #7 Movimientos inventario
+   ¿Tabla propia o dentro de Inventario? Verificar código.
+
+6. InstalacionObserver::AVISOS tiene claves 'completada' y 'cancelada'
+   que NO EXISTEN en tabla estatus. Código muerto (nunca se dispara).
+   ¿Son estatus legacy de dev? ¿O drift dev/prod?
+   Acción: verificar en BD real:
+   SELECT * FROM estatus WHERE estatus IN ('completada','cancelada');
+   Si no existen, considerar (Fase 2):
+     • Eliminar las claves de AVISOS (limpieza), O
+     • Agregarlas al catálogo si son flujo vigente.
+   NO urgente. Anotado como deuda Q-129 (nueva).
+
+7. InstalacionFoto::url() usa disk('public') pero controller guarda
+   en disk('local'). El método devuelve path inválido. Fix rápido:
+   servir vía Storage::response() en controlador. Ver Reglas v2.5.0.
+
+================================================================================
+🔧 COMANDOS ÚTILES
+================================================================================
+
+# Estado git
+git status
+git log --oneline -10
+
+# Suite
+php artisan test
+php artisan test --filter=InstalacionFlujoTest
+php artisan test --filter="terminada"
+
+# Verificar rutas (evitar duplicados web/api)
+php artisan route:list | grep instalaciones
+php artisan route:list | grep -E "instalaciones/\{instalacion\}/(iniciar|pausar|reanudar|finalizar)"
+
+# Verificar alias auth.session
+grep -n "auth.session" bootstrap/app.php
+
+# Migraciones aplicadas
+php artisan migrate:status
+
+# Aplicar migración en testing
+DB_DATABASE=proyectosavi_testing php artisan migrate
+
+# Limpiar cachés (OBLIGATORIO después de routes/*.php)
+php artisan view:clear
+php artisan optimize:clear
+
+# Verificar fix Q-122
+grep -n "mysqldump" scripts/deploy-prod.sh
+
+# Verificar Observer
+grep -n "terminada" app/Observers/InstalacionObserver.php
+
+# Verificar HasApiTokens (B-02)
+grep -n "HasApiTokens" app/Models/Usuario.php
+
+================================================================================
+                      FIN DEL RESUMEN TÉCNICO v2.5.0
+                             20/10/2026
+================================================================================
