@@ -52,8 +52,26 @@ class InstalacionEventoTest extends TestCase
         $this->assertInstanceOf(\Illuminate\Support\Carbon::class, $evento->capturado_at);
     }
 
+        #[Test]
+    public function forceDelete_de_instalacion_con_eventos_falla_por_restrict(): void
+    {
+        $inst = $this->instalacionDePrueba();
+
+        InstalacionEvento::create([
+            'instalacion_id' => $inst->id,
+            'tipo'           => 'iniciada',
+            'capturado_at'   => now(),
+            'por'            => 'lino',
+        ]);
+
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectExceptionMessageMatches('/fk_instalacion_eventos_instalacion_id/');
+
+        $inst->forceDelete();
+    }
+
     #[Test]
-    public function eliminar_instalacion_elimina_sus_eventos(): void
+    public function softDelete_de_instalacion_con_eventos_funciona_y_preserva_evidencia(): void
     {
         $inst = $this->instalacionDePrueba();
 
@@ -64,13 +82,20 @@ class InstalacionEventoTest extends TestCase
             'por'            => 'lino',
         ]);
 
-        $id = $evento->id;
+        $inst->delete(); // soft delete, no dispara RESTRICT
 
-        // forceDelete porque instalaciones usa SoftDeletes.
-        // El cascade real de la FK solo se dispara con DELETE físico.
+        $this->assertSoftDeleted('instalaciones', ['id' => $inst->id]);
+        $this->assertDatabaseHas('instalacion_eventos', ['id' => $evento->id]);
+    }
+
+    #[Test]
+    public function forceDelete_de_instalacion_sin_eventos_funciona(): void
+    {
+        $inst = $this->instalacionDePrueba();
+
         $inst->forceDelete();
 
-        $this->assertDatabaseMissing('instalacion_eventos', ['id' => $id]);
+        $this->assertDatabaseMissing('instalaciones', ['id' => $inst->id]);
     }
 
    private function instalacionDePrueba(): Instalacion
