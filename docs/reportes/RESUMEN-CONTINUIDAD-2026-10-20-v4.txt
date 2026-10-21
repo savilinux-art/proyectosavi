@@ -1,0 +1,151 @@
+cat > docs/reportes/RESUMEN-CONTINUIDAD-2026-10-20-v4.txt << 'RESUMEN_EOF'
+================================================================================
+RESUMEN DE CONTINUIDAD — ProyectoSAVI
+Sesión: 20-oct-2026 (continuación B-06 → B-05)
+Propósito: Retomar trabajo sin perder contexto
+================================================================================
+
+## 1. CONTEXTO DEL PROYECTO
+
+Sistema de gestión empresarial Laravel 13.25 (PHP 8.4.25) para instalaciones
+tecnológicas.
+- Repo: https://github.com/savilinux-art/proyectosavi
+- Rama: main
+- Docs de referencia: docs/RESUMEN-TECNICO-v2.5.0.txt +
+                      docs/movil/MODELO-NEGOCIO-APP-MOVIL-v2.txt
+
+## 2. ESTADO AL CIERRE DE ESTA SESIÓN
+
+### 2.1 Suite de tests
+151 passed / 446 assertions (antes: 141 / 422; +10 tests nuevos en esta sesión)
+
+### 2.2 Commits de esta sesión (verificados con `git log --oneline -8`)
+  40a5c84 (B-05) feat(web): B-05 upload de evidencia desde salidas/show (reusa lógica B-08)
+  09885a1 (B-06) feat(web): B-06 downloadPDF sirve evidencia vigente en PDF General
+  0c89d31 feat(api): B-08a helper ProyectoResolver (trim + case-insensitive)
+  3179cc9 feat(api): B-08 POST /api/salidas/{id}/evidencias-entrega
+  0cc60dd feat(db): B-03 extender evidencias_entrega (+tipo/estado/invalidada_*)
+  1586a8c feat(movil): B-07 GET /api/salidas + B-11 fix 500 instalaciones + pull vía pivote
+  aa2c527 docs: snapshot histórico RESUMEN-TECNICO v2.5.0
+
+✅ Estado al cierre (verificado):
+  - Working tree limpio.
+  - main == origin/main == 40a5c84.
+  - B-05 y B-06 commiteados y pusheados.
+  - Suite: 151 passed / 446 assertions.
+  - Regla 12: EvidenciaEntregaService.php 3075 B, SalidaUploadWebTest.php 4446 B,
+              SalidaDownloadTest.php 7168 B (ninguno en 0 B).
+
+Nota: este mismo resumen se commitea aparte como "docs:" porque no
+formaba parte del commit de B-05.
+
+### 2.3 Bloques cerrados en esta sesión
+- B-06 (downloadPDF sirve evidencia vigente) .................... OK (6 tests)
+- B-05 (upload web de evidencia) ................................ OK (4 tests)
+
+### 2.4 Estado del roadmap B-XX
+Cerrados: B-03, B-05, B-06, B-07, B-08, B-08a, B-11
+Pendientes: B-13, B-14, B-15, B-16, B-17
+
+--------------------------------------------------------------------------------
+## 3. HALLAZGOS CLAVE DE ESTA SESIÓN
+--------------------------------------------------------------------------------
+
+### 3.1 B-06 — downloadPDF sirve evidencia vigente
+Método `downloadPDF($id, $copia = null)` en SalidaInventarioController:
+- Si $copia === null → busca evidencia vigente (tipo pdf_cliente_firmado
+  > firma_cliente, orden FIELD + id DESC) y sirve con Storage::response.
+- Si la evidencia no existe en disco → cae al PDF generado con Dompdf.
+- Si $copia !== null (administracion/cliente/instalador) → siempre PDF generado.
+
+6 tests en tests/Feature/SalidaDownloadTest.php (patrón: sin evidencia →
+assertNotSame imagen; con firma → assertTrue str_starts_with image/;
+con PDF → streamedContent contiene marcador; ambas → prioriza PDF firmado;
+invalidada → no se sirve; copia=cliente → PDF generado).
+
+### 3.2 B-05 — upload web de evidencia
+Piezas nuevas:
+- app/Services/EvidenciaEntregaService.php
+    guardar(SalidaInventario, UploadedFile, tipo, subidoPor, notas?) →
+    EvidenciaEntrega. Lógica copiada de B-08 (SalidaApiController).
+    Métodos privados: validarMagicBytesPdf(), invalidarPrevias().
+- SalidaInventarioController::uploadEvidenciaWeb(Request, $id, $service)
+    Auth web: 403 si entregado_a !== Auth::user()->usuario.
+    Validación inline (mimes jpg/jpeg/png/pdf, max 10240, tipo in:...).
+    Captura ProyectoNoEncontradoException → redirect con error.
+- Ruta POST salidas/{id}/evidencias → salidas.evidencias.store
+    (dentro del bloque auth.session + permiso:ver-salidas).
+- Card "Evidencia de entrega" en resources/views/salidas/show.blade.php:
+    Lista vigentes + form multipart (tipo, archivo, notas).
+- tests/Feature/SalidaUploadWebTest.php (4 tests).
+
+### 3.3 Decisión de diseño: Opción C
+B-08 conserva su lógica inline en SalidaApiController (9 tests verdes).
+B-05 usa EvidenciaEntregaService (nuevo). NO se refactorizó B-08.
+Deuda registrada como Q-131 (ver §5).
+
+### 3.4 EvidenciaEntrega — modelo vigente (post B-03)
+Columnas: salida_id, proyecto_id, archivo_path, archivo_nombre_original,
+archivo_mime, archivo_tamano, tipo (enum firma_cliente|pdf_cliente_firmado|
+foto_entrega), estado (enum vigente|invalidada_por_edicion), notas,
+subido_por (string usuario), invalidada_at/por/motivo.
+scopeVigente() → where('estado', 'vigente').
+SalidaInventario::evidencias() → hasMany(EvidenciaEntrega).
+
+### 3.5 Rutas relevantes
+  GET  salidas/{id}/download/{copia?}   → salidas.download   (downloadPDF)
+  POST salidas/{id}/evidencias          → salidas.evidencias.store (uploadEvidenciaWeb)
+  POST api/salidas/{id}/evidencias-entrega → SalidaApiController@uploadEvidenciaEntrega
+  GET  api/salidas                      → SalidaApiController@index
+  GET  api/instalaciones[/{id}]         → InstalacionApiController (show OK)
+  POST api/instalaciones/{id}/iniciar|pausar|reanudar|finalizar
+
+--------------------------------------------------------------------------------
+## 4. LECCIONES APRENDIDAS (REGLAS NUEVAS / REFORZADAS)
+--------------------------------------------------------------------------------
+
+### Regla 12 (REFORZADA)
+Archivos creados con `cat > ... << 'EOF'` pueden quedar en 0 bytes.
+Verificar SIEMPRE después de crear:
+  wc -c archivo.php    # nunca debe dar 0
+  ls archivo.php*      # no debe mostrar .php.php ni .txt
+
+REFUERZO CRÍTICO:
+  php -l archivo.php TAMBIÉN devuelve "No syntax errors detected"
+  sobre archivos de 0 bytes. Por eso `wc -c` va PRIMERO. Los tests son
+  el único chequeo que atrapa archivos vacíos.
+
+### Regla 17 (NUEVA)
+`awk -v var="$value"` interpreta secuencias de escape (\I → I, \H → H).
+Si $value contiene backslashes (namespaces PHP, regex, JSON), NO usar
+-v. En su lugar:
+  - Heredoc con single-quote → /tmp/method.php
+  - php -r '...file_get_contents($f); file_put_contents($f, ...)...'
+  Síntoma típico: "Class App\Http\Controllers\IlluminateHttpRequest not
+  found" (backslashes borrados → PHP resuelve relativo al namespace).
+
+### Regla 18 (NUEVA)
+$this->withoutMiddleware() en tests de Feature DESHABILITA
+StartSession + ShareErrorsFromSession.
+Consecuencia: assertSessionHasErrors() falla aunque la validación sí
+ocurrió. Solución: usar withoutExceptionHandling() + try/catch
+ValidationException + verificar $e->errors().
+
+### Regla 13 (refuerzo)
+"Class not found" en controller con namespace relativo → falta `use`
+o falta `\` inicial.
+
+### Regla 14 (refuerzo)
+Pest --filter matchea nombre de it(), no de archivo.
+Usar SIEMPRE path: php artisan test tests/Feature/XTest.php
+
+### Regla 16 (refuerzo)
+Antes de editar un método existente, extraerlo COMPLETO con:
+  awk '/public function NOMBRE/,/^    }$/' archivo.php
+sed -n 'X,Yp' falla si los números de línea son aproximados.
+
+--------------------------------------------------------------------------------
+RESUMEN_EOF
+
+# Verificación
+wc -l docs/reportes/RESUMEN-CONTINUIDAD-2026-10-20-v4.txt   # esperado ~130
