@@ -9,8 +9,9 @@ class InstalacionEvento extends Model
 {
     protected $table = 'instalacion_eventos';
 
-    protected $fillable = [
+      protected $fillable = [
         'instalacion_id',
+        'uuid_cliente',
         'tipo',
         'latitud',
         'longitud',
@@ -20,7 +21,6 @@ class InstalacionEvento extends Model
         'capturado_at',
         'por',
     ];
-
     protected $casts = [
         'latitud'          => 'float',
         'longitud'         => 'float',

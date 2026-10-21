@@ -9,8 +9,8 @@ class InstalacionFoto extends Model
 {
     protected $table = 'instalacion_fotos';
 
-    protected $fillable = [
-        'instalacion_id', 'ruta', 'nombre_original', 'mime',
+       protected $fillable = [
+        'instalacion_id', 'uuid_cliente', 'ruta', 'nombre_original', 'mime',
         'tamano_kb', 'tipo', 'descripcion', 'subida_por_usuario',
         // geo (migración +4 cols)
         'latitud', 'longitud', 'precision_metros', 'fuente',
