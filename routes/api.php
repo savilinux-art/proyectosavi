@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\TelegramWebhookController;
 use App\Http\Controllers\Api\InstalacionEventoController;
+use App\Http\Controllers\Api\SyncController;
 
 /*
 |--------------------------------------------------------------------------
@@ -29,6 +30,7 @@ Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle'])
 
 // Rutas protegidas (requieren autenticación)
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/sync/pull', [SyncController::class, 'pull'])->name('sync.pull');
     // Auth
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
