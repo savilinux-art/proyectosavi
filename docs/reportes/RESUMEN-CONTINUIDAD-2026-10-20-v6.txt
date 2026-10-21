@@ -1,0 +1,328 @@
+================================================================================
+RESUMEN DE CONTINUIDAD — ProyectoSAVI
+Sesión: 20-oct-2026 (cierre) — B-15 cerrado, arranque de B-16
+Propósito: Retomar trabajo en chat nuevo SIN perder contexto
+================================================================================
+
+## 1. CONTEXTO DEL PROYECTO
+
+Sistema de gestión empresarial Laravel 13.25 (PHP 8.4.25) para instalaciones
+tecnológicas.
+- Repo: https://github.com/savilinux-art/proyectosavi
+- Rama: main
+- Docs de referencia:
+    docs/RESUMEN-TECNICO-v2.5.0.txt
+    docs/movil/MODELO-NEGOCIO-APP-MOVIL-v2.txt
+    docs/EQUIPO/PERFIL-DESARROLLADOR.txt (si existe)
+
+## 2. ESTADO AL CIERRE DE ESTA SESIÓN
+
+### 2.1 Suite de tests
+165 passed / 493 assertions
+(baseline al inicio de la sesión: 158 / 466; +7 tests nuevos de B-15)
+
+### 2.2 Commits de esta sesión (verificar con `git log --oneline -6`)
+  <hash>  feat(api): B-15 POST /api/instalaciones/{id}/eventos
+          (incidencia|nota_agregada) + InstalacionFotoService
+  182b7fe docs: resumen de continuidad v5 (B-11 + B-14 cerrados, B-15 listo)
+  79c9c66 fix(api): B-14 updateChecklist respeta cast array + 404 correcto + test
+  6d9502a fix(api): B-11 show respeta cast array + test de show
+
+### 2.3 Bloques cerrados en esta sesión
+- B-11 (GET /api/instalaciones/{id} show) ....................... OK
+- B-14 (POST /api/instalaciones/{id}/checklist) ................. OK
+- B-15 (POST /api/instalaciones/{id}/eventos) ................... OK
+- InstalacionFotoService extraído (Opción B, reusable) .......... OK
+
+### 2.4 Estado del roadmap B-XX
+Cerrados: B-03, B-05, B-06, B-07, B-08, B-08a, B-11, B-14, B-15
+Pendientes: B-13, B-16, B-17
+Saltado (decisión): B-13 — no bloquea Flutter, se retoma después de B-16/B-17
+
+--------------------------------------------------------------------------------
+## 3. HALLAZGOS CLAVE DE ESTA SESIÓN
+--------------------------------------------------------------------------------
+
+### 3.1 User vs Usuario (Regla 26 NUEVA)
+El proyecto usa App\Models\Usuario, NO App\Models\User.
+- El usuario autenticado se accede con $usuario->usuario (string PK)
+- NO con $usuario->id ni $usuario->name
+- Los `use App\Models\User;` en código nuevo son SIEMPRE sospechosos
+- InstalacionFotoService fue creado con `?User $subidaPor` → TypeError
+  en runtime, resuelto cambiando a `?Usuario $subidaPor`
+
+### 3.2 $status colado dentro del array (Regla 25 NUEVA)
+`response()->json([...], $status)` debe tener el `]` externo ANTES
+de `, $status`. Un `$status` dentro del array es sintaxis válida en PHP
+(clave numérica 0) y silencioso como bug: el status HTTP queda en 200.
+Síntoma: assertCreated() falla con "Expected 201, got 200".
+Solo visible con `awk '/private function respuesta/,/^    }$/'`, no con
+grep de la firma (la firma SÍ tenía int $status = 200 correcto).
+
+### 3.3 InstalacionFotoService — Opción B confirmada
+Servicio en app/Services/InstalacionFotoService.php con métodos:
+- guardar(Instalacion, UploadedFile, tipo, ?Usuario, ...): InstalacionFoto
+- guardarBatch(Instalacion, array fotos, ...): array
+- urlTemporal(InstalacionFoto, minutos=10): string
+- eliminarBlob(InstalacionFoto): void
+- assertArchivoValido(UploadedFile): void (protected, defensa en profundidad)
+- almacenarEnDisk(...): string (protected)
+Constantes: DISCO='local', MAX_KB=10240, MIMES=['image/jpeg','image/png']
+Usa getMimeType() (detecta por contenido), NO getClientMimeType() (spoofable).
+GuardarBatch envuelve en DB::transaction → atomicidad.
+
+### 3.4 guardarFotoSiViene() legacy NO se toca
+Los 4 endpoints (iniciar/pausar/reanudar/finalizar) usan
+guardarFotoSiViene() (privado en InstalacionEventoController).
+B-15 usa el servicio nuevo. Coexistencia temporal.
+Deuda: unificar en F2 (anotado como Q-131-extendida).
+
+### 3.5 B-13 (POST /api/instalaciones/{id}/fotos batch) NO hecho
+Estaba en el PASO D del v5. Decisión: saltar porque NO bloquea Flutter
+(es 🟡 importante-no-bloqueante según MODELO-NEGOCIO-v2 §6).
+Cuando se retome, es trivial: InstalacionFotoService::guardarBatch()
+ya existe y está probado indirectamente por B-15 test 7.
+
+--------------------------------------------------------------------------------
+## 4. REGLAS NUEVAS / REFORZADAS (esta sesión)
+--------------------------------------------------------------------------------
+
+### Regla 25 (NUEVA)
+`response()->json([...], $status)` con `$status = 201` devolviendo 200:
+el `]` externo debe cerrar ANTES de `, $status`. Un `$status` colado
+dentro del array es sintaxis válida (clave numérica 0) y silencioso.
+Solo assertCreated() lo detecta. Verificar con awk completo, no con
+grep de la firma.
+
+### Regla 26 (NUEVA)
+El modelo es App\Models\Usuario, NO App\Models\User.
+`use App\Models\User;` en código nuevo → reemplazar por Usuario.
+Acceso a PK: $usuario->usuario (string), no ->id.
+Acceso a nombre: verificar si es ->nombre o ->name (grep en modelo).
+
+### Regla 27 (NUEVA — observación de esta sesión)
+Al reusar métodos existentes (respuesta(), helpers), VERIFICAR qué
+devuelven exactamente ANTES de asumir. respuesta() devolvía 200, no 201,
+y el plan asumía 201. awk del método completo > asumir.
+
+### Regla 28 (NUEVA — VS Code específico)
+`code <ruta>` desde terminal es más confiable que Explorer para crear
+archivos nuevos en rutas profundas. El Explorer depende de estado
+(foco, expansión) que no siempre coincide con lo que crees. `code
+tests/Feature/XTest.php` fuerza la ruta exacta.
+
+### Regla 12 (REFUERZO)
+Un archivo nuevo en VS Code NO EXISTE hasta Ctrl+S. Verificar con
+wc -c (no wc -l, no php -l que da falso positivo en vacío).
+Síntoma: "Test file not found" aunque pegaste todo.
+
+--------------------------------------------------------------------------------
+## 5. DEUDA REGISTRADA
+--------------------------------------------------------------------------------
+
+Q-131: B-08 (SalidaApiController) sigue con lógica inline de evidencia.
+       EvidenciaEntregaService existe para Salida.
+       InstalacionFotoService existe para Instalacion.
+       NO unificar tablas. Refactor B-08 → EvidenciaEntregaService: F2.
+
+Q-132 (NUEVA): guardarFotoSiViene() en InstalacionEventoController
+       coexiste con InstalacionFotoService. Deprecar el privado en F2
+       cuando los 4 endpoints (iniciar/pausar/reanudar/finalizar) migren
+       al servicio. Requiere tests de regresión primero.
+
+Q-133 (NUEVA): docs/EQUIPO/PERFIL-DESARROLLADOR.txt y BITACORA-AVANCES.md
+       propuestos pero no creados. Crear cuando cierre B-16/B-17.
+
+--------------------------------------------------------------------------------
+## 6. B-16 / B-17 — BLOQUEANTES DE SYNC (próximo bloque)
+--------------------------------------------------------------------------------
+
+### 6.1 Objetivo
+B-16: POST /api/sync/push     (batch idempotente)
+B-17: GET  /api/sync/pull     (delta por since)
+
+Sin estos, Flutter "funciona" pero pierde datos offline al reinstalar.
+
+### 6.2 Decisiones de arquitectura NO TOMADAS (resolver ANTES de codear)
+🔴 D-1: ¿sync_log separada o uuid_cliente en cada tabla sincronizable?
+        - Opción A: tabla sync_log (id, tabla, registro_id, uuid_cliente,
+          operacion, payload_json, aplicado_at, resultado)
+          Ventaja: una sola migración, historial completo, auditoría.
+          Desventaja: búsqueda por uuid_cliente requiere índice y join.
+        - Opción B: uuid_cliente en cada tabla (eventos, fotos, checklist,
+          etc.) + UNIQUE por tabla.
+          Ventaja: lookup directo, idempotencia natural.
+          Desventaja: N migraciones, N índices, mantener en N modelos.
+        VOTO PENDIENTE.
+
+🔴 D-2: Resolución de conflictos exacta.
+        El modelo de negocio dice "server-wins con log".
+        ¿Server-wins por CAMPO o por REGISTRO?
+        - Por registro: si server tiene versión más nueva, se descarta
+          el push entero. Simple. Puede perder datos.
+        - Por campo: solo campos modificados en server ganan. Complejo.
+        VOTO PENDIENTE.
+
+🔴 D-3: ¿Qué se sincroniza? (catálogo vs transaccional)
+        Catálogo (pull-only): proyectos, clientes, categorias, inventario,
+        estatus. Sin uuid_cliente. Sin push.
+        Transaccional (push+pull): instalacion_eventos, instalacion_fotos,
+        check_list. Con uuid_cliente.
+        ¿evidencias_entrega (Módulo A) entra en B-16 o va en B-08 aparte?
+        VOTO PENDIENTE.
+
+🔴 D-4: Orden de operaciones dentro de un batch.
+        Si el batch trae [evento, foto, checklist] y la foto referencia
+        al evento:
+        - ¿Se aplica en orden de llegada? (riesgo de FK antes que padre)
+        - ¿Se ordena por tipo (padres antes que hijos)?
+        - ¿Se rechaza el batch entero si una falla? (atomicidad)
+
+🔴 D-5: Manejo de referencias huérfanas.
+        Si el push incluye un evento para instalacion_id=42, pero la
+        instalación 42 fue borrada o reasignada a otro técnico:
+        - ¿Rechazar con 422? → la app debe reintentar sin fin
+        - ¿Aceptar con flag pendiente_revision? → datos huérfanos
+        - ¿Aceptar silenciosamente? → datos perdidos en limbo
+        VOTO PENDIENTE.
+
+🔴 D-6: Estructura del pull (delta).
+        GET /api/sync/pull?since=<iso>
+        Respuesta:
+        - ¿Normalizada por tabla? {instalaciones: [...], eventos: [...], ...}
+        - ¿Raw por updated_at? [{tabla, ...fila}, ...]
+        - ¿Paginada? ¿Qué page_size máximo? ¿El cliente puede pedir
+          page=2 y perder consistencia si alguien más escribió entre pag?
+
+### 6.3 Lo que YA existe y se puede reusar
+- Laravel 13.25 con DB::transaction (patrón de InstalacionFotoService)
+- Middleware auth:sanctum funciona (B-02 HasApiTokens — verificar
+  primero con grep "HasApiTokens" app/Models/Usuario.php)
+- 165 tests verdes → red de seguridad para no romper lo existente
+- InstalacionEvento::created_at/updated_at existen (para pull delta)
+- InstalacionFoto::created_at/updated_at existen (para pull delta)
+
+### 6.4 Lo que NO existe y hay que crear
+- Migración de sync_log/outbox (D-1)
+- Índice (updated_at) en: instalaciones, instalacion_eventos,
+  instalacion_fotos, check_list (o JSONB, ver abajo)
+- FormRequest SyncPushRequest (valida array de operaciones)
+- Controller Api\SyncController con push() y pull()
+- Tests de idempotencia (mismo UUID dos veces → una sola fila)
+- Tests de resolución de conflictos (server-wins)
+- Tests de huérfanos (FK missing)
+
+### 6.5 Colisión de nombres a evitar (Regla 20)
+Existe ya app/Http/Controllers/InstalacionController.php (web, sesión)
+Y app/Http/Controllers/Api/InstalacionController.php (API).
+NO crear un tercero. SyncController va en Api\SyncController.
+
+### 6.6 Recomendación de secuencia (no obligatoria)
+PASO 0 (antes de codear):
+  - Responder D-1 a D-6. Pueden quedar como "voto" si no hay decisión,
+    pero el código va a asumir una opción. Mejor decidir con trade-off.
+
+PASO 1 (30 min): Verificar HasApiTokens (B-02).
+  grep -n "HasApiTokens" app/Models/Usuario.php
+  Si NO está: agregar trait + test LoginApiTest.
+  Sin esto, push/pull fallan con 500 en auth.
+
+PASO 2 (1h): Migración sync_log (si D-1 = A) o uuid_cliente (si D-1 = B).
+  D-1 debe estar decidido ANTES de esta migración.
+
+PASO 3 (2h): B-17 primero (pull) — es más simple y valida el modelo
+  de respuesta delta. Una vez que pull funciona, push tiene a dónde
+  apuntar (el cliente sabe qué ya tiene).
+
+PASO 4 (3h): B-16 (push) — implementa idempotencia y conflictos.
+  Test de idempotencia OBLIGATORIO antes de cerrar.
+
+PASO 5 (1h): Tests de integración push→pull (subo evento, luego pull
+  con since anterior, debe aparecer).
+
+--------------------------------------------------------------------------------
+## 7. PRÓXIMOS PASOS (en orden estricto)
+--------------------------------------------------------------------------------
+
+PASO A (bloqueante — retomar ANTES de cualquier otra cosa):
+  Verificar que el commit de B-15 está hecho:
+    git log --oneline -3
+  Si NO aparece "feat(api): B-15" arriba:
+    git add app/Services/InstalacionFotoService.php \
+            app/Http/Requests/InstalacionEventoSimpleRequest.php \
+            app/Http/Controllers/Api/InstalacionEventoController.php \
+            routes/api.php \
+            tests/Feature/InstalacionEventosApiTest.php
+    git commit -m "feat(api): B-15 POST /api/instalaciones/{id}/eventos (incidencia|nota_agregada) + InstalacionFotoService"
+    git push origin main
+
+PASO B (5 min): Verificar B-02 HasApiTokens.
+  grep -n "HasApiTokens" app/Models/Usuario.php
+  Si NO está: agregar trait + test LoginApiTest (15 min).
+  Sin esto, sync no puede autenticar.
+
+PASO C (decisión): Responder D-1 a D-6 de §6.2.
+  Sin estas decisiones, B-16/B-17 no se pueden empezar sin adivinar.
+
+PASO D: Implementar B-17 (pull) primero (ver §6.6 PASO 3).
+PASO E: Implementar B-16 (push) después (ver §6.6 PASO 4).
+PASO F: Retomar B-13 (fotos batch) — trivial con InstalacionFotoService.
+PASO G: Flutter Fase 1 (5 pasos, ver docs/movil/MODELO-NEGOCIO-v2 §9).
+
+--------------------------------------------------------------------------------
+## 8. COMANDOS DE VERIFICACIÓN AL RETOMAR (Chat nuevo)
+--------------------------------------------------------------------------------
+
+cd ~/laravel/proyectosavi
+
+echo "=== 1. Working tree ==="
+git status --porcelain
+
+echo "=== 2. Últimos commits ==="
+git log --oneline -5
+
+echo "=== 3. Suite ==="
+php artisan test --compact 2>&1 | tail -3
+
+echo "=== 4. B-15 ruta registrada ==="
+php artisan route:list | grep "instalaciones/.*eventos"
+
+echo "=== 5. HasApiTokens presente (B-02) ==="
+grep -n "HasApiTokens" app/Models/Usuario.php || echo "❌ B-02 pendiente"
+
+echo "=== 6. .php.php resucitados? ==="
+ls database/migrations/ | grep "\.php\.php" && echo "❌ VSCode los resucitó" || echo "✅ limpio"
+
+Interpretación:
+  1 vacío           → commit B-15 hecho. Ir a PASO B.
+  1 con 5 archivos  → B-15 sin commitear. Ejecutar PASO A.
+  3 = 165 passed    → suite verde. Si < 165, algo se rompió.
+  4 dice POST       → ruta OK.
+  5 dice ✅         → B-02 listo. Si ❌, resolver antes de sync.
+  6 dice ✅         → migraciones limpias.
+
+--------------------------------------------------------------------------------
+## 9. AVISO IMPORTANTE PARA EL PRÓXIMO CHAT
+
+El usuario es usuario de Linux desde ~2005, NO es junior en tecnología.
+Está aprendiendo Laravel/arquitectura de software desde cero.
+Ver: docs/EQUIPO/PERFIL-DESARROLLADOR.txt (si existe) o esta sección.
+
+NO explicar: terminal, wc -c, Ctrl+S, permisos, procesos, git básico.
+SÍ explicar: por qué una decisión de arquitectura, trade-offs, idioms
+de Laravel (FormRequest, Service, Policy, transacciones, tests), Reglas
+12/17/19/25/26/27 del proyecto.
+
+Método de aprendizaje del usuario: pregunta "por qué" antes de aplicar.
+Documenta tropiezos en forma de REGLAS (cada regla nació de un bug real).
+Un placeholder roto que le obliga a preguntar vale más que una línea
+correcta que pasa desapercibida. Prefiere diagnóstico con awk sobre el
+método completo (Regla 16) antes que sed con números aproximados.
+
+Decisión de esta sesión: B-13 se salta porque NO bloquea Flutter.
+B-16/B-17 son los bloqueantes reales. B-16 tiene 6 decisiones de
+arquitectura abiertas (§6.2) que deben resolverse ANTES de codear.
+
+================================================================================
+FIN DEL RESUMEN v6
+================================================================================
