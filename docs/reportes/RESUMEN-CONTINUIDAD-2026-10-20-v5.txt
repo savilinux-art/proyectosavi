@@ -1,0 +1,412 @@
+================================================================================
+RESUMEN DE CONTINUIDAD — ProyectoSAVI
+Sesión: 20-oct-2026 (continuación B-05 → B-11 → B-14, B-15 pendiente)
+Propósito: Retomar trabajo en un chat nuevo sin perder contexto
+================================================================================
+
+## 1. CONTEXTO DEL PROYECTO
+
+Sistema de gestión empresarial Laravel 13.25 (PHP 8.4.25) para instalaciones
+tecnológicas.
+- Repo: https://github.com/savilinux-art/proyectosavi
+- Rama: main
+- Docs de referencia: docs/RESUMEN-TECNICO-v2.5.0.txt +
+                      docs/movil/MODELO-NEGOCIO-APP-MOVIL-v2.txt
+
+## 2. ESTADO AL CIERRE DE ESTA SESIÓN
+
+### 2.1 Suite de tests
+158 passed / 466 assertions
+(baseline al inicio de la sesión: 151 / 446; +7 tests nuevos)
+
+### 2.2 Commits de esta sesión (verificar con `git log --oneline -8`)
+  6d9502a (B-11) fix(api): B-11 show respeta cast array + test de show
+  e583a2c fix(migrations): renombrar .php.php → .php (higiene Regla 12)
+  4342bb9 docs: resumen de continuidad 20-oct-2026 v4 (hashes reales)
+  6a56e4f docs: resumen de continuidad 20-oct-2026 v4 (borrador duplicado)
+  40a5c84 (B-05) feat(web): B-05 upload de evidencia desde salidas/show
+  09885a1 (B-06) feat(web): B-06 downloadPDF sirve evidencia vigente
+  0c89d31 feat(api): B-08a helper ProyectoResolver
+  3179cc9 feat(api): B-08 POST /api/salidas/{id}/evidencias-entrega
+
+⚠️ PENDIENTE AL CIERRE:
+  - B-14 (updateChecklist cast + 404) está en working tree SIN COMMITEAR.
+    Archivos: app/Http/Controllers/Api/InstalacionController.php (M)
+              tests/Feature/InstalacionChecklistTest.php (??)
+    Tests verdes: 4/4 en InstalacionChecklistTest; suite total 158.
+    Comando de commit:
+      git add app/Http/Controllers/Api/InstalacionController.php \
+              tests/Feature/InstalacionChecklistTest.php
+      git commit -m "fix(api): B-14 updateChecklist respeta cast array + 404 correcto + test"
+      git push origin main
+
+### 2.3 Bloques cerrados en esta sesión
+- Higiene .php.php → .php (3 migraciones) ....................... OK
+- B-11 (GET /api/instalaciones/{id} show) ....................... OK (3 tests)
+- B-14 (POST /api/instalaciones/{id}/checklist) ................. OK (4 tests) [sin commit]
+
+### 2.4 Estado del roadmap B-XX
+Cerrados: B-03, B-05, B-06, B-07, B-08, B-08a, B-11, B-14
+Pendientes: B-13, B-15, B-16, B-17
+
+--------------------------------------------------------------------------------
+## 3. HALLAZGOS CLAVE DE ESTA SESIÓN
+--------------------------------------------------------------------------------
+
+### 3.1 B-11 — Bug de doble cast en show()
+ANTES (roto):
+    $instalacion = Instalacion::with(['proyecto'])->findOrFail($id);
+    $instalacion->check_list = json_decode($instalacion->check_list);  ← TypeError
+
+Modelo Instalacion tiene cast 'check_list' => 'array'. La asignación
+sobre el atributo ya devuelve array; json_decode(array) explota en PHP 8.
+El endpoint fallaba con 500 solo cuando check_list tenía datos.
+
+DESPUÉS (correcto):
+    $instalacion = Instalacion::with(['proyecto'])->findOrFail($id);
+    return response()->json(['success' => true, 'data' => $instalacion]);
+
+### 3.2 B-14 — Bug de doble codificación + 500 en vez de 404
+ANTES (roto):
+    try {
+        $instalacion = Instalacion::findOrFail($id);      ← cae en catch → 500
+        $instalacion->check_list = json_encode($request->check_list);  ← doble
+        ...
+        'data' => json_decode($instalacion->check_list)   ← TypeError
+    } catch (\Exception $e) { return 500; }
+
+DESPUÉS (correcto):
+    $instalacion = Instalacion::findOrFail($id);          ← fuera del try → 404
+    $instalacion->check_list = $request->check_list;      ← cast 'array'
+    $instalacion->save();
+    return response()->json(['success' => true, ..., 'data' => $instalacion->check_list]);
+
+### 3.3 uploadEvidence en Api\InstalacionController es LEGACY
+Guarda BLOB en columnas de instalaciones (evidencia_inicio, incidencias,
+evidencia_fin) en vez de usar InstalacionFoto + Storage.
+Decisión: NO se refactoriza. B-13 será endpoint NUEVO POST /api/instalaciones/{id}/fotos
+que usa InstalacionFoto + Storage (patrón B-05/B-06). uploadEvidence queda
+como legacy a deprecar en F2. No se le escriben tests.
+
+### 3.4 Colisión de nombres: dos InstalacionController
+- app/Http/Controllers/InstalacionController.php       (namespace App\Http\Controllers, WEB, sesión)
+- app/Http/Controllers/Api/InstalacionController.php   (namespace App\Http\Controllers\Api, API, Sanctum)
+
+Antes de editar CUALQUIER InstalacionController:
+  grep -l "public function NOMBRE" app/Http/Controllers/*.php app/Http/Controllers/Api/*.php
+
+### 3.5 Modelo InstalacionEvento ya existe y es completo
+Tabla: instalacion_eventos
+Enum tipo: iniciada|pausada|reanudada|finalizada|incidencia|checklist_actualizado|nota_agregada
+fillable: instalacion_id, tipo, latitud, longitud, precision_metros, fuente,
+          payload_json, capturado_at, por
+casts: lat/long float, precision_metros int, payload_json array, capturado_at datetime
+
+Los 4 endpoints de estado (iniciar/pausar/reanudar/finalizar) ya crean eventos.
+B-15 = POST /api/instalaciones/{id}/eventos con tipo ∈ {incidencia, nota_agregada}.
+NO necesita migración. uuid_cliente NO se añade (idempotencia va en sync_log para B-16).
+
+### 3.6 InstalacionFoto + migración ya existen
+Tabla: instalacion_fotos
+Columnas: instalacion_id, ruta, nombre_original, mime, tamano_kb,
+          tipo (enum: inicio|proceso|fin|incidencia), descripcion,
+          subida_por_usuario, latitud, longitud, precision_metros, fuente
+Modelo con scopes: fotosInicio/Proceso/Fin/Incidencia.
+B-13 NO necesita migración — ya está todo.
+
+### 3.7 InstalacionEventoRequest actual (reutilizable como base)
+rules(): capturado_at required|date, lat/long nullable, precision int,
+         fuente in:gps,network,cached,mock,no_disponible, notas max:2000,
+         foto (required solo si routeIs('api.instalaciones.finalizar'))
+NO tiene tipo, NO tiene payload_json, NO tiene descripcion.
+B-15 necesita una subclase InstalacionEventoSimpleRequest extends InstalacionEventoRequest
+que sobreescriba rules() completo (ver §6).
+
+### 3.8 .php.php RESUCITAN por VSCode
+Aunque e583a2c los renombró correctamente, VSCode (con 3 extensiones PHP activas:
+devsense.phptools, bmewburn.intelephense, devsense.intelli-php) recrea los
+archivos viejos al sincronizar buffers. lsof +D no los detecta (Electron
+mantiene en RAM del renderer, sin fd abierto).
+Mitigación: Developer: Reload Window en VSCode tras cualquier rename masivo;
+verificar git status --porcelain dos veces (con sleep entre medio); instalar
+hook pre-commit anti .php.php.
+
+--------------------------------------------------------------------------------
+## 4. REGLAS NUEVAS / REFORZADAS (esta sesión)
+--------------------------------------------------------------------------------
+
+### Regla 12 (REFORZADA)
+Archivos creados con `cat > ... << 'EOF'` pueden quedar en 0 bytes.
+Verificar SIEMPRE con `wc -c` (no `wc -l`). `php -l` da falso positivo
+en archivos vacíos. Los tests son el único chequeo que atrapa archivos
+vacíos. REFUERZO: si el heredoc tiene código PHP con `\` o comillas
+anidadas, prefiere nano a heredoc.
+
+### Regla 13 (refuerzo)
+"Class not found" en controller con namespace relativo → falta `use`
+o falta `\` inicial.
+
+### Regla 14 (refuerzo)
+Pest --filter matchea nombre de it(), no de archivo.
+Usar SIEMPRE path: php artisan test tests/Feature/XTest.php
+
+### Regla 16 (refuerzo)
+Antes de editar método existente: `awk '/public function NOMBRE/,/^    }$/'`.
+sed -n 'X,Yp' falla con números aproximados.
+
+### Regla 17 (NUEVA — confirmada 2 veces)
+`awk -v var="$value"` interpreta secuencias de escape (\I → I).
+Si $value tiene backslashes (namespaces PHP, regex, JSON), NO usar -v.
+Usar heredoc single-quote o php -r con file_get_contents/file_put_contents.
+Síntoma típico: "Class App\Http\Controllers\IlluminateHttpRequest not found".
+
+### Regla 18 (NUEVA)
+$this->withoutMiddleware() en tests deshabilita StartSession +
+ShareErrorsFromSession. assertSessionHasErrors falla aunque validación
+sí ocurrió. Solución: withoutExceptionHandling + try/catch ValidationException
++ verificar $e->errors().
+
+### Regla 19 (NUEVA — confirmada 2 veces B-11 y B-14)
+DOBLE CODIFICACIÓN SILENCIOSA. Si un modelo tiene cast 'array' o 'json':
+  - NUNCA usar json_encode() al escribir ni json_decode() al leer.
+  - El cast ya hace encode/decode.
+Síntoma: el endpoint devuelve JSON "correcto" (doble encode + doble decode
+en la response se cancela), pero `$model->refresh()->campo` devuelve un
+string JSON en vez de array. Solo los tests de persistencia (con refresh())
+lo detectan.
+
+### Regla 20 (NUEVA)
+COLISIÓN DE NOMBRES EN NAMESPACES DIFERENTES. InstalacionController existe
+en App\Http\Controllers y App\Http\Controllers\Api. Antes de editar:
+  grep -l "public function NOMBRE" app/Http/Controllers/*.php app/Http/Controllers/Api/*.php
+Y verificar primera línea del archivo que abres.
+
+### Regla 21 (NUEVA)
+"FIX NO APLICADO" = archivo equivocado o nano sin guardar.
+Si test falla con MISMO error después de "aplicar un fix", el fix no se
+aplicó. Diagnóstico: awk '/public function M/,/^    }$/' archivo.
+Si el código viejo sigue → archivo equivocado o guardado fallido.
+
+### Regla 22 (NUEVA)
+BACKUPS, NO REINVENCIÓN. Si fix falla 2 veces consecutivas:
+restaurar backup y editar desde cero con nano, no acumular ediciones sobre
+estado incierto.
+
+### Regla 23 (NUEVA — VSCode)
+VSCode resucita archivos renombrados desde terminal (git mv) si tiene
+buffers abiertos con el path viejo. Síntoma: el archivo renombrado
+reaparece como untracked con nombre viejo; el nuevo aparece D en git status.
+Mitigación:
+  1. Developer: Reload Window tras rename masivo.
+  2. Verificar git status --porcelain dos veces (con sleep 5 entre medio).
+  3. Hook pre-commit anti .php.php.
+
+### Regla 24 (NUEVA)
+lsof +D NO ve archivos abiertos por Electron/VSCode (buffers en RAM del
+renderer, no fd). No concluir "no hay culpable" basándose solo en lsof.
+Complementar con: ps aux | grep -iE "code|phpstorm|vim|nano"
+
+--------------------------------------------------------------------------------
+## 5. DEUDA REGISTRADA
+--------------------------------------------------------------------------------
+
+Q-131: B-08 conserva lógica inline de evidencia en SalidaApiController;
+       B-05 usa EvidenciaEntregaService. No se refactorizó B-08 (Opción C).
+       La deuda se arrastra; evaluar en F2.
+
+Nueva deuda potencial: uploadEvidence (BLOB en instalaciones) coexiste con
+InstalacionFoto (Storage). Deprecar uploadEvidence en F2.
+
+--------------------------------------------------------------------------------
+## 6. B-15 — LISTO PARA IMPLEMENTAR (único bloque nuevo del PASO 3)
+--------------------------------------------------------------------------------
+
+Objetivo: POST /api/instalaciones/{id}/eventos
+Permite tipo ∈ {incidencia, nota_agregada}. NO crear otros tipos vía este
+endpoint (iniciada/pausada/reanudada/finalizada tienen sus propios endpoints).
+
+### 6.1 Archivo NUEVO: app/Http/Requests/InstalacionEventoSimpleRequest.php
+
+<?php
+
+namespace App\Http\Requests;
+
+class InstalacionEventoSimpleRequest extends InstalacionEventoRequest
+{
+    public function rules(): array
+    {
+        return [
+            'tipo'             => ['required', 'in:incidencia,nota_agregada'],
+            'capturado_at'     => ['required', 'date'],
+            'descripcion'      => ['nullable', 'string', 'max:2000'],
+            'payload_json'     => ['nullable', 'array'],
+            'latitud'          => ['nullable', 'numeric', 'between:-90,90'],
+            'longitud'         => ['nullable', 'numeric', 'between:-180,180'],
+            'precision_metros' => ['nullable', 'integer', 'min:0'],
+            'fuente'           => ['nullable', 'in:gps,network,cached,mock,no_disponible'],
+            'foto'             => ['nullable', 'file', 'mimes:jpg,jpeg,png', 'max:10240'],
+        ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($v) {
+            if (!$this->filled('descripcion') && empty($this->input('payload_json'))) {
+                $v->errors()->add('descripcion',
+                    'Se requiere descripcion o payload_json.');
+            }
+        });
+    }
+}
+
+### 6.2 Ruta nueva en routes/api.php
+Dentro del grupo `Route::prefix('instalaciones/{instalacion}')->name('api.instalaciones.')`:
+    Route::post('eventos', [InstalacionEventoController::class, 'store'])->name('eventos');
+
+### 6.3 Método store() en app/Http/Controllers/Api/InstalacionEventoController.php
+
+Añadir `use App\Http\Requests\InstalacionEventoSimpleRequest;` arriba.
+
+    public function store(InstalacionEventoSimpleRequest $request, Instalacion $instalacion): JsonResponse
+    {
+        $this->autorizar($request, $instalacion);
+
+        $payload = (array) ($request->input('payload_json') ?? []);
+        if ($request->filled('descripcion')) {
+            $payload['descripcion'] = $request->input('descripcion');
+        }
+
+        DB::transaction(function () use ($instalacion, $request, $payload) {
+            $this->crearEvento($instalacion, $request->input('tipo'), $request, $payload);
+
+            if ($request->hasFile('foto')) {
+                $tipoFoto = $request->input('tipo') === 'incidencia' ? 'incidencia' : 'proceso';
+                $this->guardarFotoSiViene($instalacion, $request, $tipoFoto);
+            }
+        });
+
+        return response()->json([
+            'message'     => 'Evento ' . $request->input('tipo') . ' registrado',
+            'instalacion' => [
+                'id'                  => $instalacion->id,
+                'estatus_instalacion' => $instalacion->estatus_instalacion,
+            ],
+        ], 201);
+    }
+
+Reusa los métodos privados existentes:
+  - autorizar($request, $instalacion)  → 403 si no asignado
+  - crearEvento(...)                    → valida capturado_at en futuro → 422
+  - guardarFotoSiViene(...)             → guarda en Storage + InstalacionFoto
+
+### 6.4 Test nuevo: tests/Feature/InstalacionEventosApiTest.php
+6 casos:
+  1. registra_nota_con_shortcut_descripcion (201, payload_json['descripcion'])
+  2. registra_incidencia_con_payload_json (201, payload_json con estructura)
+  3. rechaza_tipo_no_permitido (422 con tipo='iniciada')
+  4. rechaza_sin_descripcion_ni_payload (422)
+  5. rechaza_si_no_esta_asignado (403)
+  6. rechaza_capturado_at_en_futuro (422)
+
+Patrón: DatabaseTransactions + Sanctum::actingAs + InstalacionFactory +
+$inst->instaladores()->attach($user->usuario, ['es_principal' => true]).
+
+### 6.5 Verificación post-implementación
+  wc -c app/Http/Requests/InstalacionEventoSimpleRequest.php tests/Feature/InstalacionEventosApiTest.php
+  php -l app/Http/Requests/InstalacionEventoSimpleRequest.php
+  php -l app/Http/Controllers/Api/InstalacionEventoController.php
+  php artisan route:list --path=api/instalaciones/eventos
+  php artisan test tests/Feature/InstalacionEventosApiTest.php    # 6 passed
+  php artisan test --compact 2>&1 | tail -3                       # 164 passed
+
+### 6.6 Commit de B-15
+  git add app/Http/Requests/InstalacionEventoSimpleRequest.php \
+          app/Http/Controllers/Api/InstalacionEventoController.php \
+          routes/api.php \
+          tests/Feature/InstalacionEventosApiTest.php
+  git commit -m "feat(api): B-15 POST /api/instalaciones/{id}/eventos (incidencia|nota_agregada)"
+  git push origin main
+
+--------------------------------------------------------------------------------
+## 7. PRÓXIMOS PASOS (en orden estricto)
+--------------------------------------------------------------------------------
+
+PASO A (bloqueante — retomar ANTES de cualquier otra cosa):
+  Confirmar que B-14 está commiteado (git log --oneline -3).
+  Si NO está:
+    git add app/Http/Controllers/Api/InstalacionController.php \
+            tests/Feature/InstalacionChecklistTest.php
+    git commit -m "fix(api): B-14 updateChecklist respeta cast array + 404 correcto + test"
+    git push origin main
+
+PASO B (5 min): Neutralizar VSCode.
+  1. Cerrar pestañas con .php.php.
+  2. Developer: Reload Window.
+  3. ls database/migrations/ | grep "\.php\.php" && echo "❌" || echo "✅"
+  4. Instalar hook pre-commit anti .php.php (ver §8).
+
+PASO C: Implementar B-15 (ver §6 completo).
+
+PASO D: B-13 — POST /api/instalaciones/{id}/fotos (multipart batch)
+  - Endpoint NUEVO (no refactorizar uploadEvidence legacy).
+  - Usa InstalacionFoto + Storage (patrón B-05/B-06: Storage::disk()).
+  - Reutiliza lógica de guardarFotoSiViene() de InstalacionEventoController
+    o crear InstalacionFotoService (decisión abierta, coherente con Q-131).
+  - Migración: NO necesita (instalacion_fotos ya tiene todo).
+  - Tests: InstalacionFotosApiTest (5-6 casos: 1 foto, batch 3,
+    MIME inválido, tamaño excedido, excede batch, instalación 404).
+  - Commit: feat(api): B-13 POST /api/instalaciones/{id}/fotos (multipart batch).
+
+PASO E: B-16 + B-17 (sync) — bloqueante para offline real.
+  - B-16: POST /api/sync/push (batch idempotente por UUID cliente).
+    Requiere tabla sync_log/outbox con uuid_cliente UNIQUE.
+  - B-17: GET /api/sync/pull?since=<iso> (delta con updated_at).
+    Requiere updated_at indexado en tablas sincronizables.
+
+PASO F: Flutter (5 pasos, ver roadmap original en docs/movil/).
+
+--------------------------------------------------------------------------------
+## 8. HOOK PRE-COMMIT RECOMENDADO (instalar tras commit B-14)
+--------------------------------------------------------------------------------
+
+Archivo: .git/hooks/pre-commit
+#!/bin/bash
+if git diff --cached --name-only --diff-filter=ACM | grep -q '\.php\.php$'; then
+  echo "❌ Commit bloqueado: archivos .php.php detectados."
+  git diff --cached --name-only --diff-filter=ACM | grep '\.php\.php$'
+  exit 1
+fi
+exit 0
+
+chmod +x .git/hooks/pre-commit
+
+--------------------------------------------------------------------------------
+## 9. COMANDOS DE VERIFICACIÓN AL RETOMAR (Chat nuevo)
+--------------------------------------------------------------------------------
+
+cd ~/laravel/proyectosavi
+
+echo "=== 1. Working tree ==="
+git status --porcelain
+
+echo "=== 2. Últimos commits ==="
+git log --oneline -6
+
+echo "=== 3. Sync ==="
+git status -sb | head -1
+
+echo "=== 4. .php.php resucitados? ==="
+ls database/migrations/ | grep "\.php\.php" && echo "❌ VSCode los resucitó" || echo "✅ limpio"
+
+echo "=== 5. Suite ==="
+php artisan test --compact 2>&1 | tail -3
+
+Interpretación:
+  1 vacío       → B-14 ya commiteado. Salta PASO A. Ir a PASO B/C.
+  1 con 2 files → B-14 sin commitear. Ejecutar PASO A.
+  4 dice ❌     → VSCode resucitó .php.php. Hacer PASO B (reload + hook).
+  5 ≠ 158       → algo se rompió. Investigar antes de continuar.
+
+================================================================================
+FIN DEL RESUMEN v5
+================================================================================
