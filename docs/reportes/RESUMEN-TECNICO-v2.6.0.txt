@@ -1,10 +1,10 @@
 ================================================================================
               RESUMEN TÉCNICO – SISTEMA PROYECTOSAVI
-              Última actualización: 20 de Octubre de 2026
-              Versión: 2.5.0
+              Última actualización: 21 de Octubre de 2026
+              Versión: 2.6.0
               Repositorio: https://github.com/savilinux-art/proyectosavi
-              HEAD local: (pendiente commit — bloque endpoints móvil sin versionar)
-              Estado: 104 tests passed / 316 assertions / working tree con cambios
+              HEAD local: bf61596 (B-17 pull) + 5eb25dc (doc v2.6.0)
+              Estado: 171 tests passed / 521 assertions / working tree limpio
 ================================================================================
 
 🎯 PROPÓSITO GENERAL
@@ -26,7 +26,7 @@ Sistema de gestión empresarial especializado en instalaciones tecnológicas
   • Geocercas (alertas entrada/salida)
   • Roles y permisos granulares
   • Trazabilidad de materiales  ← ✅ COMPLETADA (19-oct)
-  • App móvil offline-first     ← ⏳ SIGUIENTE (backend bloque 3 cerrado 20-oct)
+  • App móvil offline-first     ← 🔄 PARCIAL (B-17 pull ✅ 21-oct; B-16 push pendiente)
 
 ================================================================================
 🎯 SESIÓN 20-OCT-2026 — BLOQUE ENDPOINTS MÓVIL (CERRADO)
@@ -67,6 +67,49 @@ DECISIONES RESUELTAS EN ESTA SESIÓN:
     en tabla estatus (código muerto, ver Discrepancias #6).
   • Tests de Pest con helpers globales (crearAdmin, contarAdmins) NO pueden
     estar en archivos PHPUnit-style. Si el archivo es Pest, el test también.
+
+
+================================================================================
+🎯 SESIÓN 21-OCT-2026 — BLOQUE B (B-17 PULL) CERRADO
+================================================================================
+
+B-17 (pull incremental) cerrado + fixes de schema y zona horaria.
+Suite: 104 → 167 (baseline v7) → 171 (+4 pull).
+
+COMPLETADO:
+  ✅ B-24  Migración sync_log
+  ✅ B-09a instalacion_eventos: uuid_cliente UNIQUE, FK RESTRICT, idx updated_at
+  ✅ B-10  instalacion_fotos:   uuid_cliente UNIQUE, FK RESTRICT, idx updated_at
+  ✅ B-17  GET /api/sync/pull (bootstrap + deltas + scope instalador)
+  ✅ Fix   instalaciones.fecha_hora_inicio: NOT NULL → nullable (Q-142)
+  ✅ Modelo SyncLog con constantes RESULTADO_*
+
+ARCHIVOS NUEVOS:
+  • app/Models/SyncLog.php
+  • app/Http/Requests/SyncPullRequest.php
+  • app/Http/Controllers/Api/SyncController.php
+  • tests/Feature/Api/SyncPullTest.php (4 tests)
+  • database/migrations/2026_10_21_*_alter_instalaciones_fecha_hora_inicio_nullable.php
+
+ARCHIVOS MODIFICADOS:
+  • app/Models/InstalacionEvento.php (+uuid_cliente en fillable)
+  • app/Models/InstalacionFoto.php   (+uuid_cliente en fillable)
+  • routes/api.php (+GET /sync/pull bajo auth:sanctum)
+
+DECISIONES SYNC CERRADAS (MODELO-NEGOCIO-v3 §14):
+  D-1  Híbrido: uuid_cliente UNIQUE + sync_log dual
+  D-2  Server-wins por registro (solo check_list)
+  D-3  3 tablas transaccionales: eventos, fotos, check_list
+  D-4  Orden por capturado_at, batch atómico, side effects en F1
+  D-5  Huérfanos → sync_log='huerfano', FK RESTRICT, SoftDeletes
+  D-6  Pull: normalizado, sin paginar F1, since vs updated_at
+
+🎓 LECCIONES NUEVAS:
+  • SyncLog requiere $table='sync_log' explícito (Laravel pluraliza sync_logs)
+  • payload_json cast = 'array' (no 'json') — consistente con InstalacionEvento
+  • Rol formal es 'Instalador', no 'técnico'
+  • since contra TIMESTAMP: parsear a app.timezone, NO UTC (drift 6h)
+  • Instalacion::create() explota por FKs en cascada; usar factory
 
 ================================================================================
 🧱 ARQUITECTURA TÉCNICA
@@ -122,15 +165,16 @@ Regla: si usás un alias en routes/web.php, DEBE estar registrado.
 Verificación: grep "auth.session" bootstrap/app.php
 
 ════════════════════════════════════════════════════════════════════════════════
-📊 TESTING — ESTADO ACTUAL (20-oct-2026)
+📊 TESTING — ESTADO ACTUAL (21-oct-2026)
 ════════════════════════════════════════════════════════════════════════════════
 
-Suite actual: 104 passed / 316 assertions / ~17s
+Suite actual: 171 passed / 521 assertions / ~22s
 
 Evolución:
   5-oct-2026 (v2.3.0):  80 passed / 237 assertions
   19-oct-2026 (v2.4.0): 94 passed / 280 assertions
-  20-oct-2026 (v2.5.0): 104 passed / 316 assertions  ← ACTUAL (+10 tests)
+  20-oct-2026 (v2.5.0): 104 passed / 316 assertions
+  21-oct-2026 (v2.6.0): 171 passed / 521 assertions  ← ACTUAL (+67 desde v2.5.0)
 
 Tests nuevos 20-oct (todos verdes):
   • InstalacionEventoTest           (3)  tabla, modelo, cascade
@@ -202,7 +246,7 @@ Cobertura ausente / parcial:
   ❌ Reverb (broadcast)
   ❌ Regresión auth/permisos (incidente 28-sep)
 
-Calificación de testing: 6.1/10  (+0.4 vs v2.4.0)
+Calificación de testing: 6.5/10  (+0.4 vs v2.5.0)
 
 Tests pendientes específicos (v32):
   [ ] SalidaInventarioControllerTest
@@ -311,6 +355,12 @@ instalacion_fotos (v2.5.0, 20-oct):
 estatus (v2.5.0, 20-oct):
   + 'terminada' (tipo=instalacion) — dispara Observer
 
+instalaciones (v2.6.0, 21-oct, Q-142):
+  ~ fecha_hora_inicio: NOT NULL → NULLABLE
+    Contradice D-4 ("fecha_hora_inicio := capturado_at si era NULL").
+    Impedía crear instalación sin iniciar. fecha_hora_fin ya era nullable.
+    Índice MUL preservado.
+
 Otras (drift prod):
   · drop id_usuario_asignado (prod); dev/testing todavía lo tienen (Q-93)
   · instalacion_instalador sin FK ni índice (B-19, Fase 2)
@@ -327,8 +377,8 @@ Storage (v31):
 
 Rama: main
 origin/main: f7628506ad4f18a6b5a7a4fb42d8457fd4f422b4
-HEAD local (laptop): f762850 + cambios sin commitear (bloque endpoints móvil)
-HEAD server (prod):  f762850 (working tree sucio: Q-106)
+HEAD local (laptop): 5eb25dc (docs v2.6.0) / bf61596 (B-17 pull)
+HEAD server (prod):  (actualizar tras deploy)
 
 ⚠️ ACCIÓN PENDIENTE ANTES DE FLUTTER: commitear bloque endpoints.
    git add -A && git commit -m "feat(instalaciones): flujo móvil
@@ -431,6 +481,21 @@ NUEVAS v2.5.0 (20-oct):
     en disk('local'). Servir vía Storage::response() en controlador,
     nunca confiar en url() del modelo.
 
+NUEVAS v2.6.0 (21-oct):
+  - R32: SyncLog requiere protected $table = 'sync_log' explícito.
+    Laravel pluraliza SyncLog → sync_logs (no existe).
+  - R33: Rol formal es 'Instalador' (BD), NO 'técnico'.
+    Pivot: instalacion_instalador.instalador_usuario.
+  - R34: since contra TIMESTAMP debe parsearse a config('app.timezone'),
+    NO a UTC. Eloquent guarda en zona app; MySQL con session.time_zone
+    =+00:00 las trata como UTC. Comparar en UTC produce 0 filas (drift).
+    Ver Q-145.
+  - R35: Instalacion::create() en tests explota por FKs en cascada
+    (nombre_proyecto → proyectos, estatus_instalacion → estatus).
+    Usar Instalacion::factory()->create().
+  - R36: no asumir rutas de docs. Verificar con find antes de cp/cat/sed.
+    Docs están en docs/reportes/, no en docs/ raíz.
+
 ================================================================================
 🚀 FASES DEL PROYECTO
 ================================================================================
@@ -484,9 +549,9 @@ CONTEXTO:
         Idempotente por UUID de cliente. Resolución server-wins.
         Sin esto, la app "funciona" pero pierde datos al reinstalar.
 
-  B-17  GET /api/sync/pull?since=<iso> (delta)                    🔴 2-3 h
-        Devuelve cambios desde timestamp. Catálogos + asignaciones.
-        Sin esto, la app no se actualiza sola.
+  B-17  GET /api/sync/pull?since=<iso> (delta)                    ✅ 21-OCT
+        Devuelve cambios desde timestamp. Scope por instalador.
+        next_since en UTC. Test: SyncPullTest (4).
 
   B-08a Helper resolverProyecto(nombre)                           🔴 30 min
         trim + case-insensitive. Log de fallos.
@@ -537,8 +602,9 @@ CONTEXTO:
     • Flutter Módulo B UI (lista, iniciar/pausar/reanudar/finalizar)
     • Mientras backend: B-08a, B-08, B-03, B-05, B-06
 
-  PASO 4 (2 días):
-    • B-16 sync/push + B-17 sync/pull
+  PASO 4 (1-2 días):
+    • B-17 sync/pull                                    ✅ 21-OCT
+    • B-16 sync/push                                    ⏳ SIGUIENTE
     • Flutter Sync Engine + outbox SQLite
 
   PASO 5 (iterativo):
@@ -551,12 +617,12 @@ CONTEXTO:
 
   Seguridad        9.5/10
   Robustez         8.8/10
-  Testing          6.1/10  (+0.4 vs v2.4.0)
+  Testing          6.5/10  (+0.4 vs v2.5.0)
   Observabilidad   5.0/10
   Mantenibilidad   9.7/10  (-0.1 por deuda de routes duplicadas, ya corregida)
   Documentación    9.6/10  (+0.1)
   ─────────────────────
-  Estimado global: 8.5/10  (+0.1 vs v2.4.0)
+  Estimado global: 8.6/10  (+0.1 vs v2.5.0)
 
 Ruta a 9.0:
   1. Cerrar Q-113 (nullable API)                   → +0.1
@@ -595,7 +661,30 @@ Ruta a 9.0:
    Si no existen, considerar (Fase 2):
      • Eliminar las claves de AVISOS (limpieza), O
      • Agregarlas al catálogo si son flujo vigente.
-   NO urgente. Anotado como deuda Q-129 (nueva).
+   NO urgente. Anotado como deuda Q-129.
+
+7-bis. Q-142 (CERRADA 21-oct):
+   instalaciones.fecha_hora_inicio era NOT NULL sin default, contradiciendo
+   D-4. Resuelto con migración alter_instalaciones_fecha_hora_inicio_nullable.
+
+7-ter. Q-143 (21-oct):
+   Ambigüedad semántica fecha_hora_inicio: web/API la usan como "programado"
+   (validan after:now), EventoController:iniciar la sobrescribe con
+   capturadoAt (real). El programado original queda solo en payload_json.
+   Fase 2: decidir si separar en _programado / _iniciado.
+
+7-quater. Q-144 (21-oct, BLOQUEANTE para B-16):
+   Drift catálogo estatus dev vs testing.
+   dev (X2): preparacion, en_proceso, programacion, pruebas, entrega,
+             Programada, terminada
+   testing:  pendiente, asignada, completada, cancelada, terminada
+             (+ 'Programada' creada por InstalacionFactory)
+   B-16 necesita 'en_proceso' y 'pruebas' sembrados en testing antes del push.
+
+7-quinquies. Q-145 (21-oct):
+   Drift de zona horaria app (America/Mexico_City) vs MySQL (+00:00).
+   Fix aplicado en SyncController@pull (parsear a app.timezone).
+   Fase 2: alinear zonas o migrar toda la app a UTC.
 
 7. InstalacionFoto::url() usa disk('public') pero controller guarda
    en disk('local'). El método devuelve path inválido. Fix rápido:
@@ -641,6 +730,6 @@ grep -n "terminada" app/Observers/InstalacionObserver.php
 grep -n "HasApiTokens" app/Models/Usuario.php
 
 ================================================================================
-                      FIN DEL RESUMEN TÉCNICO v2.5.0
-                             20/10/2026
+                      FIN DEL RESUMEN TÉCNICO v2.6.0
+                             21/10/2026
 ================================================================================
