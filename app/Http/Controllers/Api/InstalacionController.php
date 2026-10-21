@@ -237,7 +237,7 @@ public function update(Request $request, $id)
     /**
      * Actualizar checklist
      */
-    public function updateChecklist(Request $request, $id)
+        public function updateChecklist(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
             'check_list' => 'required|array'
@@ -250,22 +250,14 @@ public function update(Request $request, $id)
             ], 422);
         }
 
-        try {
-            $instalacion = Instalacion::findOrFail($id);
-            $instalacion->check_list = json_encode($request->check_list);
-            $instalacion->save();
+        $instalacion = Instalacion::findOrFail($id);
+        $instalacion->check_list = $request->check_list;
+        $instalacion->save();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Checklist actualizado exitosamente',
-                'data' => json_decode($instalacion->check_list)
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al actualizar checklist: ' . $e->getMessage()
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Checklist actualizado exitosamente',
+            'data' => $instalacion->check_list
+        ]);
     }
 }
