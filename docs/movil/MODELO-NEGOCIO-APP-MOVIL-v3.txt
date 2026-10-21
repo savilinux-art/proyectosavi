@@ -835,15 +835,32 @@ Fuera de scope Fase 1:
      - Test mínimo: push a instalación inexistente no rompe ni pierde
        payload ni fuerza reintento del cliente.
 
-  2. Borrado de instalaciones:
-     - FK RESTRICT en instalacion_eventos.instalacion_id
-     - FK RESTRICT en instalacion_fotos.instalacion_id
-     - Sin SoftDeletes en Instalacion.
-     - Regla de negocio: no se borra una instalación ya iniciada
-       (con eventos o fotos). RESTRICT lo hace imposible por esquema.
-     - Instalaciones no iniciadas sí se pueden borrar (no hay RESTRICT
-       activa porque no tienen filas hijas).
-     - Q-140 (F2): mensaje legible en el admin al intentar borrar.
+  2. Borrado de instalaciones (RESTRICT + SoftDeletes, ambos activos):
+
+   FKs:
+     - instalacion_eventos.instalacion_id → RESTRICT (✅ aplicado 2026-10-21)
+     - instalacion_fotos.instalacion_id    → RESTRICT (pendiente B-10)
+
+   Instalacion YA USA SoftDeletes (verificado en modelo).
+
+   Comportamiento resultante:
+     * Instalación sin evidencia:
+         - $inst->delete()       → soft delete, OK
+         - $inst->forceDelete()  → DELETE físico, OK (sin hijos que bloqueen)
+     * Instalación con evidencia:
+         - $inst->delete()       → soft delete, OK (archivar)
+         - $inst->forceDelete()  → QueryException por RESTRICT (histórico protegido)
+
+   Propósito (garantía 1 año + soporte 10+ años):
+     - Force delete bloqueado: la evidencia debe sobrevivir décadas para
+       disputas, garantías, auditorías.
+     - Soft delete permitido: el admin archiva lo terminado para limpiar
+       el listado activo, pero el histórico sigue consultable.
+     - Admin DEBE poder buscar instalaciones archivadas por cliente,
+       folio, fecha, proyecto. Filtro "ver archivadas" en el listado.
+
+   Q-141 (nueva): política de retención indefinida confirmada. No hay
+   purga automática. La evidencia se conserva por tiempo indefinido.
 
 14.6 D-6: Pull — estructura, paginación, since
 
